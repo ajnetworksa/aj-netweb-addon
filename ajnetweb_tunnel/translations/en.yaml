@@ -1,0 +1,23 @@
+configuration:
+  license_key:
+    name: License key
+    description: >-
+      The AJN-XXXXX-… key you received from AJ Netweb. It is only used once to activate
+      this Home Assistant; after activation you may clear it.
+  allow_installer_management:
+    name: Allow installer management
+    description: >-
+      Lets AJ Netweb maintain this system: safe updates (backup first, automatic roll-back), encrypted
+      cloud backups, network checks, standard configuration packages and short-lived technician logins.
+      Every action is listed on the AJ Netweb page in the sidebar. Turn off to allow status reporting
+      only (temporary technician logins are then removed immediately).
+  manage_webrtc_config:
+    name: Manage WebRTC relay settings
+    description: >-
+      Write TURN relay settings to ajnetweb/web_rtc.yaml so live cameras and intercom work on
+      mobile data. Include it with `web_rtc: !include ajnetweb/web_rtc.yaml`.
+  log_level:
+    name: Log level
+  server:
+    name: Server (advanced)
+    description: Only change this if AJ Netweb support asks you to.

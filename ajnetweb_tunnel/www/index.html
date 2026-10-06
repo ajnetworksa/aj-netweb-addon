@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AJ Netweb</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#2f6fed;--ok:#12805c;--warn:#b54708;--bad:#c01048;--chip:#eef2f6}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1b2027;--ink:#e6edf3;--muted:#8b949e;--line:#2a313b;--accent:#5b8ef7;--ok:#3fb68b;--warn:#e0a44a;--bad:#f06a8a;--chip:#232a33}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px;display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+h1{font-size:18px;margin:0}h2{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.hero{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}
+.uid{font:600 26px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em}
+.muted{color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--chip);font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
+dl{display:grid;grid-template-columns:minmax(140px,max-content) 1fr;gap:6px 16px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-all}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:720px){.grid{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:500}
+.ok{color:var(--ok)}.error,.rejected{color:var(--bad)}.running{color:var(--warn)}
+.note{border-left:4px solid var(--accent);padding:10px 14px;background:var(--chip);border-radius:8px}
+a{color:var(--accent)}button{font:inherit;font-size:12px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+  <div class="card hero">
+    <div>
+      <div class="muted">AJ Netweb instance ID</div>
+      <div class="uid" id="uid">—</div>
+      <div class="muted" id="site"></div>
+    </div>
+    <div style="display:grid;gap:8px;justify-items:end">
+      <span class="pill"><span class="dot" id="tunDot"></span><span id="tun">…</span></span>
+      <span class="pill"><span class="dot" id="subDot"></span><span id="sub">…</span></span>
+      <button id="copy">Copy ID</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Remote access</h2>
+      <dl>
+        <dt>Address</dt><dd id="url">—</dd>
+        <dt>Paid until</dt><dd id="paid">—</dd>
+        <dt>Device certificate</dt><dd id="cert">—</dd>
+        <dt>Last check-in</dt><dd id="hb">—</dd>
+        <dt>App version</dt><dd id="ver">—</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h2>This system</h2>
+      <dl>
+        <dt>Home Assistant ID</dt><dd class="mono" id="hauuid">—</dd>
+        <dt>Machine ID</dt><dd class="mono" id="mid">—</dd>
+        <dt>Hostname</dt><dd id="host">—</dd>
+        <dt>Board</dt><dd id="board">—</dd>
+        <dt>Network</dt><dd id="net">—</dd>
+        <dt>Versions</dt><dd id="vers">—</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Installer management</h2>
+    <div class="note" id="mgmt">…</div>
+  </div>
+
+  <div class="card" id="tempCard" hidden>
+    <h2>Temporary installer logins</h2>
+    <div class="note">Your installer created these short-lived Home Assistant logins for a support visit.
+      They are deleted automatically when they expire, or immediately if you switch off
+      <b>Allow installer management</b>.</div>
+    <table><thead><tr><th>User</th><th>Expires</th></tr></thead><tbody id="temps"></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Actions performed by your installer</h2>
+    <table><thead><tr><th>Time</th><th>Action</th><th>Result</th><th>Details</th></tr></thead><tbody id="ops"></tbody></table>
+  </div>
+  <div class="muted" style="text-align:center;font-size:12px">Updated <span id="gen">—</span></div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const dt = v => v ? new Date(v).toLocaleString() : "—";
+function set(id, v){ $(id).textContent = v ?? "—"; }
+async function load(){
+  let s; try { s = await (await fetch("status.json", {cache:"no-store"})).json(); } catch { return; }
+  set("#uid", s.instance_uid || "activating…");
+  set("#site", s.site_name || "");
+  $("#tunDot").className = "dot " + (s.tunnel_up ? "ok" : "bad"); set("#tun", s.tunnel_up ? "Secure link connected" : "Secure link offline");
+  const active = s.subscription === "active";
+  $("#subDot").className = "dot " + (active ? "ok" : s.subscription ? "warn" : ""); set("#sub", active ? "Subscription active" : (s.subscription_message || "Subscription: unknown"));
+  $("#url").innerHTML = s.public_url ? `<a href="${esc(s.public_url)}" target="_blank" rel="noopener">${esc(s.public_url)}</a>` : "—";
+  set("#paid", s.paid_until ? new Date(s.paid_until).toLocaleDateString() : "—");
+  set("#cert", s.cert_not_after ? "valid until " + dt(s.cert_not_after) + " (renews automatically)" : "—");
+  set("#hb", dt(s.last_heartbeat)); set("#ver", s.agent_version);
+  const y = s.system || {};
+  set("#hauuid", y.ha_uuid); set("#mid", y.machine_id); set("#host", y.hostname); set("#board", y.board);
+  $("#net").innerHTML = (y.interfaces || []).map(i => `<div><span class="mono">${esc(i.mac || "")}</span> · ${esc(i.interface)} (${esc(i.type)})${i.primary ? " · primary" : ""}<br><span class="muted">${esc((i.ipv4 && i.ipv4.address || []).join(", "))}</span></div>`).join("") || "—";
+  set("#vers", [y.core && "Core " + y.core, y.supervisor && "Supervisor " + y.supervisor, y.os && "OS " + y.os].filter(Boolean).join(" · "));
+  $("#mgmt").innerHTML = s.management_allowed
+    ? `<b class="ok">Enabled.</b> Your installer can check this system's health and, when needed, restart or update Home Assistant, update add-ons, create backups or read the log. Every action is listed below. You can switch this off at any time: <b>Configuration → Allow installer management</b>, then restart this app.`
+    : `<b>Disabled.</b> Your installer can see that the system is online and its versions, but cannot make any changes. To allow remote maintenance, turn on <b>Configuration → Allow installer management</b> and restart this app.`;
+  $("#ops").innerHTML = (s.oplog || []).map(o => `<tr><td class="muted">${esc(dt(o.ts))}</td><td>${esc(o.label || o.kind)}</td><td class="${esc(o.status)}">${esc(o.status)}</td><td>${esc(o.message || "")}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">No installer actions yet.</td></tr>`;
+  const tl = s.temp_logins || [];
+  $("#tempCard").hidden = !tl.length;
+  $("#temps").innerHTML = tl.map(t => `<tr><td class="mono">${esc(t.username)}</td><td>${esc(dt(t.expires))}</td></tr>`).join("");
+  set("#gen", dt(s.generated_at));
+}
+$("#copy").onclick = () => navigator.clipboard.writeText($("#uid").textContent);
+load(); setInterval(load, 10000);
+</script>
+</body>
+</html>
