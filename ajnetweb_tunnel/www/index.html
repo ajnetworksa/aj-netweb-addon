@@ -91,7 +91,7 @@ const dt = v => v ? new Date(v).toLocaleString() : "—";
 function set(id, v){ $(id).textContent = v ?? "—"; }
 async function load(){
   let s = null;
-  const candidates = ["status.json", "./status.json", "status.json?_=" + Date.now()];
+  const candidates = ["status.json?_=" + Date.now(), "./status.json?_=" + Date.now(), "status.json"];
   for (const u of candidates) {
     try {
       const r = await fetch(u, {cache:"no-store"});

@@ -19,6 +19,7 @@ readonly DATA=/data/ajn
 readonly NGX_CONF=/tmp/ajn-nginx.conf
 readonly LOCAL_PORT=18123
 readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.2}"
+export AGENT_VERSION
 mkdir -p "${DATA}" && chmod 700 "${DATA}"
 # Never act on a stale cached copy of the options (e.g. right after the license key was changed)
 bashio::cache.flush_all 2>/dev/null || rm -rf /tmp/.bashio
@@ -285,8 +286,15 @@ http {
         allow 172.30.32.2;
         deny all;
         root /usr/share/ajn/www;
-        location = /status.json { alias /tmp/ajn-www/status.json; add_header Cache-Control "no-store"; }
-        location / { try_files \$uri /index.html; }
+        location = /status.json {
+            alias /tmp/ajn-www/status.json;
+            add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0";
+            expires -1;
+        }
+        location / {
+            try_files \$uri /index.html;
+            add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
     }
     server {
         listen 127.0.0.1:${LOCAL_PORT};
