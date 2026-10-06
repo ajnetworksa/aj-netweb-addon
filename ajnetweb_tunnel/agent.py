@@ -401,13 +401,28 @@ def execute(cmd: dict) -> tuple[str, str, str]:
         supervisor("POST", "/host/reboot", {}, timeout=timeout)
         return "", "", ""  # already reported
     if kind == "update_agent":
+        me = self_slug()
+        addons_list = supervisor("GET", "/addons").get("addons", [])
+        my_addon = next((a for a in addons_list if a.get("slug") == me), None)
+        if my_addon and not my_addon.get("update_available"):
+            return "ok", f"already on the latest version ({AGENT_VERSION})", ""
+
         with open(PENDING_SELF_UPDATE, "w") as f:
             json.dump({"id": cmd["id"], "from": AGENT_VERSION, "by": cmd.get("created_by")}, f)
         try:
-            supervisor("POST", f"/addons/{self_slug()}/update", {}, timeout=timeout)
+            supervisor("POST", f"/addons/{me}/update", {}, timeout=timeout)
         except APIError as e:
-            if "no update available" in str(e).lower():
+            err = str(e).lower()
+            if "no update available" in err:
                 return "ok", f"already on the latest version ({AGENT_VERSION})", ""
+            if "can't update itself" in err or "cannot update itself" in err:
+                try:
+                    supervisor("POST", "/core/api/services/update/install",
+                               {"entity_id": f"update.{me}_update"}, timeout=timeout)
+                    return "ok", "update triggered via Home Assistant Core", ""
+                except Exception:
+                    latest = (my_addon or {}).get("version_latest") or "latest"
+                    return "ok", f"update available ({latest}) - click Update in Home Assistant Settings -> Add-ons", ""
             raise
         finally:
             if os.path.exists(PENDING_SELF_UPDATE):
@@ -478,6 +493,10 @@ def finish_pending_self_update() -> None:
 # ------------------------------------------------------------------ local status page
 def write_status() -> None:
     os.makedirs(WWW, exist_ok=True)
+    try:
+        os.chmod(WWW, 0o755)
+    except OSError:
+        pass
     st = state()
     hb = {}
     try:
@@ -512,6 +531,10 @@ def write_status() -> None:
     tmp = f"{WWW}/status.json.tmp"
     with open(tmp, "w") as f:
         json.dump(out, f)
+    try:
+        os.chmod(tmp, 0o644)
+    except OSError:
+        pass
     os.replace(tmp, f"{WWW}/status.json")
 
 
