@@ -124,10 +124,31 @@ def supervisor(method: str, path: str, body: dict | None = None, timeout: int = 
     return data.get("data", data) if isinstance(data, dict) else data
 
 
-def server(method: str, path: str, body: dict | None = None, timeout: int = 30) -> dict:
+def _get_server_url(path: str) -> str:
+    s = SERVER
+    if not s.startswith("http://") and not s.startswith("https://"):
+        s = f"https://{s}"
+    return f"{s.rstrip('/')}{path}"
+
+
+def _get_ssl_context() -> ssl.SSLContext:
     ctx = ssl.create_default_context()
-    ctx.load_cert_chain(f"{DATA}/client.crt", f"{DATA}/client.key")   # re-read: survives renewals
-    req = urllib.request.Request(f"https://{SERVER}{path}", method=method,
+    s = SERVER
+    if "://" in s:
+        s = s.split("://", 1)[1]
+    host = s.split("/")[0].split(":")[0]
+    import re
+    if re.match(r"^\d+\.\d+\.\d+\.\d+$", host) or host in ("localhost", "127.0.0.1"):
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    if os.path.exists(f"{DATA}/client.crt") and os.path.exists(f"{DATA}/client.key"):
+        ctx.load_cert_chain(f"{DATA}/client.crt", f"{DATA}/client.key")   # re-read: survives renewals
+    return ctx
+
+
+def server(method: str, path: str, body: dict | None = None, timeout: int = 30) -> dict:
+    ctx = _get_ssl_context()
+    req = urllib.request.Request(_get_server_url(path), method=method,
                                  data=json.dumps(body, default=str).encode() if body is not None else None,
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:

@@ -3,8 +3,8 @@ FROM $BUILD_FROM
 
 ARG BUILD_ARCH
 ARG FRP_VERSION=0.71.0
-ARG AJN_SERVER=api.yourname.dpdns.org
-ARG AJN_AGENT_VERSION=1.2.0
+ARG AJN_SERVER=api.ajnetweb.dpdns.org
+ARG AJN_AGENT_VERSION=1.2.1
 
 # nginx: local header adapter in front of HA   openssl: key + CSR generation (key never leaves /data)
 RUN apk add --no-cache nginx openssl python3 \

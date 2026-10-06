@@ -464,12 +464,21 @@ class ServerConn:
     """Streaming HTTPS to the AJ Netweb API with the device certificate (for large transfers)."""
 
     def __init__(self, server: str, data_dir: str = DATA):
-        host, _, port = server.partition(":")
+        s = server
+        if "://" in s:
+            s = s.split("://", 1)[1]
+        s = s.rstrip("/")
+        host, _, port = s.partition(":")
         self.host, self.port, self.data_dir = host, int(port or 443), data_dir
 
     def _conn(self, timeout: int = 3600):
         ctx = ssl.create_default_context()
-        ctx.load_cert_chain(f"{self.data_dir}/client.crt", f"{self.data_dir}/client.key")
+        import re
+        if re.match(r"^\d+\.\d+\.\d+\.\d+$", self.host) or self.host in ("localhost", "127.0.0.1"):
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        if os.path.exists(f"{self.data_dir}/client.crt") and os.path.exists(f"{self.data_dir}/client.key"):
+            ctx.load_cert_chain(f"{self.data_dir}/client.crt", f"{self.data_dir}/client.key")
         return http.client.HTTPSConnection(self.host, self.port, context=ctx, timeout=timeout)
 
     def download(self, path: str) -> int:

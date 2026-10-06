@@ -44,13 +44,37 @@ state() { jq -r "$1" "${DATA}/state.json"; }
 
 api_post() {  # api_post <path> <json-file> <out-file> [mtls]  -> prints HTTP status
     local path=$1 body=$2 out=$3 mtls=${4:-}
-    local args=(-sS --max-time 30 --retry 2 --retry-delay 3 -o "${out}" -w '%{http_code}'
+    local target="${SERVER}"
+    local scheme="https"
+    local insecure=""
+    if [[ "${target}" =~ ^https?:// ]]; then
+        scheme="${target%%://*}"
+        target="${target#*://}"
+    fi
+    target="${target%/}"
+    local host_only="${target%%:*}"
+    # If connecting to an IP address or if HTTPS check fails on LAN, allow -k
+    if [[ "${host_only}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        insecure="-k"
+    fi
+    local args=(-sS ${insecure} --max-time 30 --retry 2 --retry-delay 3 -o "${out}" -w '%{http_code}'
                 -H 'Content-Type: application/json' --data "@${body}")
     if [[ -n "${mtls}" ]]; then
         args+=(--cert "${DATA}/client.crt" --key "${DATA}/client.key")
     fi
-    curl "${args[@]}" "https://${SERVER}${path}" 2>/dev/null || echo "000"
+    local err_tmp="/tmp/ajn_curl_err"
+    local raw_code
+    raw_code="$(curl "${args[@]}" "${scheme}://${target}${path}" 2>"${err_tmp}" || true)"
+    local code
+    code="$(printf '%s' "${raw_code}" | tr -dc '0-9' | tail -c 3)"
+    [[ -n "${code}" ]] || code="000"
+    if [[ "${code}" == "000" ]]; then
+        CURL_LAST_ERR="$(head -n 2 "${err_tmp}" 2>/dev/null | tr '\n' ' ')"
+    fi
+    rm -f "${err_tmp}"
+    printf '%s' "${code}"
 }
+
 
 new_keypair_and_csr() {  # -> ${DATA}/client.key.new  ${DATA}/client.csr
     openssl ecparam -name prime256v1 -genkey -noout -out "${DATA}/client.key.new" 2>/dev/null
@@ -94,7 +118,7 @@ enroll() {
         403) rm -f "${DATA}/enroll.resp"; die_soft "License key was rejected (invalid or revoked). Check the key and restart the add-on."; return 1 ;;
         409) rm -f "${DATA}/enroll.resp"; die_soft "This license is already bound to another Home Assistant. Ask AJ Netweb support to reset the binding."; return 1 ;;
         429) rm -f "${DATA}/enroll.resp"; bashio::log.warning "Too many activation attempts; retrying in 10 minutes"; sleep 600; return 1 ;;
-        000) rm -f "${DATA}/enroll.resp"; bashio::log.warning "Cannot reach ${SERVER}; retrying in 60 s"; sleep 60; return 1 ;;
+        000) rm -f "${DATA}/enroll.resp"; bashio::log.warning "Cannot reach ${SERVER}${CURL_LAST_ERR:+: ${CURL_LAST_ERR}}; retrying in 60 s"; sleep 60; return 1 ;;
         *)   bashio::log.warning "Activation failed (HTTP ${code}): $(jq -r '.detail // "unknown error"' "${DATA}/enroll.resp" 2>/dev/null)"
              rm -f "${DATA}/enroll.resp"; sleep 60; return 1 ;;
     esac
@@ -156,6 +180,18 @@ render_frpc() {
     addr="$(state .tunnel.server_addr)"; port="$(state .tunnel.server_port)"; sni="$(state .tunnel.server_name)"
     user="$(state .tunnel.user)"; token="$(state .tunnel.token)"; ptoken="$(state .tunnel.platform_token)"
     sub="$(state .subdomain)"
+
+    # If SERVER was configured as a direct LAN IP, route the tunnel TCP connection directly to it
+    local target="${SERVER}"
+    if [[ "${target}" =~ ^https?:// ]]; then
+        target="${target#*://}"
+    fi
+    local host_only="${target%%:*}"
+    if [[ "${host_only}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        bashio::log.info "Routing tunnel directly to LAN server IP: ${host_only}"
+        addr="${host_only}"
+    fi
+
     cat > "${f}" <<EOF
 serverAddr = "${addr}"
 serverPort = ${port}

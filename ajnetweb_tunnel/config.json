@@ -1,9 +1,9 @@
 {
   "name": "AJ Netweb Remote Access",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "slug": "ajnetweb_tunnel",
   "description": "Secure remote access, live cameras and two-way intercom for your home through AJ Netweb.",
-  "url": "https://yourname.dpdns.org",
+  "url": "https://ajnetweb.dpdns.org",
   "arch": [
     "aarch64",
     "amd64"
@@ -20,16 +20,17 @@
   ],
   "options": {
     "license_key": "",
+    "server": "api.ajnetweb.dpdns.org",
     "allow_installer_management": true,
     "manage_webrtc_config": true,
     "log_level": "info"
   },
   "schema": {
     "license_key": "password",
+    "server": "str?",
     "allow_installer_management": "bool",
     "manage_webrtc_config": "bool",
-    "log_level": "list(debug|info|warning|error)",
-    "server": "str?"
+    "log_level": "list(debug|info|warning|error)"
   },
   "ingress": true,
   "ingress_port": 8099,

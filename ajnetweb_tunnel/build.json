@@ -5,7 +5,7 @@
   },
   "args": {
     "FRP_VERSION": "0.71.0",
-    "AJN_SERVER": "api.yourname.dpdns.org",
-    "AJN_AGENT_VERSION": "1.2.0"
+    "AJN_SERVER": "api.ajnetweb.dpdns.org",
+    "AJN_AGENT_VERSION": "1.2.1"
   }
 }
