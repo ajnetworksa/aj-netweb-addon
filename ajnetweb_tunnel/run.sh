@@ -18,7 +18,7 @@ umask 077
 readonly DATA=/data/ajn
 readonly NGX_CONF=/tmp/ajn-nginx.conf
 readonly LOCAL_PORT=18123
-readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.0.0}"
+readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.2}"
 mkdir -p "${DATA}" && chmod 700 "${DATA}"
 # Never act on a stale cached copy of the options (e.g. right after the license key was changed)
 bashio::cache.flush_all 2>/dev/null || rm -rf /tmp/.bashio
@@ -101,6 +101,29 @@ HA_PORT="$(bashio::core.port 2>/dev/null || echo 8123)"
 if [[ "$(bashio::core.ssl 2>/dev/null)" == "true" ]]; then HA_SCHEME=https; else HA_SCHEME=http; fi
 
 # -------------------------------------------------------------- activation
+get_host_hardware_signature() {
+    local pm="" mid=""
+    if [[ -n "${SUPERVISOR_TOKEN:-}" ]]; then
+        pm="$(curl -s -m 4 -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/network/info 2>/dev/null \
+            | jq -r '(.data.interfaces[] | select(.primary == true) | .mac) // (.data.interfaces[0].mac) // empty' 2>/dev/null)"
+        mid="$(curl -s -m 4 -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/host/info 2>/dev/null \
+            | jq -r '.data.machine_id // empty' 2>/dev/null)"
+    fi
+    if [[ -z "${pm}" ]]; then
+        for f in /sys/class/net/eth*/address /sys/class/net/en*/address /sys/class/net/wlan*/address; do
+            if [[ -r "${f}" ]]; then
+                pm="$(cat "${f}" 2>/dev/null | tr -d '[:space:]')"
+                [[ -n "${pm}" ]] && break
+            fi
+        done
+    fi
+    if [[ -z "${mid}" ]]; then
+        [[ -r /etc/machine-id ]] && mid="$(cat /etc/machine-id 2>/dev/null | tr -d '[:space:]')"
+        [[ -z "${mid}" && -r "${DATA}/install_id" ]] && mid="$(cat "${DATA}/install_id" 2>/dev/null | tr -d '[:space:]')"
+    fi
+    printf '%s %s' "${pm}" "${mid}"
+}
+
 enroll() {
     if [[ -z "${LICENSE}" ]]; then
         die_soft "No license key configured. Open the add-on Configuration tab, enter your AJ Netweb license key and restart."
@@ -110,14 +133,7 @@ enroll() {
     new_keypair_and_csr
 
     local primary_mac="" machine_id=""
-    for f in /sys/class/net/eth*/address /sys/class/net/en*/address /sys/class/net/wlan*/address; do
-        if [[ -r "${f}" ]]; then
-            primary_mac="$(cat "${f}" 2>/dev/null | tr -d '[:space:]')"
-            [[ -n "${primary_mac}" ]] && break
-        fi
-    done
-    [[ -r /etc/machine-id ]] && machine_id="$(cat /etc/machine-id 2>/dev/null | tr -d '[:space:]')"
-    [[ -z "${machine_id}" && -r "${DATA}/install_id" ]] && machine_id="$(cat "${DATA}/install_id" 2>/dev/null | tr -d '[:space:]')"
+    read -r primary_mac machine_id <<< "$(get_host_hardware_signature)"
 
     LK="${LICENSE}" IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" PM="${primary_mac}" MID="${machine_id}" \
         jq -n --rawfile csr "${DATA}/client.csr" \
@@ -394,14 +410,7 @@ heartbeat_loop() {
         up=false
         pgrep -x frpc >/dev/null && up=true
         local primary_mac="" machine_id=""
-        for f in /sys/class/net/eth*/address /sys/class/net/en*/address /sys/class/net/wlan*/address; do
-            if [[ -r "${f}" ]]; then
-                primary_mac="$(cat "${f}" 2>/dev/null | tr -d '[:space:]')"
-                [[ -n "${primary_mac}" ]] && break
-            fi
-        done
-        [[ -r /etc/machine-id ]] && machine_id="$(cat /etc/machine-id 2>/dev/null | tr -d '[:space:]')"
-        [[ -z "${machine_id}" && -r "${DATA}/install_id" ]] && machine_id="$(cat "${DATA}/install_id" 2>/dev/null | tr -d '[:space:]')"
+        read -r primary_mac machine_id <<< "$(get_host_hardware_signature)"
 
         IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" UP="${up}" UT="$((now - started))" PM="${primary_mac}" MID="${machine_id}" \
             jq -n '{install_id: env.IID, tunnel_up: (env.UP == "true"), agent_version: env.AV,
@@ -470,7 +479,7 @@ except Exception:
     pass
 out = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    'agent_version': os.environ.get('AGENT_VERSION', '1.2.1'),
+    'agent_version': os.environ.get('AGENT_VERSION', '1.2.2'),
     'instance_uid': st.get('instance_uid'),
     'site_name': st.get('site_name'),
     'public_url': st.get('public_url'),
