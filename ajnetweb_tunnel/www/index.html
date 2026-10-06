@@ -35,6 +35,7 @@ a{color:var(--accent)}button{font:inherit;font-size:12px;padding:3px 8px;border-
     <div style="display:grid;gap:8px;justify-items:end">
       <span class="pill"><span class="dot" id="tunDot"></span><span id="tun">…</span></span>
       <span class="pill"><span class="dot" id="subDot"></span><span id="sub">…</span></span>
+      <span class="pill"><span class="dot" id="pingDot"></span><span id="ping">…</span></span>
       <button id="copy">Copy ID</button>
     </div>
   </div>
@@ -44,6 +45,7 @@ a{color:var(--accent)}button{font:inherit;font-size:12px;padding:3px 8px;border-
       <h2>Remote access</h2>
       <dl>
         <dt>Address</dt><dd id="url">—</dd>
+        <dt>Server Ping</dt><dd id="lat">—</dd>
         <dt>Paid until</dt><dd id="paid">—</dd>
         <dt>Device certificate</dt><dd id="cert">—</dd>
         <dt>Last check-in</dt><dd id="hb">—</dd>
@@ -88,12 +90,38 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const dt = v => v ? new Date(v).toLocaleString() : "—";
 function set(id, v){ $(id).textContent = v ?? "—"; }
 async function load(){
-  let s; try { s = await (await fetch("status.json", {cache:"no-store"})).json(); } catch { return; }
+  let s = null;
+  const candidates = ["status.json", "./status.json", "status.json?_=" + Date.now()];
+  for (const u of candidates) {
+    try {
+      const r = await fetch(u, {cache:"no-store"});
+      if (r.ok) { s = await r.json(); break; }
+    } catch (e) {
+      // try next candidate
+    }
+  }
+  if (!s) {
+    console.warn("AJ Netweb: status.json not ready yet");
+    return;
+  }
   set("#uid", s.instance_uid || "activating…");
   set("#site", s.site_name || "");
   $("#tunDot").className = "dot " + (s.tunnel_up ? "ok" : "bad"); set("#tun", s.tunnel_up ? "Secure link connected" : "Secure link offline");
   const active = s.subscription === "active";
   $("#subDot").className = "dot " + (active ? "ok" : s.subscription ? "warn" : ""); set("#sub", active ? "Subscription active" : (s.subscription_message || "Subscription: unknown"));
+  
+  const lat = s.hub_latency_ms;
+  if (lat !== undefined && lat !== null && !isNaN(Number(lat))) {
+    const latNum = Math.round(Number(lat));
+    $("#pingDot").className = "dot " + (latNum < 80 ? "ok" : latNum < 200 ? "warn" : "bad");
+    set("#ping", `Ping: ${latNum} ms`);
+    set("#lat", `${latNum} ms`);
+  } else {
+    $("#pingDot").className = "dot";
+    set("#ping", "Ping: …");
+    set("#lat", "—");
+  }
+
   $("#url").innerHTML = s.public_url ? `<a href="${esc(s.public_url)}" target="_blank" rel="noopener">${esc(s.public_url)}</a>` : "—";
   set("#paid", s.paid_until ? new Date(s.paid_until).toLocaleDateString() : "—");
   set("#cert", s.cert_not_after ? "valid until " + dt(s.cert_not_after) + " (renews automatically)" : "—");
@@ -112,7 +140,7 @@ async function load(){
   set("#gen", dt(s.generated_at));
 }
 $("#copy").onclick = () => navigator.clipboard.writeText($("#uid").textContent);
-load(); setInterval(load, 10000);
+load(); setInterval(load, 5000);
 </script>
 </body>
 </html>

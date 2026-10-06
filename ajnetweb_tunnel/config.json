@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Remote Access",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "slug": "ajnetweb_tunnel",
   "description": "Secure remote access, live cameras and two-way intercom for your home through AJ Netweb.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
@@ -23,6 +23,7 @@
     "server": "",
     "allow_installer_management": true,
     "manage_webrtc_config": true,
+    "auto_update": false,
     "log_level": "info"
   },
   "schema": {
@@ -30,6 +31,7 @@
     "server": "str?",
     "allow_installer_management": "bool",
     "manage_webrtc_config": "bool",
+    "auto_update": "bool?",
     "log_level": "list(debug|info|warning|error)"
   },
   "ingress": true,

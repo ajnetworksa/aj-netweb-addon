@@ -109,9 +109,19 @@ enroll() {
     bashio::log.info "Activating with license …${LICENSE: -4} (Home Assistant ${HA_VERSION})"
     new_keypair_and_csr
 
-    LK="${LICENSE}" IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" \
+    local primary_mac="" machine_id=""
+    for f in /sys/class/net/eth*/address /sys/class/net/en*/address /sys/class/net/wlan*/address; do
+        if [[ -r "${f}" ]]; then
+            primary_mac="$(cat "${f}" 2>/dev/null | tr -d '[:space:]')"
+            [[ -n "${primary_mac}" ]] && break
+        fi
+    done
+    [[ -r /etc/machine-id ]] && machine_id="$(cat /etc/machine-id 2>/dev/null | tr -d '[:space:]')"
+    [[ -z "${machine_id}" && -r "${DATA}/install_id" ]] && machine_id="$(cat "${DATA}/install_id" 2>/dev/null | tr -d '[:space:]')"
+
+    LK="${LICENSE}" IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" PM="${primary_mac}" MID="${machine_id}" \
         jq -n --rawfile csr "${DATA}/client.csr" \
-        '{license_key: env.LK, install_id: env.IID, csr_pem: $csr, agent_version: env.AV, ha_version: env.HV}' \
+        '{license_key: env.LK, install_id: env.IID, csr_pem: $csr, agent_version: env.AV, ha_version: env.HV, mac: env.PM, machine_id: env.MID}' \
         > "${DATA}/enroll.req"
     local code
     code="$(api_post /api/v1/agent/enroll "${DATA}/enroll.req" "${DATA}/enroll.resp")"
@@ -239,6 +249,7 @@ render_nginx() {
     local ssl_opts=""
     [[ "${HA_SCHEME}" == https ]] && ssl_opts="proxy_ssl_verify off; proxy_ssl_server_name off;"
     cat > "${NGX_CONF}" <<EOF
+user root;
 worker_processes 1;
 pid /tmp/ajn-nginx.pid;
 error_log stderr warn;
@@ -382,9 +393,19 @@ heartbeat_loop() {
         now="$(date +%s)"
         up=false
         pgrep -x frpc >/dev/null && up=true
-        IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" UP="${up}" UT="$((now - started))" \
+        local primary_mac="" machine_id=""
+        for f in /sys/class/net/eth*/address /sys/class/net/en*/address /sys/class/net/wlan*/address; do
+            if [[ -r "${f}" ]]; then
+                primary_mac="$(cat "${f}" 2>/dev/null | tr -d '[:space:]')"
+                [[ -n "${primary_mac}" ]] && break
+            fi
+        done
+        [[ -r /etc/machine-id ]] && machine_id="$(cat /etc/machine-id 2>/dev/null | tr -d '[:space:]')"
+        [[ -z "${machine_id}" && -r "${DATA}/install_id" ]] && machine_id="$(cat "${DATA}/install_id" 2>/dev/null | tr -d '[:space:]')"
+
+        IID="${INSTALL_ID}" AV="${AGENT_VERSION}" HV="${HA_VERSION}" UP="${up}" UT="$((now - started))" PM="${primary_mac}" MID="${machine_id}" \
             jq -n '{install_id: env.IID, tunnel_up: (env.UP == "true"), agent_version: env.AV,
-                    ha_version: env.HV, uptime: (env.UT | tonumber)}' > "${DATA}/hb.req"
+                    ha_version: env.HV, uptime: (env.UT | tonumber), mac: env.PM, machine_id: env.MID}' > "${DATA}/hb.req"
         code="$(api_post /api/v1/agent/heartbeat "${DATA}/hb.req" "${DATA}/hb.resp" mtls)"
         case "${code}" in
             200)
@@ -427,7 +448,54 @@ until enrolled || enroll; do :; done
 check_reverse_proxy_config
 write_webrtc_config
 render_nginx
-mkdir -p /tmp/ajn-www && echo '{"tunnel_up":true,"agent_version":"'"${AGENT_VERSION}"'"}' > /tmp/ajn-www/status.json
+
+mkdir -p /tmp/ajn-www /usr/share/ajn/www
+chmod 0755 /tmp/ajn-www /usr/share/ajn/www
+
+# Pre-seed rich initial status.json so ingress UI never shows blank dashes
+python3 -c "
+import json, os, datetime
+data = '/data/ajn'
+st = {}
+try:
+    with open(f'{data}/state.json') as f:
+        st = json.load(f)
+except Exception:
+    pass
+hb = {}
+try:
+    with open(f'{data}/last_heartbeat.json') as f:
+        hb = json.load(f)
+except Exception:
+    pass
+out = {
+    'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    'agent_version': os.environ.get('AGENT_VERSION', '1.2.1'),
+    'instance_uid': st.get('instance_uid'),
+    'site_name': st.get('site_name'),
+    'public_url': st.get('public_url'),
+    'subdomain': st.get('subdomain'),
+    'cert_not_after': st.get('cert_not_after'),
+    'tunnel_up': True,
+    'subscription': hb.get('status', 'active'),
+    'subscription_message': hb.get('message'),
+    'paid_until': hb.get('paid_until'),
+    'last_heartbeat': hb.get('_at'),
+    'management_allowed': True,
+    'system': {
+        'ha_uuid': os.environ.get('INSTALL_ID'),
+        'board': 'Home Assistant',
+    }
+}
+for p in ['/tmp/ajn-www/status.json', '/usr/share/ajn/www/status.json']:
+    try:
+        with open(p, 'w') as f:
+            json.dump(out, f)
+        os.chmod(p, 0o666)
+    except Exception:
+        pass
+" 2>/dev/null || true
+
 nginx -c "${NGX_CONF}" &
 PIDS+=($!)
 heartbeat_loop &

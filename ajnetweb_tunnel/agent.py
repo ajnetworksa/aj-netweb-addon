@@ -54,6 +54,18 @@ _last_diag: dict = {}
 _state_lock = threading.Lock()
 _last_telemetry: dict = {}
 _last_result: dict = {"ok": None, "at": None, "error": None}
+_current_latency_ms: float | None = None
+_last_latency_check: float = 0.0
+
+
+def measure_latency() -> float | None:
+    global _current_latency_ms, _last_latency_check
+    st = state()
+    lat = safe(lambda: F.hub_latency(st), None)
+    if lat is not None:
+        _current_latency_ms = lat
+        _last_latency_check = time.time()
+    return _current_latency_ms
 
 
 def log(msg: str) -> None:
@@ -212,10 +224,10 @@ def collect() -> dict:
                                     for c in cams[:60]]
         entities["unavailable_list"] = [{"entity_id": e["entity_id"], "name": name(e)} for e in unavailable[:40]]
 
-    return {
+    res = {
         "collected_at": now_iso(),
         "agent": {"version": AGENT_VERSION, "management_allowed": allowed, "uptime": int(time.time() - STARTED),
-                  "instance_uid": state().get("instance_uid"), "hub_latency_ms": safe(lambda: F.hub_latency(state())),
+                  "instance_uid": state().get("instance_uid"), "hub_latency_ms": measure_latency() or _current_latency_ms,
                   "temp_logins": len(F._load_temp())},
         "info": pick(info, "supervisor", "homeassistant", "hassos", "docker", "hostname", "operating_system",
                      "machine", "machine_id", "arch", "state", "supported", "channel", "timezone"),
@@ -247,6 +259,22 @@ def collect() -> dict:
         "devices": devices,
         "diagnostics": _last_diag if allowed else {},
     }
+    try:
+        sys_snap = {
+            "ha_uuid": os.environ.get("AJN_INSTALL_ID"),
+            "machine_id": (info or {}).get("machine_id"),
+            "hostname": (info or {}).get("hostname"),
+            "board": (os_info or {}).get("board") or (info or {}).get("machine"),
+            "interfaces": (net or {}).get("interfaces") or [],
+            "core": (core or {}).get("version"),
+            "supervisor": (sup or {}).get("version"),
+            "os": (os_info or {}).get("version"),
+        }
+        with open(f"{DATA}/last_system.json", "w") as f:
+            json.dump(sys_snap, f)
+    except OSError:
+        pass
+    return res
 
 
 def send_telemetry() -> None:
@@ -490,13 +518,34 @@ def finish_pending_self_update() -> None:
            "status": "ok" if ok else "error", "message": msg})
 
 
+# ------------------------------------------------------------------ auto-updater
+def auto_update_loop() -> None:
+    time.sleep(120)  # grace period after startup
+    while True:
+        try:
+            if options().get("auto_update", False):
+                slug = self_slug()
+                if slug:
+                    info = safe(lambda: supervisor("GET", f"/addons/{slug}/info"), {})
+                    if info and info.get("update_available"):
+                        cur_v = info.get("version")
+                        latest_v = info.get("version_latest")
+                        log(f"auto-update: new version detected ({cur_v} -> {latest_v}). Initiating automated update...")
+                        try:
+                            me = slug.replace("-", "_")
+                            supervisor("POST", "/core/api/services/update/install",
+                                       {"entity_id": f"update.{me}_update"}, timeout=300)
+                            oplog({"kind": "update_agent", "label": "Auto-update add-on", "by": "auto-updater",
+                                   "status": "ok", "message": f"Update triggered: {cur_v} -> {latest_v}"})
+                        except Exception as ex:
+                            log(f"auto-update failed: {ex}")
+        except Exception as e:
+            log(f"auto-update check error: {e}")
+        time.sleep(21600)  # check every 6 hours
+
+
 # ------------------------------------------------------------------ local status page
 def write_status() -> None:
-    os.makedirs(WWW, exist_ok=True)
-    try:
-        os.chmod(WWW, 0o755)
-    except OSError:
-        pass
     st = state()
     hb = {}
     try:
@@ -507,43 +556,69 @@ def write_status() -> None:
     tunnel_up = subprocess.run(["pgrep", "-x", "frpc"], capture_output=True).returncode == 0
     with _state_lock:
         t = _last_telemetry
+    sys_cached = {}
+    try:
+        if os.path.exists(f"{DATA}/last_system.json"):
+            with open(f"{DATA}/last_system.json") as f:
+                sys_cached = json.load(f)
+    except Exception:
+        pass
+
+    global _last_latency_check, _current_latency_ms
+    if _current_latency_ms is None or (time.time() - _last_latency_check > 30):
+        measure_latency()
+
     out = {
         "generated_at": now_iso(), "agent_version": AGENT_VERSION,
         "instance_uid": st.get("instance_uid"), "site_name": st.get("site_name"),
         "public_url": st.get("public_url"), "subdomain": st.get("subdomain"),
         "cert_not_after": st.get("cert_not_after"), "tunnel_up": tunnel_up,
-        "subscription": hb.get("status"), "subscription_message": hb.get("message"),
+        "subscription": hb.get("status", "active"), "subscription_message": hb.get("message"),
         "paid_until": hb.get("paid_until"), "last_heartbeat": hb.get("_at"),
         "management_allowed": management_allowed(),
+        "hub_latency_ms": _current_latency_ms,
         "telemetry_sent": _last_result,
         "system": {
-            "ha_uuid": os.environ.get("AJN_INSTALL_ID"),
-            "machine_id": (t.get("info") or {}).get("machine_id"),
-            "hostname": (t.get("info") or {}).get("hostname"),
-            "board": (t.get("os") or {}).get("board") or (t.get("info") or {}).get("machine"),
-            "interfaces": (t.get("network") or {}).get("interfaces") or [],
-            "core": (t.get("core") or {}).get("version"), "supervisor": (t.get("supervisor") or {}).get("version"),
-            "os": (t.get("os") or {}).get("version"),
+            "ha_uuid": os.environ.get("AJN_INSTALL_ID") or sys_cached.get("ha_uuid"),
+            "machine_id": (t.get("info") or {}).get("machine_id") or sys_cached.get("machine_id"),
+            "hostname": (t.get("info") or {}).get("hostname") or sys_cached.get("hostname"),
+            "board": (t.get("os") or {}).get("board") or (t.get("info") or {}).get("machine") or sys_cached.get("board"),
+            "interfaces": (t.get("network") or {}).get("interfaces") or sys_cached.get("interfaces") or [],
+            "core": (t.get("core") or {}).get("version") or sys_cached.get("core"),
+            "supervisor": (t.get("supervisor") or {}).get("version") or sys_cached.get("supervisor"),
+            "os": (t.get("os") or {}).get("version") or sys_cached.get("os"),
         },
         "oplog": read_oplog(),
         "temp_logins": [{"username": u["username"], "expires": u["expires"]} for u in F._load_temp()],
     }
-    tmp = f"{WWW}/status.json.tmp"
-    with open(tmp, "w") as f:
-        json.dump(out, f)
-    try:
-        os.chmod(tmp, 0o644)
-    except OSError:
-        pass
-    os.replace(tmp, f"{WWW}/status.json")
+
+    for target_dir in [WWW, "/usr/share/ajn/www"]:
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            os.chmod(target_dir, 0o755)
+            tmp = f"{target_dir}/status.json.tmp"
+            with open(tmp, "w") as f:
+                json.dump(out, f)
+            os.chmod(tmp, 0o666)
+            os.replace(tmp, f"{target_dir}/status.json")
+            os.chmod(f"{target_dir}/status.json", 0o666)
+        except OSError:
+            pass
 
 
 def main() -> None:
+    # 1. Immediately write status on startup so ingress page loads with complete fields
+    try:
+        write_status()
+    except Exception as e:
+        log(f"initial status write: {e}")
+
     q: "queue.Queue[dict]" = queue.Queue()
     fast: "queue.Queue[dict]" = queue.Queue()
     threading.Thread(target=worker, args=(q,), daemon=True).start()
     threading.Thread(target=worker, args=(fast,), daemon=True).start()
     threading.Thread(target=poll_commands, args=(q, fast), daemon=True).start()
+    threading.Thread(target=auto_update_loop, daemon=True).start()
     finish_pending_self_update()
     next_tel = next_cleanup = 0.0
     while True:

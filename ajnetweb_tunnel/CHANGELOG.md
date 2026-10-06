@@ -1,6 +1,11 @@
 # Changelog
 
-## 1.2.1
+## 1.2.2
+- Fix sidebar ingress status page loading (`Permission denied` and empty fields).
+- Add live Server Ping / Latency metric badge in the UI and telemetry.
+- Hardware binding: report hardware MAC address and machine ID during enrollment and heartbeats.
+- Automatic add-on update engine option in configuration.
+- Immediate status pre-seeding on container startup.
 - Fix activation HTTP status parsing (`000000` error code bug).
 - Support direct LAN IP server addresses with automatic TLS trust and LAN tunnel routing.
 - Improved connectivity error reporting during activation and heartbeats.
