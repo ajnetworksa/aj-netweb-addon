@@ -4,7 +4,7 @@
 - Fix activation HTTP status parsing (`000000` error code bug).
 - Support direct LAN IP server addresses with automatic TLS trust and LAN tunnel routing.
 - Improved connectivity error reporting during activation and heartbeats.
-- Default server set to `api.ajnetweb.dpdns.org`.
+- Configurable server address with direct LAN IP routing support.
 
 ## 1.2.0
 - Safe Home Assistant updates: a backup is taken first and the update is rolled back

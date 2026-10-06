@@ -8,7 +8,7 @@ without opening ports on your router.
 1. Install this app/add-on and open the **Configuration** tab.
 2. Paste the **license key** you received from AJ Netweb (`AJN-XXXXX-XXXXX-…`) and **Save**.
 3. **Start** the add-on and open the **Log** tab. After a few seconds you'll see
-   `Activated. Your remote address: https://<your-home>.ajnetweb.dpdns.org`.
+   `Activated. Your remote address: https://<your-home>.<your-domain>`.
 4. Add these lines to `configuration.yaml` (File editor or Studio Code Server) and restart
    Home Assistant:
 

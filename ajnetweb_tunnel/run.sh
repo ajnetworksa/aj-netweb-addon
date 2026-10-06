@@ -27,6 +27,11 @@ LOG_LEVEL="$(bashio::config 'log_level' 'info')"
 bashio::log.level "${LOG_LEVEL}"
 
 SERVER="$(bashio::config 'server' "${AJN_SERVER}")"
+SERVER="$(printf '%s' "${SERVER}" | tr -d '[:space:]')"
+if [[ -z "${SERVER}" ]]; then
+    die_soft "No server configured. Open the add-on Configuration tab, enter your server address and restart."
+    exit 1
+fi
 LICENSE="$(bashio::config 'license_key' '')"
 LICENSE="$(printf '%s' "${LICENSE}" | tr -d '[:space:]')"
 
@@ -422,6 +427,7 @@ until enrolled || enroll; do :; done
 check_reverse_proxy_config
 write_webrtc_config
 render_nginx
+mkdir -p /tmp/ajn-www && echo '{"tunnel_up":true,"agent_version":"'"${AGENT_VERSION}"'"}' > /tmp/ajn-www/status.json
 nginx -c "${NGX_CONF}" &
 PIDS+=($!)
 heartbeat_loop &
