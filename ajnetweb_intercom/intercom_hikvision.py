@@ -36,17 +36,17 @@ class HikvisionIntercomClient:
             self._session.auth = HTTPDigestAuth(self.username, self.password)
         return self._session
 
-    def _request(self, method: str, path: str, data=None, headers=None, timeout=None, stream=False):
+    def _request(self, method: str, path: str, data=None, json=None, headers=None, timeout=None, stream=False):
         url = f"{self.base_url}{path}"
         sess = self._get_session()
         to = timeout or self.timeout
         hdrs = headers or {}
 
         try:
-            resp = sess.request(method, url, data=data, headers=hdrs, timeout=to, stream=stream)
+            resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
             if resp.status_code == 401 and isinstance(sess.auth, HTTPDigestAuth):
                 sess.auth = HTTPBasicAuth(self.username, self.password)
-                resp = sess.request(method, url, data=data, headers=hdrs, timeout=to, stream=stream)
+                resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
             return resp
         except Exception as e:
             log.warning("Hikvision intercom request failed (%s %s): %s", method, path, e)
@@ -203,3 +203,161 @@ class HikvisionIntercomClient:
                     buf = ""
         except Exception as e:
             log.warning("Hikvision alertStream disconnected: %s", e)
+
+    # ---------------------------------------------------------------- Access Control & Guest QR / PIN Credentials
+    # Supported terminals: DS-K1T502, DS-K1T671, DS-K1T673, DS-K1T321, DS-K1T342, and all MinMoe series
+    def create_guest_credential(self, employee_no: str, name: str, card_no: str,
+                                pin: str = None, valid_from: str = None, valid_to: str = None,
+                                door_no: int = 1) -> dict:
+        """
+        Directly provisions a guest credential (User + PIN + optical QR Card) onto the terminal via ISAPI.
+        Eliminates the need to use Hik-Partner Pro or web browser configuration.
+        """
+        from datetime import datetime, timedelta
+
+        # Format timestamps to YYYY-MM-DDTHH:MM:SS
+        if not valid_from:
+            valid_from = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+        if not valid_to:
+            valid_to = (datetime.now() + timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%S")
+
+        valid_from = valid_from[:19]
+        valid_to = valid_to[:19]
+
+        user_payload = {
+            "UserInfo": {
+                "employeeNo": str(employee_no),
+                "name": str(name)[:32],
+                "userType": "normal",
+                "closeDelayEnabled": False,
+                "Valid": {
+                    "enable": True,
+                    "beginTime": valid_from,
+                    "endTime": valid_to,
+                    "timeType": "local",
+                },
+                "doorRight": "1",
+                "RightPlan": [
+                    {
+                        "doorNo": int(door_no),
+                        "planTemplateNo": "1",
+                    }
+                ],
+                "maxOpenDoorTime": 0,
+            }
+        }
+        if pin and str(pin).strip():
+            user_payload["UserInfo"]["password"] = str(pin).strip()
+
+        # Step 1: Push UserInfo to terminal
+        user_ok = False
+        user_msg = "OK"
+        try:
+            r = self._request("POST", "/ISAPI/AccessControl/UserInfo/Record?format=json", json=user_payload, timeout=6)
+            if r.status_code in (200, 204):
+                user_ok = True
+            else:
+                # If user exists, modify it
+                mod_r = self._request("PUT", "/ISAPI/AccessControl/UserInfo/Modify?format=json", json=user_payload, timeout=6)
+                if mod_r.status_code in (200, 204):
+                    user_ok = True
+                else:
+                    user_msg = r.text[:200]
+        except Exception as e:
+            user_msg = str(e)
+            log.warning("Terminal user creation error: %s", e)
+
+        # Step 2: Push CardInfo (Virtual Card / Optical QR Code Token)
+        card_ok = False
+        card_msg = "OK"
+        if card_no:
+            card_payload = {
+                "CardInfo": {
+                    "employeeNo": str(employee_no),
+                    "cardNo": str(card_no).strip(),
+                    "cardType": "normalCard",
+                }
+            }
+            try:
+                r_card = self._request("POST", "/ISAPI/AccessControl/CardInfo/Record?format=json", json=card_payload, timeout=6)
+                if r_card.status_code in (200, 204):
+                    card_ok = True
+                else:
+                    # If exists, try modify
+                    mod_c = self._request("PUT", "/ISAPI/AccessControl/CardInfo/Modify?format=json", json=card_payload, timeout=6)
+                    if mod_c.status_code in (200, 204):
+                        card_ok = True
+                    else:
+                        card_msg = r_card.text[:200]
+            except Exception as e:
+                card_msg = str(e)
+                log.warning("Terminal card creation error: %s", e)
+
+        return {
+            "ok": user_ok,
+            "employee_no": employee_no,
+            "name": name,
+            "card_no": card_no,
+            "pin": pin,
+            "door_no": door_no,
+            "valid_from": valid_from,
+            "valid_to": valid_to,
+            "user_synced": user_ok,
+            "card_synced": card_ok,
+            "user_msg": user_msg,
+            "card_msg": card_msg,
+        }
+
+    def delete_guest_credential(self, employee_no: str, card_no: str = None) -> bool:
+        """Removes user and virtual card credentials from the terminal."""
+        if card_no:
+            try:
+                c_del = {"CardInfoDelCond": {"CardNoList": [{"cardNo": str(card_no)}]}}
+                self._request("PUT", "/ISAPI/AccessControl/CardInfo/Delete?format=json", json=c_del, timeout=5)
+            except Exception as e:
+                log.debug("Card delete notice: %s", e)
+
+        try:
+            u_del = {"UserInfoDelCond": {"EmployeeNoList": [{"employeeNo": str(employee_no)}]}}
+            resp = self._request("PUT", "/ISAPI/AccessControl/UserInfo/Delete?format=json", json=u_del, timeout=5)
+            return resp.status_code in (200, 204)
+        except Exception as e:
+            log.warning("Failed to delete user %s from terminal: %s", employee_no, e)
+            return False
+
+    def list_terminal_users(self, max_results: int = 30) -> list:
+        """Fetches active user records directly from terminal ISAPI."""
+        try:
+            cond = {
+                "UserInfoSearchCond": {
+                    "searchID": "ajn_query",
+                    "searchResultPosition": 0,
+                    "maxResults": max_results,
+                }
+            }
+            resp = self._request("POST", "/ISAPI/AccessControl/UserInfo/Search?format=json", json=cond, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json()
+                return (data.get("UserInfoSearch") or {}).get("UserInfo") or []
+        except Exception as e:
+            log.debug("Failed to list terminal users: %s", e)
+        return []
+
+    def list_terminal_cards(self, max_results: int = 30) -> list:
+        """Fetches active card records directly from terminal ISAPI."""
+        try:
+            cond = {
+                "CardInfoSearchCond": {
+                    "searchID": "ajn_card_query",
+                    "searchResultPosition": 0,
+                    "maxResults": max_results,
+                }
+            }
+            resp = self._request("POST", "/ISAPI/AccessControl/CardInfo/Search?format=json", json=cond, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json()
+                return (data.get("CardInfoSearch") or {}).get("CardInfo") or []
+        except Exception as e:
+            log.debug("Failed to list terminal cards: %s", e)
+        return []
+

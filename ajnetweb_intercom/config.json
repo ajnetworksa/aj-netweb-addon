@@ -1,8 +1,8 @@
 {
   "name": "AJ Netweb Intercom & Door Station Studio",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "slug": "ajnetweb_intercom",
-  "description": "Professional Video Intercom & Door Station Controller for Hikvision and Dahua. Dynamic Hik-Connect/DMSS mobile push notifications, real-time chimes, instant door release relays, and visitor snapshot capture.",
+  "description": "Professional Video Intercom & Access Control Terminal Studio for Hikvision & Dahua. Direct ISAPI QR code & PIN guest credential provisioning (DS-K1T502, DS-K1T671, DS-K1T673, DS-K1T321, DS-K1T342), dynamic mobile push notifications, instant door release relays, and auto-pruning.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
   "arch": [
     "aarch64",

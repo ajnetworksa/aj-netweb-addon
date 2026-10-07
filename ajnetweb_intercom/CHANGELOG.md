@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.1.0
+- **Direct Terminal ISAPI Credential & Guest Key Provisioning**:
+  - Direct local ISAPI provisioning for Hikvision MinMoe and Access Control Terminals (`DS-K1T502DBWX-CQR`, `DS-K1T671TMFW`, `DS-K1T673TDGX`, `DS-K1T321MFWX`, `DS-K1T342DWX`).
+  - **Eliminates Hik-Partner Pro & Web GUI Logins**: Installers and homeowners can issue guest credentials directly from the add-on interface without opening Hik-Partner Pro or logging into terminal IP addresses.
+  - **Optical QR Code Generation**: Generates scannable QR tokens that are immediately verified by terminal cameras/scanners to unlock doors.
+  - **Keypad PIN Management**: Provisions 4- to 8-digit temporary PIN codes directly to terminal hardware for entry on physical keypads and touchscreens via `#PIN#`.
+  - **Interactive Guest Pass Modal**: Digital guest pass badge with real-time SVG QR code, large PIN badge, 1-click WhatsApp/SMS sharing, clipboard copy, and printable card.
+  - **Automated Background Pruning Daemon**: Automatically deletes expired user and card credentials from the physical terminal memory every 60 seconds, keeping terminal storage clean.
+
 ## 1.0.1
 - **Dynamic Hik-Connect / DMSS Mobile Push Notification Engine**:
   - Automatically discovers all active iOS & Android mobile companion apps registered in Home Assistant on the fly via Supervisor API.

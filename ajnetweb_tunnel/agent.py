@@ -301,7 +301,12 @@ def collect() -> dict:
         "network": {"interfaces": [
             {"interface": i.get("interface"), "type": i.get("type"), "mac": i.get("mac"),
              "primary": i.get("primary"), "connected": i.get("connected"),
-             "ipv4": {"address": ((i.get("ipv4") or {}).get("address") or [])[:2]}}
+             "ipv4": {
+                 "address": ((i.get("ipv4") or {}).get("address") or [])[:2],
+                 "gateway": (i.get("ipv4") or {}).get("gateway"),
+                 "nameservers": (i.get("ipv4") or {}).get("nameservers") or [],
+                 "method": (i.get("ipv4") or {}).get("method"),
+             }}
             for i in (net or {}).get("interfaces") or []]},
         "addons": [pick(a, "name", "slug", "version", "version_latest", "update_available", "state", "repository")
                    for a in (addons or {}).get("addons") or []],

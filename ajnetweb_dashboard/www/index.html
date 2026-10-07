@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AJ Netweb Dashboard Suite</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand-block">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="9"></rect>
+            <rect x="14" y="3" width="7" height="5"></rect>
+            <rect x="14" y="12" width="7" height="9"></rect>
+            <rect x="3" y="16" width="7" height="5"></rect>
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">AJ NETWEB DASHBOARD SUITE</div>
+          <div class="brand-sub">Automated Room-Aware Lovelace Generator · 5 Curated Aesthetics</div>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge cyber">Native Sections View</span>
+        <span class="badge success">Zero HACS Dependencies</span>
+      </div>
+    </header>
+
+    <!-- Discovered Inventory KPI Bar -->
+    <section class="kpi-bar">
+      <div class="kpi-card">
+        <span class="kpi-val" id="kpiRooms">—</span>
+        <span class="kpi-lbl">Discovered Rooms</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-val" id="kpiLights">—</span>
+        <span class="kpi-lbl">Lighting Devices</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-val" id="kpiClimates">—</span>
+        <span class="kpi-lbl">Climate &amp; ACs</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-val" id="kpiCovers">—</span>
+        <span class="kpi-lbl">Shades &amp; Curtains</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-val" id="kpiCameras">—</span>
+        <span class="kpi-lbl">Cameras &amp; Locks</span>
+      </div>
+      <button id="btnRescan" class="btn-rescan" title="Rescan Home Assistant Entities">
+        ↻ Rescan Layout
+      </button>
+    </section>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <!-- Step 1: Aesthetic Selection -->
+      <section class="studio-section">
+        <div class="section-head">
+          <div class="step-num">1</div>
+          <div>
+            <h2>Select Dashboard Aesthetic &amp; Architecture</h2>
+            <p class="section-desc">Choose from 5 curated styles designed for luxury residences, modern villas, and wall tablets.</p>
+          </div>
+        </div>
+
+        <div class="theme-grid">
+          <!-- Theme 1 -->
+          <div class="theme-card active" data-theme="cyber_luxury">
+            <div class="theme-card-preview cyber-bg">
+              <div class="mock-tile" style="border-color:#00e5ff; box-shadow:0 0 10px rgba(0,229,255,0.4);">
+                <span class="mock-dot" style="background:#00e5ff;"></span>
+                <span>Living Room</span>
+              </div>
+              <div class="mock-slider" style="background:#00e5ff;"></div>
+            </div>
+            <div class="theme-card-body">
+              <div class="theme-card-title">Cyber Luxury Glassmorphism</div>
+              <p class="theme-card-desc">Dark obsidian base, glowing cyan neon borders, frosted glass blur, and high-tech status badges.</p>
+              <span class="theme-badge">⚡ Installer Favorite</span>
+            </div>
+          </div>
+
+          <!-- Theme 2 -->
+          <div class="theme-card" data-theme="scandinavian_minimal">
+            <div class="theme-card-preview scandi-bg">
+              <div class="mock-tile" style="border-color:rgba(255,255,255,0.15);">
+                <span class="mock-dot" style="background:#f59e0b;"></span>
+                <span>Master Suite</span>
+              </div>
+              <div class="mock-slider" style="background:#f59e0b;"></div>
+            </div>
+            <div class="theme-card-body">
+              <div class="theme-card-title">Minimalist Scandinavian</div>
+              <p class="theme-card-desc">Warm neutral tones, ultra-clean typography, ample breathing room, and serene atmosphere.</p>
+              <span class="theme-badge">🌿 Calm &amp; Clean</span>
+            </div>
+          </div>
+
+          <!-- Theme 3 -->
+          <div class="theme-card" data-theme="modern_bento">
+            <div class="theme-card-preview bento-bg">
+              <div class="mock-tile" style="border-radius:18px; border-color:#38bdf8;">
+                <span class="mock-dot" style="background:#38bdf8;"></span>
+                <span>Bento Room</span>
+              </div>
+              <div class="mock-slider" style="background:#38bdf8;"></div>
+            </div>
+            <div class="theme-card-body">
+              <div class="theme-card-title">Modern Bento Grid (iOS)</div>
+              <p class="theme-card-desc">Apple Home inspired 2x2 rounded bento cards, dynamic active status tinting, and tactile sliders.</p>
+              <span class="theme-badge">📱 Apple Home Feel</span>
+            </div>
+          </div>
+
+          <!-- Theme 4 -->
+          <div class="theme-card" data-theme="oled_stealth">
+            <div class="theme-card-preview oled-bg">
+              <div class="mock-tile" style="border-color:#10b981; background:#000;">
+                <span class="mock-dot" style="background:#10b981;"></span>
+                <span>Wall Console</span>
+              </div>
+              <div class="mock-slider" style="background:#10b981;"></div>
+            </div>
+            <div class="theme-card-body">
+              <div class="theme-card-title">Pure OLED Stealth</div>
+              <p class="theme-card-desc">Pitch black #000000 background, zero light bleed, battery saving, razor-sharp on wall tablets.</p>
+              <span class="theme-badge">🔋 Zero Burn-In</span>
+            </div>
+          </div>
+
+          <!-- Theme 5 -->
+          <div class="theme-card" data-theme="hotel_suite">
+            <div class="theme-card-preview hotel-bg">
+              <div class="mock-tile" style="border-color:#d97706; background:#1c1917;">
+                <span class="mock-dot" style="background:#fbbf24;"></span>
+                <span>Penthouse Suite</span>
+              </div>
+              <div class="mock-slider" style="background:#fbbf24;"></div>
+            </div>
+            <div class="theme-card-body">
+              <div class="theme-card-title">Boutique Hotel Hub</div>
+              <p class="theme-card-desc">Hospitality concierge layout with prominent greeting, quick scenes (DND, Welcome, Clean), and suite selector.</p>
+              <span class="theme-badge">👑 Concierge Luxury</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2: Room Discovery Inspector -->
+      <section class="studio-section">
+        <div class="section-head">
+          <div class="step-num">2</div>
+          <div style="flex:1;">
+            <h2>Discovered Rooms &amp; Entity Registry</h2>
+            <p class="section-desc">Select which rooms to include in the generated dashboard. Devices are automatically categorized.</p>
+          </div>
+          <div class="selection-actions">
+            <button type="button" id="btnSelectAll" class="btn-micro-action">Select All</button>
+            <button type="button" id="btnDeselectAll" class="btn-micro-action">Deselect All</button>
+          </div>
+        </div>
+
+        <div id="roomsGrid" class="rooms-grid">
+          <div class="loading-state">Scanning Home Assistant room registries...</div>
+        </div>
+      </section>
+
+      <!-- Step 3: Deployment Settings & Launch -->
+      <section class="studio-section deploy-card">
+        <div class="section-head">
+          <div class="step-num">3</div>
+          <div>
+            <h2>Dashboard Deployment Settings</h2>
+            <p class="section-desc">Customize title, sidebar URL path, and deploy directly to Home Assistant in 1 click.</p>
+          </div>
+        </div>
+
+        <form id="deployForm" class="deploy-form">
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="cfgTitle">Dashboard Title</label>
+              <input type="text" id="cfgTitle" value="AJ Netweb Smart Home" required />
+            </div>
+            <div class="form-row">
+              <label for="cfgUrl">Sidebar URL Path</label>
+              <div class="url-input-wrap">
+                <span class="url-prefix">/</span>
+                <input type="text" id="cfgUrl" value="ajnetweb" required pattern="[a-zA-Z0-9_\-]+" />
+              </div>
+            </div>
+          </div>
+
+          <div class="deploy-actions">
+            <button type="button" id="btnPreview" class="secondary-btn">
+              👁️ Preview Configuration
+            </button>
+            <button type="submit" id="btnDeploy" class="primary-btn pulse-glow">
+              🚀 Deploy Dashboard to Home Assistant
+            </button>
+          </div>
+
+          <div id="deployFeedback" class="deploy-feedback"></div>
+        </form>
+      </section>
+    </main>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal-overlay" style="display:none;">
+      <div class="modal-box preview-modal-box">
+        <div class="modal-head">
+          <h3>Generated Lovelace Configuration Preview</h3>
+          <button id="modalCloseBtn" class="modal-close-btn">&times;</button>
+        </div>
+        <pre id="previewCode" class="preview-code"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -20,6 +20,8 @@
     theme: localStorage.getItem("ajn_intercom_theme") || "cyan",
     customColor: localStorage.getItem("ajn_intercom_custom_color") || "#00e5ff",
     oledMode: localStorage.getItem("ajn_intercom_oled") === "true",
+    selectedDurationHours: 4,
+    activeModalPass: null,
   };
 
   const el = {
@@ -76,6 +78,31 @@
     pushTestFeedback: document.getElementById("pushTestFeedback"),
     cfgPushMode: document.getElementById("cfgPushMode"),
     cfgCriticalSound: document.getElementById("cfgCriticalSound"),
+    // Credentials & Terminal Guest Passes
+    passForm: document.getElementById("passForm"),
+    passGuestName: document.getElementById("passGuestName"),
+    passDoorSelect: document.getElementById("passDoorSelect"),
+    durationChips: document.querySelectorAll(".duration-chip"),
+    passPinCode: document.getElementById("passPinCode"),
+    passCardNo: document.getElementById("passCardNo"),
+    btnRandomPin: document.getElementById("btnRandomPin"),
+    btnRandomCard: document.getElementById("btnRandomCard"),
+    btnIssuePass: document.getElementById("btnIssuePass"),
+    passFeedback: document.getElementById("passFeedback"),
+    passesList: document.getElementById("passesList"),
+    btnRefreshPasses: document.getElementById("btnRefreshPasses"),
+    // Pass Modal
+    passBadgeModal: document.getElementById("passBadgeModal"),
+    passModalCloseBtn: document.getElementById("passModalCloseBtn"),
+    modalDoorName: document.getElementById("modalDoorName"),
+    passQrContainer: document.getElementById("passQrContainer"),
+    modalPinCode: document.getElementById("modalPinCode"),
+    modalGuestName: document.getElementById("modalGuestName"),
+    modalCardNo: document.getElementById("modalCardNo"),
+    modalValidTo: document.getElementById("modalValidTo"),
+    btnSharePass: document.getElementById("btnSharePass"),
+    btnCopyPassText: document.getElementById("btnCopyPassText"),
+    btnPrintPass: document.getElementById("btnPrintPass"),
   };
 
   // ------------------------------------------------------------------ Browser Push Notifications
@@ -161,11 +188,13 @@
     setupNavigation();
     setupDoorControls();
     setupSettings();
+    setupCredentialsUI();
     setupBrowserNotifications();
     startClock();
 
     await checkStatus();
     await loadVisitors();
+    loadCredentials();
     loadDiscoveredDevices();
     initEventStream();
   }
@@ -264,6 +293,8 @@
 
     if (tab === "visitors") {
       loadVisitors();
+    } else if (tab === "credentials") {
+      loadCredentials();
     } else if (tab === "settings") {
       loadSettings();
     }
@@ -473,6 +504,8 @@
       hideRingBanner();
       el.callStatusBadge.textContent = "Standby";
       el.callStatusBadge.className = "badge neutral";
+    } else if (ev.event === "credential_updated") {
+      loadCredentials();
     }
   }
 
@@ -524,6 +557,295 @@
         el.imageModal.style.display = "flex";
       });
     });
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // ------------------------------------------------------------------ QR Code & Credentials Engine
+  function renderQrCodeSvg(text) {
+    try {
+      if (window.qrcode) {
+        const qr = window.qrcode(0, "M");
+        qr.addData(String(text));
+        qr.make();
+        return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+      }
+    } catch (err) {
+      console.warn("QR render notice:", err);
+    }
+    return `<div style="padding:40px 10px; font-family:monospace; font-size:1.4rem; font-weight:bold; color:#000;">${text}</div>`;
+  }
+
+  function formatTimeWindow(validFrom, validTo) {
+    if (!validTo) return "Never expires";
+    try {
+      const toDate = new Date(validTo);
+      const now = new Date();
+      const diffMs = toDate - now;
+      if (diffMs <= 0) return "Expired";
+      const diffHrs = Math.floor(diffMs / 3600000);
+      const diffMins = Math.floor((diffMs % 3600000) / 60000);
+      let remaining = "";
+      if (diffHrs > 24) {
+        remaining = `in ${Math.floor(diffHrs / 24)}d ${diffHrs % 24}h`;
+      } else if (diffHrs > 0) {
+        remaining = `in ${diffHrs}h ${diffMins}m`;
+      } else {
+        remaining = `in ${diffMins}m`;
+      }
+      return `Valid until ${toDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${remaining})`;
+    } catch (e) {
+      return validTo;
+    }
+  }
+
+  async function loadCredentials() {
+    if (!el.passesList) return;
+    try {
+      const res = await fetch("api/credentials");
+      const data = await res.json();
+      const list = data.credentials || [];
+
+      if (!list.length) {
+        el.passesList.innerHTML = `
+          <div class="empty-state">
+            <p>No active passes. Fill out the form above to generate a scannable QR &amp; PIN pass for your guests.</p>
+          </div>
+        `;
+        return;
+      }
+
+      el.passesList.innerHTML = list.map((item) => {
+        const isExpired = item.status === "expired" || (item.valid_to && new Date(item.valid_to) < new Date());
+        const isRevoked = item.status === "revoked";
+        let statusBadge = '<span class="badge success">Active</span>';
+        if (isRevoked) {
+          statusBadge = '<span class="badge danger">Revoked</span>';
+        } else if (isExpired) {
+          statusBadge = '<span class="badge neutral">Expired</span>';
+        }
+
+        const doorLabel = item.door_name || (item.door === 2 ? state.door2Name : state.door1Name);
+        const syncBadge = item.synced_to_terminal
+          ? '<span class="small" style="color:var(--success);">✓ Terminal Synced</span>'
+          : '<span class="small" style="color:var(--warning);">Local Pass</span>';
+
+        return `
+          <div class="pass-card-item ${isExpired || isRevoked ? 'expired' : ''}">
+            <div class="pass-card-top">
+              <div>
+                <div class="pass-guest-name">${escapeHtml(item.name)}</div>
+                <div class="pass-door-pill">${escapeHtml(doorLabel)}</div>
+              </div>
+              <div>${statusBadge}</div>
+            </div>
+
+            <div class="pass-pin-badge">
+              <span>PIN: #${item.pin}#</span>
+              <span class="mono small" style="opacity:0.75;">QR: ${item.card_no}</span>
+            </div>
+
+            <div class="pass-validity-meta">
+              <div>${formatTimeWindow(item.valid_from, item.valid_to)}</div>
+              <div>${syncBadge}</div>
+            </div>
+
+            <div class="pass-btn-row">
+              <button class="secondary-btn btn-view-pass" data-id="${item.id}" style="flex:1; padding:6px 10px; font-size:0.78rem;">
+                👁️ View QR Pass
+              </button>
+              ${!isRevoked && !isExpired ? `
+                <button class="secondary-btn btn-revoke-pass" data-id="${item.id}" data-emp="${item.employee_no}" style="padding:6px 10px; font-size:0.78rem; color:var(--danger); border-color:rgba(255,0,85,0.4);">
+                  🗑️ Revoke
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // Bind card buttons
+      el.passesList.querySelectorAll(".btn-view-pass").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const pass = list.find((p) => p.id === btn.dataset.id);
+          if (pass) openPassModal(pass);
+        });
+      });
+
+      el.passesList.querySelectorAll(".btn-revoke-pass").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Are you sure you want to revoke and delete this credential from the terminal immediately?")) return;
+          try {
+            await fetch("api/credentials/revoke", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id: btn.dataset.id, employee_no: btn.dataset.emp }),
+            });
+            loadCredentials();
+          } catch (e) {
+            alert("Revoke failed: " + e.message);
+          }
+        });
+      });
+
+    } catch (err) {
+      console.error("Failed to load credentials:", err);
+    }
+  }
+
+  function openPassModal(pass) {
+    state.activeModalPass = pass;
+    const doorName = pass.door_name || (pass.door === 2 ? state.door2Name : state.door1Name);
+    if (el.modalDoorName) el.modalDoorName.textContent = doorName;
+    if (el.modalGuestName) el.modalGuestName.textContent = pass.name;
+    if (el.modalPinCode) el.modalPinCode.textContent = `#${pass.pin}#`;
+    if (el.modalCardNo) el.modalCardNo.textContent = pass.card_no;
+    if (el.modalValidTo) {
+      el.modalValidTo.textContent = new Date(pass.valid_to).toLocaleString();
+    }
+    if (el.passQrContainer) {
+      el.passQrContainer.innerHTML = renderQrCodeSvg(pass.qr_token || pass.card_no);
+    }
+    if (el.passBadgeModal) {
+      el.passBadgeModal.style.display = "flex";
+    }
+  }
+
+  function closePassModal() {
+    if (el.passBadgeModal) {
+      el.passBadgeModal.style.display = "none";
+    }
+  }
+
+  function setupCredentialsUI() {
+    // Duration chip clicks
+    if (el.durationChips) {
+      el.durationChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+          el.durationChips.forEach((c) => c.classList.remove("active"));
+          chip.classList.add("active");
+          state.selectedDurationHours = parseFloat(chip.dataset.hours || 4);
+        });
+      });
+    }
+
+    // Randomize buttons
+    if (el.btnRandomPin) {
+      el.btnRandomPin.addEventListener("click", () => {
+        if (el.passPinCode) {
+          el.passPinCode.value = String(Math.floor(100000 + Math.random() * 900000));
+        }
+      });
+    }
+
+    if (el.btnRandomCard) {
+      el.btnRandomCard.addEventListener("click", () => {
+        if (el.passCardNo) {
+          el.passCardNo.value = "88" + String(Math.floor(100000 + Math.random() * 900000));
+        }
+      });
+    }
+
+    // Form submit
+    if (el.passForm) {
+      el.passForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = (el.passGuestName.value || "").trim();
+        if (!name) return;
+
+        const door = parseInt(el.passDoorSelect.value || 1);
+        const pin = (el.passPinCode.value || "").trim();
+        const cardNo = (el.passCardNo.value || "").trim();
+
+        el.btnIssuePass.disabled = true;
+        el.passFeedback.innerHTML = '<span style="color:var(--accent);">Pushing credentials to terminal...</span>';
+
+        try {
+          const res = await fetch("api/credentials/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              door,
+              duration_hours: state.selectedDurationHours,
+              pin,
+              card_no: cardNo,
+            }),
+          });
+          const data = await res.json();
+          if (data.ok && data.credential) {
+            el.passFeedback.innerHTML = '<span style="color:var(--success);">✓ Pass issued successfully!</span>';
+            el.passForm.reset();
+            if (el.durationChips && el.durationChips[0]) el.durationChips[0].classList.add("active");
+            state.selectedDurationHours = 4;
+            loadCredentials();
+            openPassModal(data.credential);
+          } else {
+            el.passFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || "Failed to issue pass"}</span>`;
+          }
+        } catch (err) {
+          el.passFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
+        } finally {
+          el.btnIssuePass.disabled = false;
+        }
+      });
+    }
+
+    // Modal close
+    if (el.passModalCloseBtn) {
+      el.passModalCloseBtn.addEventListener("click", closePassModal);
+    }
+    if (el.passBadgeModal) {
+      el.passBadgeModal.addEventListener("click", (e) => {
+        if (e.target === el.passBadgeModal) closePassModal();
+      });
+    }
+
+    // Refresh button
+    if (el.btnRefreshPasses) {
+      el.btnRefreshPasses.addEventListener("click", loadCredentials);
+    }
+
+    // Share Pass Actions
+    if (el.btnSharePass) {
+      el.btnSharePass.addEventListener("click", async () => {
+        const p = state.activeModalPass;
+        if (!p) return;
+        const msg = `⚡ Welcome! Here is your entry pass for ${p.door_name || 'Entrance Gate'}:\n\n🔑 Keypad PIN: #${p.pin}#\n📱 Scannable QR: ${p.card_no}\n⏰ Valid until: ${new Date(p.valid_to).toLocaleString()}\n\nType the PIN code on the keypad or show the QR code to the terminal camera to unlock.`;
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: "Guest Access Pass", text: msg });
+          } catch (e) {}
+        } else {
+          window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+        }
+      });
+    }
+
+    if (el.btnCopyPassText) {
+      el.btnCopyPassText.addEventListener("click", () => {
+        const p = state.activeModalPass;
+        if (!p) return;
+        const msg = `Entrance Gate Access: PIN #${p.pin}# (Valid until ${new Date(p.valid_to).toLocaleString()})`;
+        navigator.clipboard.writeText(msg).then(() => {
+          alert("✓ Pass details copied to clipboard!");
+        });
+      });
+    }
+
+    if (el.btnPrintPass) {
+      el.btnPrintPass.addEventListener("click", () => {
+        window.print();
+      });
+    }
   }
 
   // ------------------------------------------------------------------ Dynamic Push Device Discovery

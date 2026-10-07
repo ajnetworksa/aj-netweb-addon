@@ -26,6 +26,7 @@ OPTIONS_FILE = "/data/options.json"
 DATA_DIR = "/data/intercom"
 VISITORS_DIR = "/data/intercom/visitors"
 HISTORY_FILE = "/data/intercom/visitor_history.json"
+CREDENTIALS_FILE = "/data/intercom/credentials.json"
 HA_WWW_DIR = "/config/www/ajnetweb_intercom"
 WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8097))
@@ -44,6 +45,7 @@ _config_cache = {}
 _event_subscribers = []  # List of SSE response queues
 _event_thread = None
 _ha_action_thread = None
+_pruner_thread = None
 _last_ring_time = 0
 
 
@@ -379,6 +381,77 @@ def handle_mobile_notification_action(action: str, ev_data: dict):
             record_visitor_event("door_unlock", f"Unlocked {door_name} (Mobile Lock-Screen Action)")
             notify_homeassistant_event("ajnetweb_door_unlocked", {"door": 2, "name": door_name, "source": "mobile_action"})
             broadcast_sse({"event": "door_unlocked", "door": 2, "name": door_name})
+
+
+# ---------------------------------------------------------------- Credential & Guest Key Management
+def load_credentials() -> list:
+    """Load issued guest passes and keys from disk."""
+    if os.path.exists(CREDENTIALS_FILE):
+        try:
+            with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            log.warning("Could not read credentials.json: %s", e)
+    return []
+
+
+def save_credentials(creds: list):
+    """Save credentials to disk."""
+    try:
+        os.makedirs(os.path.dirname(CREDENTIALS_FILE), exist_ok=True)
+        with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+            json.dump(creds, f, indent=2)
+    except Exception as e:
+        log.error("Could not write credentials.json: %s", e)
+
+
+def prune_expired_credentials():
+    """
+    Auto-pruning daemon:
+    Finds credentials whose valid_to date has passed, removes them from the
+    terminal hardware via ISAPI (DS-K1T502, DS-K1T671, DS-K1T673, etc.),
+    and updates their status to 'expired' so terminal slots stay free.
+    """
+    creds = load_credentials()
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    updated = False
+
+    with _state_lock:
+        client = _active_client
+        brand = _client_brand
+
+    for c in creds:
+        if c.get("status") == "active" and c.get("valid_to") and c["valid_to"] < now_iso:
+            log.info("Pass for %s expired at %s. Deleting from terminal...", c.get("name"), c.get("valid_to"))
+            if client and brand == "hikvision" and hasattr(client, "delete_guest_credential"):
+                try:
+                    client.delete_guest_credential(c.get("employee_no"), c.get("card_no"))
+                except Exception as e:
+                    log.warning("Terminal delete error for %s: %s", c.get("name"), e)
+            c["status"] = "expired"
+            updated = True
+
+    if updated:
+        save_credentials(creds)
+        broadcast_sse({"event": "credential_updated"})
+
+
+def credential_pruner_worker():
+    """Background loop pruning expired passes every 60 seconds."""
+    while True:
+        try:
+            prune_expired_credentials()
+        except Exception as e:
+            log.debug("Pruner tick exception: %s", e)
+        time.sleep(60)
+
+
+def start_credential_pruner():
+    """Launch background credential pruner thread."""
+    global _pruner_thread
+    if _pruner_thread is None or not _pruner_thread.is_alive():
+        _pruner_thread = threading.Thread(target=credential_pruner_worker, daemon=True, name="cred-pruner")
+        _pruner_thread.start()
 
 
 def ha_action_listener_worker():
@@ -767,6 +840,17 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(cfg)
             return
 
+        if path == "/api/credentials":
+            with _state_lock:
+                brand = _client_brand
+                connected = bool(_active_client)
+            self._send_json({
+                "credentials": load_credentials(),
+                "brand": brand,
+                "connected": connected,
+            })
+            return
+
         super().do_GET()
 
     def do_POST(self):
@@ -859,6 +943,107 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "message": "Door Station configuration updated"})
             return
 
+        if path == "/api/credentials/create":
+            import random
+            from datetime import timedelta
+            name = (payload.get("name") or "Guest").strip()
+            door = int(payload.get("door", 1))
+            pin = (payload.get("pin") or "").strip()
+            card_no = (payload.get("card_no") or "").strip()
+            duration_hrs = float(payload.get("duration_hours", 4.0))
+
+            if not pin:
+                pin = f"{random.randint(100000, 999999)}"
+            if not card_no:
+                card_no = f"88{random.randint(100000, 999999)}"
+
+            emp_no = f"g{int(time.time()) % 1000000:06d}"
+
+            now = datetime.now()
+            v_from = (payload.get("valid_from") or now.strftime("%Y-%m-%dT%H:%M:%S"))[:19]
+            v_to = (payload.get("valid_to") or (now + timedelta(hours=duration_hrs)).strftime("%Y-%m-%dT%H:%M:%S"))[:19]
+
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+                cfg = dict(_config_cache)
+
+            synced = False
+            sync_detail = "Offline / Local Pass"
+            if client and brand == "hikvision" and hasattr(client, "create_guest_credential"):
+                res = client.create_guest_credential(
+                    employee_no=emp_no,
+                    name=name,
+                    card_no=card_no,
+                    pin=pin,
+                    valid_from=v_from,
+                    valid_to=v_to,
+                    door_no=door,
+                )
+                synced = res.get("ok", False)
+                sync_detail = f"ISAPI: User {res.get('user_msg', 'OK')} / Card {res.get('card_msg', 'OK')}"
+            elif client and brand == "dahua":
+                synced = True
+                sync_detail = "Dahua local pass profile"
+
+            cred_item = {
+                "id": f"cred_{int(time.time())}_{random.randint(100, 999)}",
+                "employee_no": emp_no,
+                "name": name,
+                "door": door,
+                "door_name": cfg.get(f"door_{door}_name", f"Door {door}"),
+                "pin": pin,
+                "card_no": card_no,
+                "qr_token": card_no,
+                "valid_from": v_from,
+                "valid_to": v_to,
+                "status": "active",
+                "created_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "synced_to_terminal": synced,
+                "sync_detail": sync_detail,
+            }
+
+            creds = load_credentials()
+            creds.insert(0, cred_item)
+            save_credentials(creds)
+            broadcast_sse({"event": "credential_updated", "item": cred_item})
+
+            self._send_json({"ok": True, "credential": cred_item})
+            return
+
+        if path == "/api/credentials/revoke":
+            cred_id = payload.get("id")
+            emp_no = payload.get("employee_no")
+
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+
+            creds = load_credentials()
+            target = None
+            for c in creds:
+                if (cred_id and c.get("id") == cred_id) or (emp_no and c.get("employee_no") == emp_no):
+                    target = c
+                    break
+
+            if not target:
+                self._send_json({"ok": False, "error": "Credential not found"}, status=404)
+                return
+
+            if client and brand == "hikvision" and hasattr(client, "delete_guest_credential"):
+                try:
+                    client.delete_guest_credential(target.get("employee_no"), target.get("card_no"))
+                except Exception as e:
+                    log.warning("Revoke delete failed: %s", e)
+
+            target["status"] = "revoked"
+            target["revoked_at"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+            save_credentials(creds)
+            broadcast_sse({"event": "credential_updated", "item": target})
+
+            self._send_json({"ok": True, "message": f"Credential for {target.get('name')} revoked."})
+            return
+
         self.send_error(404, "Endpoint not found")
 
 
@@ -866,6 +1051,7 @@ def main():
     log.info("Starting AJ Netweb Intercom & Door Station Server on port %s...", PORT)
     init_client()
     start_ha_action_listener()
+    start_credential_pruner()
     server = ThreadedHTTPServer(("0.0.0.0", PORT), IntercomRequestHandler)
     try:
         server.serve_forever()
