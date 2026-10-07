@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AJ Netweb CCTV & NVR Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 7l-7 5 7 5V7z"></path>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+        </svg>
+      </div>
+      <div>
+        <div class="title-row">
+          <h1>AJ Netweb CCTV Studio</h1>
+          <span id="nvrBrandBadge" class="badge neutral">Connecting...</span>
+        </div>
+        <div class="subtitle" id="nvrSubTitle">Hikvision &amp; Dahua Video Hub</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-btn active" data-tab="grid">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <span>Live Wall</span>
+      </button>
+      <button class="nav-btn" data-tab="ptz">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="m10 8 4 4-4 4"></path>
+          <path d="M12 2v4"></path>
+          <path d="M12 18v4"></path>
+          <path d="M2 12h4"></path>
+          <path d="M18 12h4"></path>
+        </svg>
+        <span>PTZ Control</span>
+      </button>
+      <button class="nav-btn" data-tab="playback">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+          <line x1="7" y1="2" x2="7" y2="22"></line>
+          <line x1="17" y1="2" x2="17" y2="22"></line>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+        </svg>
+        <span>NVR Playback</span>
+      </button>
+      <button class="nav-btn" data-tab="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <!-- Grid Layout switchers -->
+      <div class="grid-picker" id="gridPicker">
+        <button class="grid-btn" data-cols="1" title="Single (1x1)">1</button>
+        <button class="grid-btn active" data-cols="2" title="Quad (2x2)">4</button>
+        <button class="grid-btn" data-cols="3" title="Grid (3x3)">9</button>
+        <button class="grid-btn" data-cols="4" title="Wall (4x4)">16</button>
+      </div>
+
+      <!-- Live Stream Mode Switcher -->
+      <div class="mode-select">
+        <select id="streamModeSelect" title="Stream Mode">
+          <option value="mjpeg">Live MJPEG Stream</option>
+          <option value="snapshot_fast">Fast Snapshot (1s)</option>
+          <option value="snapshot_slow">Eco Snapshot (3s)</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-main">
+    <!-- VIEW: LIVE GRID WALL -->
+    <section id="viewGrid" class="view-panel active">
+      <div id="cameraGrid" class="camera-grid cols-2">
+        <!-- Rendered dynamically via JavaScript -->
+        <div class="empty-state">
+          <div class="spinner"></div>
+          <p>Connecting to NVR and discovering camera channels...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: PTZ CONTROLLER -->
+    <section id="viewPtz" class="view-panel">
+      <div class="ptz-layout">
+        <!-- Active Camera Live Video Player -->
+        <div class="ptz-feed-container">
+          <div class="feed-header">
+            <select id="ptzChannelSelect" class="ptz-select"></select>
+            <div class="feed-tools">
+              <span id="ptzStatusBadge" class="badge success">PTZ Ready</span>
+              <button id="ptzFullscreenBtn" class="tool-btn" title="Fullscreen">⛶</button>
+            </div>
+          </div>
+          <div class="feed-viewport">
+            <img id="ptzLiveImage" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>" alt="PTZ Live Feed">
+            <!-- On-screen directional overlay for touch/mouse drag -->
+            <div class="ptz-screen-overlay" id="ptzOverlay"></div>
+          </div>
+        </div>
+
+        <!-- Virtual Joystick & Controls Panel -->
+        <div class="ptz-controls-panel">
+          <h3>PTZ Directional Joystick</h3>
+          <p class="hint">Hold down directional buttons or drag on screen to move camera</p>
+
+          <!-- 8-way D-Pad -->
+          <div class="dpad-grid">
+            <button class="dpad-btn" data-code="LeftUp" title="Up Left">↖</button>
+            <button class="dpad-btn" data-code="Up" title="Up">▲</button>
+            <button class="dpad-btn" data-code="RightUp" title="Up Right">↗</button>
+            <button class="dpad-btn" data-code="Left" title="Left">◀</button>
+            <button class="dpad-btn center" data-code="Stop" title="Stop">●</button>
+            <button class="dpad-btn" data-code="Right" title="Right">▶</button>
+            <button class="dpad-btn" data-code="LeftDown" title="Down Left">↙</button>
+            <button class="dpad-btn" data-code="Down" title="Down">▼</button>
+            <button class="dpad-btn" data-code="RightDown" title="Down Right">↘</button>
+          </div>
+
+          <!-- Speed Slider -->
+          <div class="control-row">
+            <label for="ptzSpeed">Speed: <span id="speedValue">5</span></label>
+            <input type="range" id="ptzSpeed" min="1" max="8" value="5">
+          </div>
+
+          <!-- Optical Zoom & Focus -->
+          <div class="ptz-action-groups">
+            <div class="action-group">
+              <span class="group-title">Optical Zoom</span>
+              <div class="btn-group">
+                <button class="action-btn" data-code="ZoomIn">🔍 Zoom +</button>
+                <button class="action-btn" data-code="ZoomOut">🔍 Zoom -</button>
+              </div>
+            </div>
+            <div class="action-group">
+              <span class="group-title">Focus &amp; Iris</span>
+              <div class="btn-group">
+                <button class="action-btn" data-code="FocusNear">Near</button>
+                <button class="action-btn" data-code="FocusFar">Far</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div class="presets-section">
+            <div class="presets-header">
+              <span class="group-title">Camera Presets</span>
+              <div class="preset-action-toggle">
+                <button id="presetModeGoto" class="active">Go To</button>
+                <button id="presetModeSet">Save Position</button>
+              </div>
+            </div>
+            <div class="presets-chips" id="presetChips">
+              <!-- Rendered 1 to 16 dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: NVR PLAYBACK & RECORDINGS -->
+    <section id="viewPlayback" class="view-panel">
+      <div class="playback-header-bar">
+        <div class="filter-item">
+          <label>Camera Channel:</label>
+          <select id="pbChannelSelect" class="pb-select"></select>
+        </div>
+        <div class="filter-item">
+          <label>Date:</label>
+          <input type="date" id="pbDateInput">
+        </div>
+        <button id="pbSearchBtn" class="primary-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Search Recordings
+        </button>
+      </div>
+
+      <!-- Playback Viewport & Timeline Area -->
+      <div class="playback-content">
+        <div class="playback-player-card">
+          <div class="player-wrapper">
+            <div id="pbPlayerPlaceholder" class="player-placeholder">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#484f58" stroke-width="1.5">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <p>Select a recorded clip or click on the timeline to start playback</p>
+            </div>
+            <video id="pbVideo" controls playsinline style="display:none;"></video>
+          </div>
+
+          <!-- Interactive 24h Timeline -->
+          <div class="timeline-container">
+            <div class="timeline-labels">
+              <span>00:00</span>
+              <span>03:00</span>
+              <span>06:00</span>
+              <span>09:00</span>
+              <span>12:00</span>
+              <span>15:00</span>
+              <span>18:00</span>
+              <span>21:00</span>
+              <span>24:00</span>
+            </div>
+            <div class="timeline-track" id="timelineTrack">
+              <!-- Dynamic recording segment blocks (green = continuous, red = motion) -->
+              <div class="timeline-segments" id="timelineSegments"></div>
+              <!-- Scrubber needle -->
+              <div class="timeline-needle" id="timelineNeedle">
+                <div class="needle-tooltip" id="needleTooltip">12:00:00</div>
+              </div>
+            </div>
+            <div class="timeline-legend">
+              <span class="legend-item"><span class="dot continuous"></span> Continuous Recording</span>
+              <span class="legend-item"><span class="dot motion"></span> Motion / Event Detection</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recorded Clips List -->
+        <div class="clips-sidebar">
+          <h3>Recorded Segments (<span id="clipsCount">0</span>)</h3>
+          <div class="clips-list" id="clipsList">
+            <div class="empty-clips">Click "Search Recordings" to scan NVR storage</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: SETTINGS -->
+    <section id="viewSettings" class="view-panel">
+      <div class="settings-card">
+        <h2>NVR Connection Settings</h2>
+        <p class="hint">Configure your Hikvision or Dahua NVR IP, port, and credentials. Settings are saved to Home Assistant add-on options.</p>
+
+        <form id="settingsForm" class="settings-form">
+          <div class="form-row">
+            <label for="cfgBrand">NVR System Brand</label>
+            <select id="cfgBrand">
+              <option value="auto">Auto-Detect (Hikvision / Dahua)</option>
+              <option value="hikvision">Hikvision (ISAPI)</option>
+              <option value="dahua">Dahua / Amcrest (CGI / RPC)</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label for="cfgHost">NVR IP Address / Hostname *</label>
+            <input type="text" id="cfgHost" placeholder="e.g. 192.168.1.100" required>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="cfgHttpPort">HTTP API Port</label>
+              <input type="number" id="cfgHttpPort" value="80">
+            </div>
+            <div class="form-row">
+              <label for="cfgRtspPort">RTSP Streaming Port</label>
+              <input type="number" id="cfgRtspPort" value="554">
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="cfgUsername">Username</label>
+              <input type="text" id="cfgUsername" value="admin" required>
+            </div>
+            <div class="form-row">
+              <label for="cfgPassword">Password</label>
+              <input type="password" id="cfgPassword" placeholder="••••••••">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label for="cfgStreamQuality">Default Grid Stream Quality</label>
+            <select id="cfgStreamQuality">
+              <option value="sub">Sub-stream (Recommended: Fast, Low Bandwidth)</option>
+              <option value="main">Main-stream (Full HD / 4K)</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="btnTestConn" class="secondary-btn">Test Connection</button>
+            <button type="submit" class="primary-btn">Save &amp; Connect</button>
+          </div>
+          <div id="settingsFeedback" class="feedback-msg"></div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
