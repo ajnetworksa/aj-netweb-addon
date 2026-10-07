@@ -1,0 +1,50 @@
+{
+  "name": "AJ Netweb Intercom & Door Station Studio",
+  "version": "1.0.0",
+  "slug": "ajnetweb_intercom",
+  "description": "Professional Video Intercom & Door Station Controller for Hikvision and Dahua. Real-time doorbell chimes, instant door release relays, and visitor snapshot capture for Home Assistant.",
+  "url": "https://github.com/ajnetworksa/aj-netweb-addon",
+  "arch": [
+    "aarch64",
+    "amd64"
+  ],
+  "startup": "services",
+  "boot": "auto",
+  "init": false,
+  "stage": "stable",
+  "hassio_api": true,
+  "hassio_role": "manager",
+  "homeassistant_api": true,
+  "options": {
+    "brand": "auto",
+    "host": "",
+    "http_port": 80,
+    "rtsp_port": 554,
+    "username": "admin",
+    "password": "",
+    "door_1_name": "Main Gate",
+    "door_2_name": "Pedestrian Door",
+    "unlock_duration_sec": 3,
+    "auto_snapshot_on_ring": true,
+    "ha_notify_on_ring": true,
+    "log_level": "info"
+  },
+  "schema": {
+    "brand": "list(auto|hikvision|dahua)",
+    "host": "str",
+    "http_port": "port",
+    "rtsp_port": "port",
+    "username": "str",
+    "password": "password",
+    "door_1_name": "str?",
+    "door_2_name": "str?",
+    "unlock_duration_sec": "int?",
+    "auto_snapshot_on_ring": "bool?",
+    "ha_notify_on_ring": "bool?",
+    "log_level": "list(debug|info|warning|error)"
+  },
+  "ingress": true,
+  "ingress_port": 8097,
+  "panel_icon": "mdi:doorbell-video",
+  "panel_title": "Door Station"
+}
