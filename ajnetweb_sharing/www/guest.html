@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Smart Room Guest Controller</title>
+  <style>
+    :root {
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.4);
+      --bg: #070a12;
+      --surface: #0e1422;
+      --card: #151d30;
+      --border: #243049;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; padding: 16px; padding-bottom: 40px; }
+    .header { text-align: center; margin-bottom: 18px; }
+    .header h1 { font-size: 1.35rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .guest-subtitle { font-size: 0.85rem; color: var(--text-muted); }
+    .status-pill { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 4px 12px; border-radius: 20px; background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); margin-top: 6px; }
+
+    /* Room Tabs */
+    .room-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; -webkit-overflow-scrolling: touch; }
+    .room-tab { background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); padding: 8px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: all 0.2s ease; }
+    .room-tab.active { background: var(--accent); color: #070a12; border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+
+    /* Category Cards */
+    .section-title { font-size: 0.88rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 16px 0 8px 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+
+    /* Climate Control */
+    .climate-box { text-align: center; }
+    .climate-temp { font-size: 3rem; font-weight: 800; color: #fff; line-height: 1.1; margin: 10px 0; }
+    .climate-target-label { font-size: 0.8rem; color: var(--text-muted); }
+    .temp-adjust-row { display: flex; justify-content: center; align-items: center; gap: 24px; margin-top: 12px; }
+    .btn-circle { width: 50px; height: 50px; border-radius: 50%; background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 1.6rem; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; }
+    .btn-circle:active { background: var(--accent); color: #070a12; }
+    .climate-modes { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+    .mode-btn { background: var(--card); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 14px; border-radius: 16px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+    .mode-btn.active { background: var(--accent); color: #070a12; border-color: var(--accent); }
+
+    /* Entity Grids */
+    .devices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .device-tile { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: left; cursor: pointer; transition: all 0.2s ease; position: relative; }
+    .device-tile.active { border-color: var(--accent); background: rgba(0, 229, 255, 0.08); box-shadow: 0 0 10px var(--accent-glow); }
+    .device-icon { font-size: 1.4rem; margin-bottom: 6px; }
+    .device-name { font-size: 0.85rem; font-weight: 600; color: #fff; line-height: 1.2; }
+    .device-state { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .device-tile.active .device-state { color: var(--accent); font-weight: 600; }
+
+    /* Sliders & Covers */
+    .slider-row { margin-top: 8px; }
+    .slider-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .cover-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .cover-actions button { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+    .cover-actions button:active { background: var(--accent); color: #070a12; }
+
+    /* Error / Expired state */
+    .error-box { text-align: center; padding: 40px 20px; }
+    .error-box h2 { font-size: 1.5rem; color: var(--danger); margin-bottom: 10px; }
+    .error-box p { color: var(--text-muted); font-size: 0.95rem; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--border); box-shadow: 0 4px 20px rgba(0,0,0,0.5); z-index: 1000; display: none; }
+  </style>
+</head>
+<body>
+  <div id="appContainer">
+    <div class="header">
+      <h1 id="portalTitle">Smart Room Controller</h1>
+      <div class="guest-subtitle" id="portalSubtitle">Connecting to your room...</div>
+      <div id="statusBadge" class="status-pill">Active Pass</div>
+    </div>
+
+    <!-- Room Tabs -->
+    <div class="room-tabs" id="roomTabs"></div>
+
+    <!-- Active Room Content -->
+    <div id="roomContent">
+      <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading room devices...</div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Command sent</div>
+
+  <script>
+    (function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get("token") || "";
+
+      let currentPass = null;
+      let rooms = [];
+      let activeRoomId = null;
+
+      const el = {
+        appContainer: document.getElementById("appContainer"),
+        portalTitle: document.getElementById("portalTitle"),
+        portalSubtitle: document.getElementById("portalSubtitle"),
+        statusBadge: document.getElementById("statusBadge"),
+        roomTabs: document.getElementById("roomTabs"),
+        roomContent: document.getElementById("roomContent"),
+        toast: document.getElementById("toast"),
+      };
+
+      function showToast(msg) {
+        el.toast.textContent = msg;
+        el.toast.style.display = "block";
+        setTimeout(() => { el.toast.style.display = "none"; }, 2000);
+      }
+
+      async function loadPortal() {
+        if (!token) {
+          showError("Missing Access Token", "Please scan the QR code again or contact your host for a valid room pass link.");
+          return;
+        }
+
+        try {
+          const res = await fetch(`api/guest/portal?token=${encodeURIComponent(token)}`);
+          const data = await res.json();
+
+          if (!res.ok || !data.ok) {
+            showError("Pass Inactive", data.error || "This guest pass has expired or is invalid.");
+            return;
+          }
+
+          currentPass = data;
+          rooms = data.rooms || [];
+          el.portalTitle.textContent = data.guest_name ? `Welcome, ${data.guest_name}` : (data.pass_name || "Smart Room Controller");
+          el.portalSubtitle.textContent = `Authorized Room Access · ${rooms.length} room(s)`;
+
+          if (data.expires_at) {
+            const exp = new Date(data.expires_at);
+            el.statusBadge.textContent = `Expires ${exp.toLocaleDateString("en-GB")} ${exp.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"})}`;
+          } else {
+            el.statusBadge.textContent = "Permanent Access";
+          }
+
+          if (!rooms.length) {
+            el.roomContent.innerHTML = `<div class="card"><p style="text-align:center; color:var(--text-muted);">No devices found in assigned rooms.</p></div>`;
+            return;
+          }
+
+          renderRoomTabs();
+          selectRoom(rooms[0].area_id);
+        } catch (err) {
+          showError("Connection Error", "Could not reach Home Assistant controller. Make sure you are connected to the home Wi-Fi.");
+        }
+      }
+
+      function showError(title, msg) {
+        el.appContainer.innerHTML = `
+          <div class="error-box">
+            <h2>⚠️ ${title}</h2>
+            <p>${msg}</p>
+          </div>
+        `;
+      }
+
+      function renderRoomTabs() {
+        if (rooms.length <= 1) {
+          el.roomTabs.style.display = "none";
+          return;
+        }
+        el.roomTabs.innerHTML = rooms.map(r => `
+          <button class="room-tab" data-id="${r.area_id}">${r.name}</button>
+        `).join("");
+
+        el.roomTabs.querySelectorAll(".room-tab").forEach(tab => {
+          tab.addEventListener("click", () => selectRoom(tab.dataset.id));
+        });
+      }
+
+      function selectRoom(areaId) {
+        activeRoomId = areaId;
+        el.roomTabs.querySelectorAll(".room-tab").forEach(t => {
+          t.classList.toggle("active", t.dataset.id === areaId);
+        });
+
+        const room = rooms.find(r => r.area_id === areaId);
+        if (!room) return;
+        renderRoomContent(room);
+      }
+
+      function renderRoomContent(room) {
+        const ents = room.entities || [];
+        const climates = ents.filter(e => e.domain === "climate");
+        const lights = ents.filter(e => e.domain === "light");
+        const covers = ents.filter(e => e.domain === "cover");
+        const switches = ents.filter(e => e.domain === "switch");
+
+        let html = "";
+
+        // Climate Section
+        if (climates.length) {
+          html += `<div class="section-title">❄️ Air Conditioning &amp; Climate</div>`;
+          climates.forEach(c => {
+            const temp = c.attributes.current_temperature || c.attributes.temperature || 24;
+            const target = c.attributes.temperature || 24;
+            const mode = c.state;
+            html += `
+              <div class="card climate-box" data-id="${c.entity_id}">
+                <div class="climate-target-label">${c.name} · Target Temp</div>
+                <div class="climate-temp"><span class="val-target">${target}</span>°C</div>
+                <div class="climate-target-label">Current: ${temp}°C · Mode: ${mode}</div>
+                <div class="temp-adjust-row">
+                  <button class="btn-circle btn-temp-down" data-id="${c.entity_id}" data-target="${target}">-</button>
+                  <button class="btn-circle btn-temp-up" data-id="${c.entity_id}" data-target="${target}">+</button>
+                </div>
+                <div class="climate-modes">
+                  <button class="mode-btn ${mode==='cool'?'active':''}" data-id="${c.entity_id}" data-mode="cool">Cool</button>
+                  <button class="mode-btn ${mode==='heat'?'active':''}" data-id="${c.entity_id}" data-mode="heat">Heat</button>
+                  <button class="mode-btn ${mode==='fan_only'?'active':''}" data-id="${c.entity_id}" data-mode="fan_only">Fan</button>
+                  <button class="mode-btn ${mode==='off'?'active':''}" data-id="${c.entity_id}" data-mode="off">Off</button>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        // Lights Section
+        if (lights.length) {
+          html += `<div class="section-title">💡 Room Lights</div><div class="devices-grid">`;
+          lights.forEach(l => {
+            const isOn = l.state === "on";
+            html += `
+              <div class="device-tile ${isOn?'active':''}" data-id="${l.entity_id}" data-domain="light" data-action="${isOn?'turn_off':'turn_on'}">
+                <div class="device-icon">${isOn?'💡':'🔌'}</div>
+                <div class="device-name">${l.name}</div>
+                <div class="device-state">${isOn?'On':'Off'}</div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+        }
+
+        // Covers & Curtains Section
+        if (covers.length) {
+          html += `<div class="section-title">🪟 Curtains &amp; Blinds</div><div class="devices-grid">`;
+          covers.forEach(cv => {
+            html += `
+              <div class="card" style="margin-bottom:8px;">
+                <div class="device-name">${cv.name}</div>
+                <div class="device-state" style="margin-bottom:8px;">Status: ${cv.state}</div>
+                <div class="cover-actions">
+                  <button data-id="${cv.entity_id}" data-service="open_cover">Open 🔼</button>
+                  <button data-id="${cv.entity_id}" data-service="stop_cover">Stop ⏸️</button>
+                  <button data-id="${cv.entity_id}" data-service="close_cover">Close 🔽</button>
+                </div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+        }
+
+        // Switches Section
+        if (switches.length) {
+          html += `<div class="section-title">🔌 Smart Sockets &amp; Switches</div><div class="devices-grid">`;
+          switches.forEach(s => {
+            const isOn = s.state === "on";
+            html += `
+              <div class="device-tile ${isOn?'active':''}" data-id="${s.entity_id}" data-domain="switch" data-action="${isOn?'turn_off':'turn_on'}">
+                <div class="device-icon">${isOn?'⚡':'⚪'}</div>
+                <div class="device-name">${s.name}</div>
+                <div class="device-state">${isOn?'On':'Off'}</div>
+              </div>
+            `;
+          });
+          html += `</div>`;
+        }
+
+        el.roomContent.innerHTML = html;
+        bindDeviceActions();
+      }
+
+      function bindDeviceActions() {
+        // Light & Switch toggles
+        el.roomContent.querySelectorAll(".device-tile").forEach(tile => {
+          tile.addEventListener("click", async () => {
+            const entId = tile.dataset.id;
+            const domain = tile.dataset.domain;
+            const service = tile.dataset.action;
+            await callGuestService(domain, service, { entity_id: entId });
+            tile.classList.toggle("active");
+            const st = tile.querySelector(".device-state");
+            if (st) st.textContent = tile.classList.contains("active") ? "On" : "Off";
+            tile.dataset.action = tile.classList.contains("active") ? "turn_off" : "turn_on";
+          });
+        });
+
+        // Climate Target Temp +/-
+        el.roomContent.querySelectorAll(".btn-temp-up").forEach(btn => {
+          btn.addEventListener("click", () => adjustTemp(btn.dataset.id, 1));
+        });
+        el.roomContent.querySelectorAll(".btn-temp-down").forEach(btn => {
+          btn.addEventListener("click", () => adjustTemp(btn.dataset.id, -1));
+        });
+
+        // Climate Modes
+        el.roomContent.querySelectorAll(".mode-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const entId = btn.dataset.id;
+            const mode = btn.dataset.mode;
+            await callGuestService("climate", "set_hvac_mode", { entity_id: entId, hvac_mode: mode });
+            btn.parentElement.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+          });
+        });
+
+        // Cover Actions
+        el.roomContent.querySelectorAll(".cover-actions button").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const entId = btn.dataset.id;
+            const srv = btn.dataset.service;
+            await callGuestService("cover", srv, { entity_id: entId });
+          });
+        });
+      }
+
+      async function adjustTemp(entId, delta) {
+        const box = el.roomContent.querySelector(`.climate-box[data-id="${entId}"]`);
+        if (!box) return;
+        const valSpan = box.querySelector(".val-target");
+        let cur = parseFloat(valSpan.textContent) || 24;
+        cur = Math.min(30, Math.max(16, cur + delta));
+        valSpan.textContent = cur;
+        await callGuestService("climate", "set_temperature", { entity_id: entId, temperature: cur });
+      }
+
+      async function callGuestService(domain, service, serviceData) {
+        try {
+          showToast(`Sending command...`);
+          const res = await fetch("api/guest/control", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token: token,
+              entity_id: serviceData.entity_id,
+              domain: domain,
+              service: service,
+              service_data: serviceData,
+            }),
+          });
+          const d = await res.json();
+          if (d.ok) {
+            showToast(`✓ Updated`);
+          } else {
+            alert(d.error || "Action failed");
+          }
+        } catch (err) {
+          alert("Network error: " + err.message);
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", loadPortal);
+    })();
+  </script>
+</body>
+</html>

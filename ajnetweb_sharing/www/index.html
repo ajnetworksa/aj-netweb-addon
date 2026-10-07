@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AJ Netweb Room &amp; Guest Pass Studio</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔑</text></svg>">
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="brand">
+      <div class="logo-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+      </div>
+      <div>
+        <div class="title-row">
+          <h1>AJ Netweb Room &amp; Guest Access</h1>
+          <span id="headerBadge" class="badge success">Active</span>
+        </div>
+        <div class="subtitle" id="headerSubtitle">Zero-YAML Room Sharing &amp; Temporary Guest Pass Engine</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-btn active" data-tab="passes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>Guest Passes (QR)</span>
+      </button>
+      <button class="nav-btn" data-tab="matrix">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <span>User Room Matrix</span>
+      </button>
+      <button class="nav-btn" data-tab="audit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        <span>Access Audit Log</span>
+      </button>
+      <button class="nav-btn" data-tab="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <!-- Header Actions -->
+    <div class="header-actions">
+      <div class="theme-select">
+        <select id="quickThemeSelect" title="Color Theme">
+          <option value="cyan">⚡ Cyber Cyan</option>
+          <option value="emerald">🌲 Emerald Night</option>
+          <option value="amber">🌕 Tactical Amber</option>
+          <option value="crimson">🚨 Crimson Alert</option>
+          <option value="titanium">🌌 Titanium Slate</option>
+          <option value="custom">🎨 Custom Color</option>
+        </select>
+      </div>
+      <label class="theme-color-picker" id="colorPickerWrapper" title="Choose Accent Color" style="display:none;">
+        <input type="color" id="headerColorPicker" value="#00e5ff">
+      </label>
+    </div>
+  </header>
+
+  <!-- Main View Container -->
+  <main class="app-main">
+    <!-- VIEW: GUEST PASSES -->
+    <section id="viewPasses" class="view-panel active">
+      <!-- Quick Stats & Action Banner -->
+      <div class="action-banner">
+        <div class="stats-group">
+          <div class="stat-pill">
+            <span class="stat-num" id="statActivePasses">0</span>
+            <span class="stat-label">Active Passes</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-num" id="statTotalRooms">0</span>
+            <span class="stat-label">Discovered Rooms</span>
+          </div>
+          <div class="stat-pill">
+            <span class="stat-num" id="statGuestActions">0</span>
+            <span class="stat-label">Guest Actions</span>
+          </div>
+        </div>
+
+        <button id="btnOpenCreatePass" class="primary-btn btn-lg">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>Create New Room Pass (QR / Link)</span>
+        </button>
+      </div>
+
+      <!-- Passes List Container -->
+      <div class="passes-container">
+        <div class="section-sub-header">
+          <h3>Active &amp; Scheduled Room Passes</h3>
+          <span class="hint">Guests can scan the QR code or click the WhatsApp link to control their room without downloading the Home Assistant app.</span>
+        </div>
+
+        <div id="passesList" class="passes-grid">
+          <div class="empty-state">
+            <p>Loading guest passes...</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: USER ROOM MATRIX -->
+    <section id="viewMatrix" class="view-panel">
+      <div class="matrix-header-card">
+        <div>
+          <h2>Home Assistant User Room Permission Matrix</h2>
+          <p class="hint">Easily check which family members, kids, or staff have access to each room. Click "Sync Dashboards" to automatically apply visibility rules to Home Assistant Lovelace views without writing YAML code.</p>
+        </div>
+        <div class="matrix-actions">
+          <button id="btnSaveMatrix" class="secondary-btn">Save Permissions</button>
+          <button id="btnSyncDashboards" class="primary-btn">⚡ 1-Click Sync to HA Dashboards</button>
+        </div>
+      </div>
+      <div id="matrixFeedback" class="feedback-msg"></div>
+
+      <div class="matrix-table-wrapper">
+        <table class="matrix-table" id="matrixTable">
+          <thead>
+            <tr id="matrixHeaderRow">
+              <th class="user-col">User / Person</th>
+              <!-- Dynamic Area Columns -->
+            </tr>
+          </thead>
+          <tbody id="matrixBody">
+            <tr>
+              <td colspan="6" class="loading-td">Scanning Home Assistant users and areas...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW: AUDIT LOG -->
+    <section id="viewAudit" class="view-panel">
+      <div class="gallery-header">
+        <h2>Access Control Audit Log</h2>
+        <p class="hint">Real-time log of room controls triggered by guests, link passes, and permission changes.</p>
+      </div>
+      <div class="audit-table-wrapper">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Actor</th>
+              <th>Action / Service</th>
+              <th>Entity</th>
+              <th>Room / Area</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="auditTableBody">
+            <tr>
+              <td colspan="6" class="empty-hint">No audit events recorded yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- VIEW: SETTINGS -->
+    <section id="viewSettings" class="view-panel">
+      <div class="settings-card">
+        <h2>Studio Settings &amp; Defaults</h2>
+        <p class="hint">Configure default guest pass expiration, permitted device domains, and interface appearance.</p>
+
+        <!-- Appearance -->
+        <div class="settings-section-title">Color Theme &amp; OLED Mode</div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="settingsCustomColor">Custom Accent Color</label>
+            <input type="color" id="settingsCustomColor" value="#00e5ff" style="height:38px; padding:2px; cursor:pointer;">
+          </div>
+          <div class="form-row">
+            <label for="settingsOledToggle">Display Background</label>
+            <select id="settingsOledToggle">
+              <option value="false">Deep Glass Space (#070a12)</option>
+              <option value="true">Pure OLED Black (#000000)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Pass Defaults -->
+        <div class="settings-section-title">Guest Pass Default Parameters</div>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="cfgDefaultHours">Default Pass Duration (Hours)</label>
+            <input type="number" id="cfgDefaultHours" value="24" min="1" max="8760">
+          </div>
+          <div class="form-row">
+            <label for="cfgAutoPrune">Auto-Prune Expired Passes</label>
+            <select id="cfgAutoPrune">
+              <option value="true">Enabled (Keep database clean)</option>
+              <option value="false">Disabled (Retain history)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Default Allowed Device Categories for New Passes</label>
+          <div class="checkbox-chips-grid">
+            <label class="checkbox-chip"><input type="checkbox" id="chkDefLights" checked> 💡 Lights</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkDefClimate" checked> ❄️ Climate / AC</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkDefCovers" checked> 🪟 Curtains &amp; Blinds</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkDefSwitches" checked> 🔌 Switches</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkDefLocks"> 🔒 Smart Locks (Caution)</label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: CREATE ROOM PASS -->
+  <div id="modalCreatePass" class="modal-overlay" style="display:none;">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3>Create New Room Pass (QR / Link)</h3>
+        <button class="modal-close-x" id="btnCloseCreatePass">&times;</button>
+      </div>
+      <form id="formCreatePass" class="modal-body">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="passName">Pass Label / Purpose *</label>
+            <input type="text" id="passName" placeholder="e.g. Guest Bedroom Pass" required>
+          </div>
+          <div class="form-row">
+            <label for="passGuestName">Guest Name (Optional)</label>
+            <input type="text" id="passGuestName" placeholder="e.g. Uncle David">
+          </div>
+        </div>
+
+        <!-- Room Selector Checkboxes -->
+        <div class="form-row">
+          <div class="label-row">
+            <label>Select Authorized Rooms *</label>
+            <button type="button" id="btnSelectAllRooms" class="text-btn">Select All</button>
+          </div>
+          <div id="createPassRoomsGrid" class="rooms-selection-grid">
+            <div class="loading-hint">Loading Home Assistant rooms...</div>
+          </div>
+        </div>
+
+        <!-- Expiration Presets -->
+        <div class="form-row">
+          <label>Access Duration / Expiration</label>
+          <div class="duration-presets-grid">
+            <button type="button" class="preset-btn active" data-hours="24">24 Hours</button>
+            <button type="button" class="preset-btn" data-hours="3">3 Hours (Cleaner/Party)</button>
+            <button type="button" class="preset-btn" data-hours="72">3 Days (Weekend)</button>
+            <button type="button" class="preset-btn" data-hours="168">1 Week</button>
+            <button type="button" class="preset-btn" data-hours="0">Permanent</button>
+          </div>
+          <input type="hidden" id="passDurationHours" value="24">
+        </div>
+
+        <!-- Allowed Device Domains -->
+        <div class="form-row">
+          <label>Allowed Controls</label>
+          <div class="checkbox-chips-grid">
+            <label class="checkbox-chip"><input type="checkbox" id="chkPassLights" checked> 💡 Lights</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkPassClimate" checked> ❄️ Climate &amp; AC</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkPassCovers" checked> 🪟 Curtains &amp; Blinds</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkPassSwitches" checked> 🔌 Switches</label>
+            <label class="checkbox-chip"><input type="checkbox" id="chkPassLocks"> 🔒 Locks</label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="secondary-btn" id="btnCancelCreatePass">Cancel</button>
+          <button type="submit" class="primary-btn">Generate Pass &amp; QR Code</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: VIEW & SHARE PASS QR -->
+  <div id="modalViewPass" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="viewPassTitle">Guest Room Pass</h3>
+        <button class="modal-close-x" id="btnCloseViewPass">&times;</button>
+      </div>
+      <div class="modal-body qr-share-body">
+        <div class="qr-container" id="qrCodeContainer"></div>
+        <div class="pass-meta-info" id="viewPassMeta"></div>
+
+        <div class="share-url-box">
+          <input type="text" id="passShareUrl" readonly>
+          <button type="button" id="btnCopyPassUrl" class="secondary-btn">Copy Link</button>
+        </div>
+
+        <div class="share-actions-row">
+          <button type="button" id="btnWhatsAppShare" class="btn-whatsapp">
+            <span>💬 Send via WhatsApp</span>
+          </button>
+          <button type="button" id="btnPrintCard" class="secondary-btn">
+            <span>🖨️ Print Welcome Card</span>
+          </button>
+          <button type="button" id="btnTestPortal" class="secondary-btn">
+            <span>📱 Open Guest App</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="qrcode.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
