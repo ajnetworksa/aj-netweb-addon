@@ -81,6 +81,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(e)}, status=500)
             return
 
+        if path == "/api/blueprints":
+            blueprints = engine.list_blueprints()
+            self._send_json({"ok": True, "blueprints": blueprints})
+            return
+
         super().do_GET()
 
     def do_POST(self):
@@ -91,6 +96,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             payload = json.loads(body)
         except ValueError:
             payload = {}
+
+        if path == "/api/blueprints/install":
+            res = engine.install_bundled_blueprints()
+            self._send_json(res, status=200 if res.get("ok") else 500)
+            return
 
         if path == "/api/deploy":
             theme = payload.get("theme", "cyber_luxury")

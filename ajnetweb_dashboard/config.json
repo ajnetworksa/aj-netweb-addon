@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Dashboard Suite",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "slug": "ajnetweb_dashboard",
   "description": "Automated Room-Aware Lovelace Dashboard Generator with 5 Curated Aesthetics. Native-first architecture, zero-HACS dependencies, bundled AJ Netweb Card Suite, and 1-click deployment.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",

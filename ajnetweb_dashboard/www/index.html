@@ -207,6 +207,60 @@
 
           <div id="deployFeedback" class="deploy-feedback"></div>
         </form>
+      <!-- Step 4: GCC Luxury Villa Super-Features (Blueprints) -->
+      <section class="studio-section">
+        <div class="section-head">
+          <div class="step-num">4</div>
+          <div style="flex:1;">
+            <h2>GCC Luxury Villa Automation Blueprints</h2>
+            <p class="section-desc">Turnkey smart automations engineered for Gulf villas: Umm Al-Qura prayer mute, balcony AC eco-saver, and water tank watchdogs.</p>
+          </div>
+          <button type="button" id="btnInstallBlueprints" class="btn-micro-action" style="background:var(--accent,#00e5ff); color:#000; font-weight:700;">
+            📥 Sync All Blueprints to HA
+          </button>
+        </div>
+
+        <div id="blueprintsGrid" class="theme-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+          <!-- Card 1: Umm Al-Qura Adhan -->
+          <div class="theme-card active">
+            <div class="theme-card-body">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:24px;">🕌</span>
+                <span class="badge success" id="bpStatusAdhan">Installed</span>
+              </div>
+              <div class="theme-card-title" style="margin-top:8px;">Umm Al-Qura Adhan &amp; Media Mute</div>
+              <p class="theme-card-desc">Automatically mutes/pauses active living room TVs, Apple TVs, and sound systems at prayer times, broadcasts a gentle reminder chime to wall screens, and resumes audio after prayer.</p>
+              <span class="theme-badge">🌙 Islamic Villa Core</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Balcony AC Protector -->
+          <div class="theme-card active">
+            <div class="theme-card-body">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:24px;">❄️🚪</span>
+                <span class="badge success" id="bpStatusBalcony">Installed</span>
+              </div>
+              <div class="theme-card-title" style="margin-top:8px;">Balcony Door &amp; Patio AC Energy Protector</div>
+              <p class="theme-card-desc">If a balcony or terrace sliding door is left open &gt;120s, automatically shuts down the room AC and alerts wall displays to prevent desert heat ingress. Restores cooling when closed.</p>
+              <span class="theme-badge">⚡ 35% AC Power Saver</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Water Tank Watchdog -->
+          <div class="theme-card active">
+            <div class="theme-card-body">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:24px;">💧⚡</span>
+                <span class="badge success" id="bpStatusTank">Installed</span>
+              </div>
+              <div class="theme-card-title" style="margin-top:8px;">Villa Water Tank &amp; Booster Pump Watchdog</div>
+              <p class="theme-card-desc">Monitors roof/ground water tank levels with urgent &lt;20% alerts. Automatically cuts booster pump power if running continuously for &gt;45m to prevent motor burnout and pipe flooding.</p>
+              <span class="theme-badge">🛡️ Facility Protection</span>
+            </div>
+          </div>
+        </div>
+        <div id="blueprintFeedback" class="deploy-feedback" style="margin-top:12px;"></div>
       </section>
     </main>
 

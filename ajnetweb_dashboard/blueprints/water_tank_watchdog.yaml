@@ -1,0 +1,84 @@
+blueprint:
+  name: "AJ Netweb · Villa Water Tank & Booster Pump Watchdog"
+  description: "Protects villa water security. Alerts when the roof or underground water tank drops below safe levels, and detects continuous pump operation (>45m) to automatically cut pump power, preventing dry-run motor burnout or pipe burst flooding."
+  domain: automation
+  input:
+    tank_sensor:
+      name: Water Tank Level Sensor
+      description: The sensor tracking tank water level percentage (0 - 100%).
+      selector:
+        entity:
+          domain: sensor
+    low_threshold:
+      name: Low Water Warning Threshold (%)
+      description: Percentage level below which an urgent warning is broadcast.
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+          step: 5
+          unit_of_measurement: "%"
+    pump_switch:
+      name: Booster Pump Relay Switch (Optional)
+      description: Smart switch controlling the water booster pump power.
+      default: {}
+      selector:
+        target:
+          entity:
+            domain: switch
+    max_pump_runtime_minutes:
+      name: Max Continuous Pump Runtime (Minutes)
+      description: If pump runs non-stop longer than this, pump power is cut off immediately.
+      default: 45
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: minutes
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  # Trigger 1: Water level drops below safe threshold
+  - platform: numeric_state
+    entity_id: !input tank_sensor
+    below: !input low_threshold
+    id: low_water
+
+  # Trigger 2: Pump continuous run exceeds safety threshold
+  - platform: state
+    entity_id: !input pump_switch
+    to: "on"
+    for:
+      minutes: !input max_pump_runtime_minutes
+    id: pump_overrun
+
+action:
+  - choose:
+      # Low water warning
+      - conditions:
+          - condition: trigger
+            id: low_water
+        sequence:
+          - service: persistent_notification.create
+            data:
+              notification_id: "water_tank_low"
+              title: "⚠️ Villa Water Tank Low Warning"
+              message: "Water tank level has dropped below {{ states(trigger.entity_id) }}%. Please check municipal supply or request a water delivery truck."
+
+      # Pump overrun emergency cutoff
+      - conditions:
+          - condition: trigger
+            id: pump_overrun
+        sequence:
+          - service: switch.turn_off
+            target: !input pump_switch
+            continue_on_error: true
+          - service: persistent_notification.create
+            data:
+              notification_id: "pump_dry_run_cutoff"
+              title: "🚨 Emergency: Booster Pump Auto-Cutoff"
+              message: "Booster pump was running continuously for over {{ max_pump_runtime_minutes }} minutes. Power has been disconnected to prevent motor burnout, dry running, or pipe flooding."

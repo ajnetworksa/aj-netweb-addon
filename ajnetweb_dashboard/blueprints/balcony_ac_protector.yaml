@@ -1,0 +1,75 @@
+blueprint:
+  name: "AJ Netweb · Balcony Door & Patio AC Energy Protector"
+  description: "Preserves luxury villa cooling efficiency. If a balcony, patio, or terrace door is left open for longer than the set timeout, the room's AC unit is automatically switched off and an alert is broadcast to wall displays. When the door is closed, cooling is restored."
+  domain: automation
+  input:
+    door_sensor:
+      name: Balcony / Patio Door Sensor
+      description: Contact sensor on the balcony, terrace, or patio sliding door.
+      selector:
+        entity:
+          domain: binary_sensor
+          device_class:
+            - door
+            - window
+            - opening
+    climate_entity:
+      name: Room Climate / AC Unit
+      description: The air conditioning thermostat to control.
+      selector:
+        entity:
+          domain: climate
+    open_timeout_seconds:
+      name: Open Door Timeout (Seconds)
+      description: How many seconds the door can remain open before turning off the AC.
+      default: 120
+      selector:
+        number:
+          min: 30
+          max: 600
+          step: 10
+          unit_of_measurement: seconds
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: state
+    entity_id: !input door_sensor
+    to: "on"
+    for:
+      seconds: !input open_timeout_seconds
+    id: door_opened_timeout
+
+  - platform: state
+    entity_id: !input door_sensor
+    to: "off"
+    id: door_closed
+
+action:
+  - choose:
+      # If door opened longer than timeout: Turn off AC and alert
+      - conditions:
+          - condition: trigger
+            id: door_opened_timeout
+        sequence:
+          - service: climate.turn_off
+            target:
+              entity_id: !input climate_entity
+          - service: persistent_notification.create
+            data:
+              notification_id: "balcony_ac_alert"
+              title: "❄️ Eco Protection: AC Switched Off"
+              message: "The balcony/patio door has been open for more than {{ (trigger.for.total_seconds() | int) }} seconds. AC was switched off to prevent desert heat ingress and conserve energy."
+
+      # If door closed: Restore AC cooling
+      - conditions:
+          - condition: trigger
+            id: door_closed
+        sequence:
+          - service: climate.turn_on
+            target:
+              entity_id: !input climate_entity
+          - service: persistent_notification.dismiss
+            data:
+              notification_id: "balcony_ac_alert"

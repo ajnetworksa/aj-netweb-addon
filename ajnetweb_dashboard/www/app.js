@@ -240,11 +240,51 @@
       .replace(/'/g, "&#039;");
   }
 
+  function setupBlueprints() {
+    const btnSync = document.getElementById("btnInstallBlueprints");
+    const feedback = document.getElementById("blueprintFeedback");
+    if (!btnSync) return;
+
+    btnSync.addEventListener("click", async () => {
+      btnSync.disabled = true;
+      btnSync.textContent = "⏳ Installing...";
+      if (feedback) {
+        feedback.className = "deploy-feedback";
+        feedback.textContent = "";
+      }
+      try {
+        const res = await fetch("/api/blueprints/install", { method: "POST" });
+        const data = await res.json();
+        if (data.ok) {
+          if (feedback) {
+            feedback.className = "deploy-feedback show success";
+            feedback.innerHTML = `✓ 3 GCC Luxury Villa Blueprints synchronized into Home Assistant (<code>/config/blueprints/automation/ajnetweb/</code>). Available now in HA Settings → Automations → Blueprints!`;
+          }
+        } else {
+          if (feedback) {
+            feedback.className = "deploy-feedback show error";
+            feedback.textContent = `✕ Failed to install blueprints: ${data.error || "Unknown error"}`;
+          }
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.className = "deploy-feedback show error";
+          feedback.textContent = `✕ Network error: ${err.message}`;
+        }
+      } finally {
+        btnSync.disabled = false;
+        btnSync.textContent = "📥 Sync All Blueprints to HA";
+      }
+    });
+  }
+
   function init() {
     setupThemeSelector();
     setupPreviewAndDeploy();
+    setupBlueprints();
     loadDiscovery();
   }
 
   window.addEventListener("DOMContentLoaded", init);
 })();
+

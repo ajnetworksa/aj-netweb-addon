@@ -1,0 +1,78 @@
+blueprint:
+  name: "AJ Netweb · Umm Al-Qura Adhan & Smart Media Mute"
+  description: "Automatically mutes or pauses villa TVs, media players, Apple TVs, and living room sound systems at prayer times (Umm Al-Qura), broadcasts an optional reminder chime across in-ceiling and wall touch displays, and restores media state after prayer."
+  domain: automation
+  input:
+    prayer_sensor:
+      name: Prayer Time Sensor
+      description: The timestamp sensor for the prayer (e.g. sensor.islamic_prayer_time_dhuhr, or any datetime sensor).
+      selector:
+        entity:
+          domain: sensor
+          device_class: timestamp
+    media_players:
+      name: Media Players to Mute / Pause
+      description: Select living room TVs, AVR amplifiers, Apple TVs, or soundbars to mute or pause during prayer.
+      selector:
+        target:
+          entity:
+            domain: media_player
+    chime_players:
+      name: Adhan Chime Speakers / Wall Displays (Optional)
+      description: In-ceiling speakers or wall touch displays to play the gentle reminder audio.
+      default: {}
+      selector:
+        target:
+          entity:
+            domain: media_player
+    chime_url:
+      name: Chime Audio URL (Optional)
+      description: URL or local path to the Adhan chime audio file (e.g. /local/ajnetweb/adhan_chime.mp3).
+      default: "/local/ajnetweb/adhan_chime.mp3"
+      selector:
+        text: {}
+    restore_delay_minutes:
+      name: Prayer Duration / Restore Delay (Minutes)
+      description: How many minutes after the prayer time before resuming previous audio playback.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 45
+          step: 1
+          unit_of_measurement: minutes
+
+mode: restart
+max_exceeded: silent
+
+trigger:
+  - platform: time
+    at: !input prayer_sensor
+
+action:
+  # 1. Pause active media players
+  - service: media_player.media_pause
+    target: !input media_players
+    continue_on_error: true
+
+  # 2. Play Adhan chime if configured
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ input_chime_players != {} and input_chime_url != '' }}"
+        sequence:
+          - service: media_player.play_media
+            target: !input chime_players
+            data:
+              media_content_id: !input chime_url
+              media_content_type: music
+            continue_on_error: true
+
+  # 3. Wait for prayer period
+  - delay:
+      minutes: !input restore_delay_minutes
+
+  # 4. Resume previous playback
+  - service: media_player.media_play
+    target: !input media_players
+    continue_on_error: true

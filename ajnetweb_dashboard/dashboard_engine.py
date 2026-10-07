@@ -24,6 +24,8 @@ CONFIG_DIR = "/config"
 STORAGE_DIR = "/config/.storage"
 HA_WWW_DIR = "/config/www/ajnetweb"
 LOCAL_CARD_SUITE = os.path.join(os.path.dirname(__file__), "www", "ajnetweb-card-suite.js")
+HA_BLUEPRINTS_DIR = "/config/blueprints/automation/ajnetweb"
+LOCAL_BLUEPRINTS_DIR = os.path.join(os.path.dirname(__file__), "blueprints")
 
 
 class DashboardEngine:
@@ -668,10 +670,65 @@ class DashboardEngine:
                         log.info("Registered %s in lovelace_resources", url)
                 except Exception as e:
                     log.warning("Could not patch lovelace_resources: %s", e)
+            # Also auto-install GCC luxury blueprints
+            self.install_bundled_blueprints()
             return True
         except Exception as e:
             log.error("Failed to install card suite resource: %s", e)
             return False
+
+    def install_bundled_blueprints(self) -> Dict[str, Any]:
+        """
+        Auto-installs GCC luxury automation blueprints into Home Assistant:
+        1. adhan_smart_mute.yaml
+        2. balcony_ac_protector.yaml
+        3. water_tank_watchdog.yaml
+        """
+        installed = []
+        try:
+            os.makedirs(HA_BLUEPRINTS_DIR, exist_ok=True)
+            if os.path.exists(LOCAL_BLUEPRINTS_DIR):
+                for fname in os.listdir(LOCAL_BLUEPRINTS_DIR):
+                    if fname.endswith(".yaml") or fname.endswith(".yml"):
+                        src = os.path.join(LOCAL_BLUEPRINTS_DIR, fname)
+                        dst = os.path.join(HA_BLUEPRINTS_DIR, fname)
+                        shutil.copy2(src, dst)
+                        installed.append(fname)
+                        log.info("Installed GCC blueprint %s to %s", fname, dst)
+            return {"ok": True, "installed": installed}
+        except Exception as e:
+            log.error("Failed to install blueprints: %s", e)
+            return {"ok": False, "error": str(e), "installed": installed}
+
+    def list_blueprints(self) -> List[Dict[str, Any]]:
+        """List status of all available GCC blueprints."""
+        return [
+            {
+                "id": "adhan_smart_mute",
+                "filename": "adhan_smart_mute.yaml",
+                "name": "Umm Al-Qura Adhan & Smart Media Mute",
+                "description": "Automatically mutes TVs, soundbars, and Apple TVs during prayer times and plays Adhan chime.",
+                "category": "Islamic Villa Automation",
+                "installed": os.path.exists(os.path.join(HA_BLUEPRINTS_DIR, "adhan_smart_mute.yaml")),
+            },
+            {
+                "id": "balcony_ac_protector",
+                "filename": "balcony_ac_protector.yaml",
+                "name": "Balcony Door & Patio AC Energy Protector",
+                "description": "Switches off AC if patio/balcony door remains open >120s to conserve energy and prevent heat ingress.",
+                "category": "Climate Eco Preservation",
+                "installed": os.path.exists(os.path.join(HA_BLUEPRINTS_DIR, "balcony_ac_protector.yaml")),
+            },
+            {
+                "id": "water_tank_watchdog",
+                "filename": "water_tank_watchdog.yaml",
+                "name": "Villa Water Tank & Booster Pump Watchdog",
+                "description": "Monitors roof/ground water tank levels (<20% alert) and shuts off pump if running >45m continuously.",
+                "category": "Facility Protection",
+                "installed": os.path.exists(os.path.join(HA_BLUEPRINTS_DIR, "water_tank_watchdog.yaml")),
+            },
+        ]
+
 
     def deploy_to_homeassistant(self, theme_key: str, dashboard_url: str,
                                 title: str, selected_areas: List[str] = None) -> Dict[str, Any]:
