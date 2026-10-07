@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-AJ Netweb CCTV & NVR Studio - Main Web & Streaming Server
-Provides Home Assistant Ingress UI, Live Camera Wall, PTZ Control, and NVR Playback.
+AJ Netweb CCTV & NVR Studio - Main Web & Streaming Server (High Performance)
+Provides Home Assistant Ingress UI, Multi-Threaded Live Camera Wall, PTZ Control, and NVR Playback.
 """
 
 import json
@@ -10,7 +10,9 @@ import os
 import sys
 import time
 import urllib.parse
+from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from threading import Lock
 
 from nvr_dahua import DahuaClient
@@ -27,6 +29,12 @@ _state_lock = Lock()
 _active_client = None
 _client_brand = None
 _config_cache = {}
+
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    """Multi-threaded HTTP server allowing parallel low-latency MJPEG camera streams."""
+    daemon_threads = True
+    allow_reuse_address = True
 
 
 def load_config() -> dict:
@@ -137,38 +145,50 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WWW_DIR, **kwargs)
 
+    def _normalize_path(self) -> str:
+        """Strip Home Assistant Ingress base path if present."""
+        raw_path = urllib.parse.urlparse(self.path).path
+        if "/api/" in raw_path:
+            return raw_path[raw_path.find("/api/"):]
+        return raw_path
+
     def _send_json(self, data: dict, status: int = 200):
         body = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_image(self, data: bytes, mime: str = "image/jpeg"):
+    def _send_image(self, data: bytes, mime: str = "image/jpeg", filename: str = None):
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "public, max-age=1")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        if filename:
+            self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        else:
+            self.send_header("Cache-Control", "public, max-age=1")
         self.end_headers()
         self.wfile.write(data)
 
     def _placeholder_jpeg(self, label: str = "Camera") -> bytes:
         """Fallback SVG to return if camera snapshot is not available."""
         svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
-  <rect width="640" height="360" fill="#0d1117" />
-  <circle cx="320" cy="160" r="50" fill="#161b22" stroke="#30363d" stroke-width="4"/>
-  <circle cx="320" cy="160" r="24" fill="#0366d6" opacity="0.3"/>
-  <circle cx="320" cy="160" r="10" fill="#58a6ff"/>
-  <text x="320" y="240" font-family="-apple-system, sans-serif" font-size="18" fill="#8b949e" text-anchor="middle" font-weight="600">{label}</text>
-  <text x="320" y="265" font-family="-apple-system, sans-serif" font-size="12" fill="#484f58" text-anchor="middle">Awaiting NVR stream...</text>
+  <rect width="640" height="360" fill="#080c14" />
+  <circle cx="320" cy="160" r="50" fill="#111827" stroke="#1f2937" stroke-width="4"/>
+  <circle cx="320" cy="160" r="24" fill="#0284c7" opacity="0.3"/>
+  <circle cx="320" cy="160" r="10" fill="#38bdf8"/>
+  <text x="320" y="240" font-family="-apple-system, sans-serif" font-size="18" fill="#94a3b8" text-anchor="middle" font-weight="600">{label}</text>
+  <text x="320" y="265" font-family="-apple-system, sans-serif" font-size="12" fill="#475569" text-anchor="middle">Awaiting NVR stream...</text>
 </svg>"""
         return svg.encode("utf-8")
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
 
         # ---------------------------------------------------------------- API Endpoints
@@ -225,20 +245,23 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                 self.send_error(400, "Invalid channel ID")
                 return
 
+            is_download = query.get("download", ["0"])[0] == "1"
+            filename = f"Camera_{cid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg" if is_download else None
+
             with _state_lock:
                 client = _active_client
             if client:
                 try:
                     img = client.get_snapshot(cid)
                     if img:
-                        self._send_image(img, "image/jpeg")
+                        self._send_image(img, "image/jpeg", filename=filename)
                         return
                 except Exception as e:
                     log.debug("Snapshot fetch failed (ch %s): %s", cid, e)
 
             # Fallback placeholder
             ph = self._placeholder_jpeg(f"Camera {cid}")
-            self._send_image(ph, "image/svg+xml")
+            self._send_image(ph, "image/svg+xml", filename=filename)
             return
 
         if path.startswith("/api/mjpeg/"):
@@ -254,9 +277,10 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                 self.send_error(503, "NVR not connected")
                 return
 
-            # MJPEG stream: send multipart/x-mixed-replace
+            # Multi-part MJPEG live stream
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Cache-Control", "no-cache, private")
             self.end_headers()
 
@@ -269,8 +293,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                     self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
                     self.wfile.write(img)
                     self.wfile.write(b"\r\n")
-                    time.sleep(0.35)  # ~3 FPS smooth stream
-            except (BrokenPipeError, ConnectionResetError):
+                    time.sleep(0.35)  # Smooth ~3 FPS
+            except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
             return
 
@@ -305,8 +329,7 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
-        parsed = urllib.parse.urlparse(self.path)
-        path = parsed.path
+        path = self._normalize_path()
 
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
@@ -400,9 +423,9 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    log.info("Starting AJ Netweb CCTV & NVR Studio HTTP Server on port %s...", PORT)
+    log.info("Starting AJ Netweb CCTV & NVR Studio Threaded HTTP Server on port %s...", PORT)
     init_client()
-    server = HTTPServer(("0.0.0.0", PORT), CCTVRequestHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", PORT), CCTVRequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

@@ -1,6 +1,6 @@
 /**
- * AJ Netweb CCTV & NVR Studio - Frontend Controller
- * Live Camera Wall, Responsive Grid, PTZ Joystick & NVR Playback Timeline
+ * AJ Netweb CCTV & NVR Studio - Advanced Client Controller
+ * Live Camera Wall, Digital Zoom & Pan, Virtual Joystick, Color Theme Engine, and NVR Playback Timeline
  */
 
 (function () {
@@ -19,7 +19,13 @@
     presetMode: "goto", // goto | set
     recordings: [],
     refreshTimer: null,
-    isPtzMoving: false,
+    clockTimer: null,
+    // Theme
+    theme: localStorage.getItem("ajn_cctv_theme") || "cyan",
+    customColor: localStorage.getItem("ajn_cctv_custom_color") || "#00e5ff",
+    oledMode: localStorage.getItem("ajn_cctv_oled") === "true",
+    // Digital Zoom maps per channel: { [cid]: { scale: 1, x: 0, y: 0 } }
+    zoomState: {},
   };
 
   // DOM Elements
@@ -31,10 +37,14 @@
     gridPicker: document.getElementById("gridPicker"),
     gridBtns: document.querySelectorAll(".grid-btn"),
     streamModeSelect: document.getElementById("streamModeSelect"),
+    quickThemeSelect: document.getElementById("quickThemeSelect"),
+    headerColorPicker: document.getElementById("headerColorPicker"),
+    colorPickerWrapper: document.getElementById("colorPickerWrapper"),
     cameraGrid: document.getElementById("cameraGrid"),
     // PTZ elements
     ptzChannelSelect: document.getElementById("ptzChannelSelect"),
     ptzLiveImage: document.getElementById("ptzLiveImage"),
+    ptzViewport: document.getElementById("ptzViewport"),
     ptzOverlay: document.getElementById("ptzOverlay"),
     ptzSpeed: document.getElementById("ptzSpeed"),
     speedValue: document.getElementById("speedValue"),
@@ -44,6 +54,10 @@
     presetModeSet: document.getElementById("presetModeSet"),
     presetChips: document.getElementById("presetChips"),
     ptzFullscreenBtn: document.getElementById("ptzFullscreenBtn"),
+    ptzSnapshotBtn: document.getElementById("ptzSnapshotBtn"),
+    ptzOsdTitle: document.getElementById("ptzOsdTitle"),
+    ptzOsdClock: document.getElementById("ptzOsdClock"),
+    ptzZoomHud: document.getElementById("ptzZoomHud"),
     // Playback elements
     pbChannelSelect: document.getElementById("pbChannelSelect"),
     pbDateInput: document.getElementById("pbDateInput"),
@@ -67,15 +81,21 @@
     cfgStreamQuality: document.getElementById("cfgStreamQuality"),
     btnTestConn: document.getElementById("btnTestConn"),
     settingsFeedback: document.getElementById("settingsFeedback"),
+    settingsCustomColor: document.getElementById("settingsCustomColor"),
+    settingsOledToggle: document.getElementById("settingsOledToggle"),
+    themeChips: document.querySelectorAll(".theme-chip"),
   };
 
   // ------------------------------------------------------------------ Initialization
   async function init() {
+    applyTheme(state.theme, state.customColor, state.oledMode);
     setupNavigation();
     setupGridControls();
     setupPtzControls();
     setupPlaybackControls();
     setupSettings();
+    setupKeyboardShortcuts();
+    startClock();
 
     // Default playback date to today
     const today = new Date().toISOString().split("T")[0];
@@ -90,13 +110,101 @@
     startStreamLoop();
   }
 
+  // ------------------------------------------------------------------ Theme Engine
+  function applyTheme(themeName, customHex, isOled) {
+    state.theme = themeName;
+    state.customColor = customHex || state.customColor;
+    state.oledMode = isOled;
+
+    localStorage.setItem("ajn_cctv_theme", themeName);
+    localStorage.setItem("ajn_cctv_custom_color", state.customColor);
+    localStorage.setItem("ajn_cctv_oled", isOled ? "true" : "false");
+
+    document.documentElement.setAttribute("data-theme", themeName);
+    document.documentElement.setAttribute("data-oled", isOled ? "true" : "false");
+
+    if (themeName === "custom" && customHex) {
+      document.documentElement.style.setProperty("--accent", customHex);
+      document.documentElement.style.setProperty("--accent-hover", adjustBrightness(customHex, -15));
+      document.documentElement.style.setProperty("--accent-glow", hexToRgba(customHex, 0.4));
+      document.documentElement.style.setProperty("--accent-subtle", hexToRgba(customHex, 0.12));
+    } else {
+      document.documentElement.style.removeProperty("--accent");
+      document.documentElement.style.removeProperty("--accent-hover");
+      document.documentElement.style.removeProperty("--accent-glow");
+      document.documentElement.style.removeProperty("--accent-subtle");
+    }
+
+    if (el.quickThemeSelect) el.quickThemeSelect.value = themeName;
+    if (el.colorPickerWrapper) {
+      el.colorPickerWrapper.style.display = themeName === "custom" ? "inline-block" : "none";
+    }
+    if (el.headerColorPicker) el.headerColorPicker.value = state.customColor;
+    if (el.settingsCustomColor) el.settingsCustomColor.value = state.customColor;
+    if (el.settingsOledToggle) el.settingsOledToggle.value = isOled ? "true" : "false";
+
+    el.themeChips.forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.themeVal === themeName);
+    });
+  }
+
+  function hexToRgba(hex, alpha) {
+    const c = hex.replace("#", "");
+    const r = parseInt(c.substring(0, 2), 16) || 0;
+    const g = parseInt(c.substring(2, 4), 16) || 0;
+    const b = parseInt(c.substring(4, 6), 16) || 0;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  function adjustBrightness(hex, percent) {
+    const num = parseInt(hex.replace("#", ""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = ((num >> 8) & 0x00ff) + amt;
+    const B = (num & 0x0000ff) + amt;
+    return (
+      "#" +
+      (
+        0x1000000 +
+        (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+        (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+        (B < 255 ? (B < 1 ? 0 : B) : 255)
+      )
+        .toString(16)
+        .slice(1)
+    );
+  }
+
+  // ------------------------------------------------------------------ Live Clock
+  function startClock() {
+    const updateTime = () => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString("en-GB");
+      const dateStr = now.toLocaleDateString("en-GB");
+      const fullStr = `${dateStr} ${timeStr}`;
+
+      if (el.ptzOsdClock) el.ptzOsdClock.textContent = fullStr;
+      document.querySelectorAll(".tile-osd-clock").forEach((span) => {
+        span.textContent = fullStr;
+      });
+    };
+    updateTime();
+    state.clockTimer = setInterval(updateTime, 1000);
+  }
+
   // ------------------------------------------------------------------ Navigation
   function setupNavigation() {
     el.navBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const tab = btn.dataset.tab;
-        switchTab(tab);
-      });
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+
+    el.quickThemeSelect.addEventListener("change", (e) => {
+      const t = e.target.value;
+      applyTheme(t, state.customColor, state.oledMode);
+    });
+
+    el.headerColorPicker.addEventListener("input", (e) => {
+      applyTheme("custom", e.target.value, state.oledMode);
     });
   }
 
@@ -134,7 +242,8 @@
         return;
       }
 
-      const brandName = data.brand === "hikvision" ? "Hikvision ISAPI" : data.brand === "dahua" ? "Dahua CGI" : "Auto-Detected";
+      const brandName =
+        data.brand === "hikvision" ? "Hikvision ISAPI" : data.brand === "dahua" ? "Dahua CGI" : "Auto-Detected";
       el.nvrBrandBadge.textContent = brandName;
       el.nvrBrandBadge.className = "badge success";
 
@@ -202,20 +311,34 @@
       <div class="camera-tile" data-id="${ch.id}">
         <div class="tile-header">
           <div class="tile-title">
-            <span class="status-dot"></span>
+            <span class="rec-dot" title="Live Recording"></span>
             <span>${ch.name}</span>
           </div>
           <div class="tile-actions">
-            <button class="icon-btn btn-focus-ptz" data-id="${ch.id}" title="Control PTZ">
+            <button class="icon-btn btn-snapshot" data-id="${ch.id}" title="Save Instant Screenshot">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+              </svg>
+            </button>
+            <button class="icon-btn btn-focus-ptz" data-id="${ch.id}" title="Control PTZ Joystick">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>
               </svg>
             </button>
-            <button class="icon-btn btn-fullscreen" data-id="${ch.id}" title="Fullscreen">⛶</button>
+            <button class="icon-btn btn-fullscreen" data-id="${ch.id}" title="Toggle Fullscreen">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="tile-feed" data-id="${ch.id}">
+          <div class="feed-osd">
+            <span>CH ${ch.id} · ${ch.name.toUpperCase()}</span>
+            <span class="tile-osd-clock">--:--:--</span>
+          </div>
+          <div class="zoom-hud" id="zoomHud_${ch.id}">1.0x</div>
           <img id="gridImg_${ch.id}" src="${getImageSrc(ch.id)}" alt="${ch.name}" loading="lazy">
         </div>
       </div>
@@ -223,13 +346,23 @@
       )
       .join("");
 
-    // Tile click bindings
-    el.cameraGrid.querySelectorAll(".tile-feed").forEach((div) => {
-      div.addEventListener("click", () => {
-        const cid = parseInt(div.dataset.id, 10);
+    // Bindings
+    el.cameraGrid.querySelectorAll(".tile-feed").forEach((feed) => {
+      const cid = parseInt(feed.dataset.id, 10);
+      setupDigitalZoom(feed, document.getElementById(`gridImg_${cid}`), document.getElementById(`zoomHud_${cid}`), cid);
+
+      feed.addEventListener("dblclick", () => {
         state.ptzChannel = cid;
         if (el.ptzChannelSelect) el.ptzChannelSelect.value = cid;
         switchTab("ptz");
+      });
+    });
+
+    el.cameraGrid.querySelectorAll(".btn-snapshot").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const cid = parseInt(btn.dataset.id, 10);
+        downloadSnapshot(cid);
       });
     });
 
@@ -255,6 +388,82 @@
     });
   }
 
+  function downloadSnapshot(cid) {
+    const link = document.createElement("a");
+    link.href = `api/snapshot/${cid}?download=1&_t=${Date.now()}`;
+    link.download = `Camera_${cid}_${Date.now()}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // ------------------------------------------------------------------ Digital Zoom & Pan Engine
+  function setupDigitalZoom(container, imgElement, hudElement, idKey) {
+    if (!state.zoomState[idKey]) {
+      state.zoomState[idKey] = { scale: 1, x: 0, y: 0 };
+    }
+    const z = state.zoomState[idKey];
+    let isPanning = false;
+    let startX = 0;
+    let startY = 0;
+
+    const applyTransform = () => {
+      imgElement.style.transform = `scale(${z.scale}) translate(${z.x / z.scale}px, ${z.y / z.scale}px)`;
+      if (hudElement) {
+        if (z.scale > 1.05) {
+          hudElement.style.display = "block";
+          hudElement.textContent = `${z.scale.toFixed(1)}x ZOOM (Double-click to reset)`;
+        } else {
+          hudElement.style.display = "none";
+        }
+      }
+    };
+
+    container.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.25 : 0.25;
+        z.scale = Math.max(1, Math.min(z.scale + delta, 5));
+        if (z.scale === 1) {
+          z.x = 0;
+          z.y = 0;
+        }
+        applyTransform();
+      },
+      { passive: false },
+    );
+
+    container.addEventListener("mousedown", (e) => {
+      if (z.scale > 1.05) {
+        isPanning = true;
+        startX = e.clientX - z.x;
+        startY = e.clientY - z.y;
+      }
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (isPanning) {
+        z.x = e.clientX - startX;
+        z.y = e.clientY - startY;
+        applyTransform();
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      isPanning = false;
+    });
+
+    // Double-click to reset zoom
+    container.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      z.scale = 1;
+      z.x = 0;
+      z.y = 0;
+      applyTransform();
+    });
+  }
+
   function getImageSrc(chId) {
     if (state.streamMode === "mjpeg") {
       return `api/mjpeg/${chId}`;
@@ -263,7 +472,7 @@
   }
 
   function startStreamLoop() {
-    if (state.streamMode === "mjpeg") return; // Handled directly by HTTP multipart streaming!
+    if (state.streamMode === "mjpeg") return;
 
     const interval = state.streamMode === "snapshot_fast" ? 1000 : 3000;
     state.refreshTimer = setInterval(() => {
@@ -303,7 +512,6 @@
       el.speedValue.textContent = state.ptzSpeed;
     });
 
-    // D-Pad and Action buttons (continuous movement on press)
     const bindPtzButton = (button, code) => {
       const start = (e) => {
         e.preventDefault();
@@ -334,11 +542,9 @@
     });
 
     el.actionBtns.forEach((btn) => {
-      const code = btn.dataset.code;
-      bindPtzButton(btn, code);
+      bindPtzButton(btn, btn.dataset.code);
     });
 
-    // Preset toggle
     el.presetModeGoto.addEventListener("click", () => {
       state.presetMode = "goto";
       el.presetModeGoto.classList.add("active");
@@ -350,7 +556,6 @@
       el.presetModeGoto.classList.remove("active");
     });
 
-    // Fullscreen for PTZ view
     el.ptzFullscreenBtn.addEventListener("click", () => {
       const container = document.querySelector(".ptz-feed-container");
       if (container && container.requestFullscreen) {
@@ -358,12 +563,24 @@
       }
     });
 
-    // Interactive Drag on Viewport Overlay
+    el.ptzSnapshotBtn.addEventListener("click", () => {
+      downloadSnapshot(state.ptzChannel);
+    });
+
+    // Digital Zoom on PTZ Viewport
+    setupDigitalZoom(el.ptzViewport, el.ptzLiveImage, el.ptzZoomHud, "ptz");
+
+    // Drag-to-steer overlay
     setupViewportDrag();
   }
 
   function updatePtzLiveFeed() {
     if (!el.ptzLiveImage) return;
+    const curChannel = state.channels.find((c) => c.id === state.ptzChannel);
+    if (el.ptzOsdTitle) {
+      el.ptzOsdTitle.textContent = `CH ${state.ptzChannel} · ${(curChannel?.name || "CAMERA").toUpperCase()}`;
+    }
+
     if (state.streamMode === "mjpeg") {
       el.ptzLiveImage.src = `api/mjpeg/${state.ptzChannel}`;
     } else {
@@ -427,6 +644,8 @@
     let dragging = false;
 
     const onStart = (x, y) => {
+      // Only drag if not digitally zoomed in
+      if ((state.zoomState["ptz"]?.scale || 1) > 1.05) return;
       startX = x;
       startY = y;
       dragging = true;
@@ -436,7 +655,7 @@
       if (!dragging) return;
       const dx = x - startX;
       const dy = y - startY;
-      const threshold = 30;
+      const threshold = 35;
 
       if (Math.abs(dx) > threshold || Math.abs(dy) > threshold) {
         let code = "";
@@ -471,11 +690,46 @@
     window.addEventListener("touchend", onEnd);
   }
 
+  // ------------------------------------------------------------------ Keyboard Shortcuts
+  function setupKeyboardShortcuts() {
+    window.addEventListener("keydown", (e) => {
+      // Ignore if typing inside input/select
+      if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
+
+      if (state.activeTab === "ptz") {
+        let code = null;
+        if (e.key === "ArrowUp") code = "Up";
+        else if (e.key === "ArrowDown") code = "Down";
+        else if (e.key === "ArrowLeft") code = "Left";
+        else if (e.key === "ArrowRight") code = "Right";
+        else if (e.key === "+" || e.key === "=") code = "ZoomIn";
+        else if (e.key === "-") code = "ZoomOut";
+        else if (e.key === " ") code = "Stop";
+
+        if (code) {
+          e.preventDefault();
+          if (code === "Stop") {
+            triggerPtz("Stop", "stop");
+          } else {
+            triggerPtz(code, "start");
+          }
+        }
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (state.activeTab === "ptz") {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "+", "=", "-"].includes(e.key)) {
+          triggerPtz("Stop", "stop");
+        }
+      }
+    });
+  }
+
   // ------------------------------------------------------------------ Playback
   function setupPlaybackControls() {
     el.pbSearchBtn.addEventListener("click", searchRecordings);
 
-    // Interactive timeline scrub
     el.timelineTrack.addEventListener("mousemove", (e) => {
       const rect = el.timelineTrack.getBoundingClientRect();
       const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -516,7 +770,6 @@
   }
 
   function parseTimeToSec(tStr) {
-    // Expects ISO string (2026-10-07T14:30:00Z) or "2026-10-07 14:30:00"
     const match = tStr.match(/(\d{2}):(\d{2}):(\d{2})/);
     if (match) {
       return parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60 + parseInt(match[3], 10);
@@ -590,11 +843,9 @@
     if (!clip) return;
     el.pbPlayerPlaceholder.style.display = "none";
     el.pbVideo.style.display = "block";
-    // If NVR playback URI is available
     if (clip.playback_uri) {
       el.pbVideo.src = clip.playback_uri;
     } else {
-      // Ingress transcode fallback
       el.pbVideo.src = `api/stream/playback?channel=${clip.channel}&start=${encodeURIComponent(clip.start)}`;
     }
     el.pbVideo.play().catch(() => {});
@@ -630,6 +881,21 @@
   }
 
   function setupSettings() {
+    el.themeChips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const t = chip.dataset.themeVal;
+        applyTheme(t, state.customColor, state.oledMode);
+      });
+    });
+
+    el.settingsCustomColor.addEventListener("input", (e) => {
+      applyTheme("custom", e.target.value, state.oledMode);
+    });
+
+    el.settingsOledToggle.addEventListener("change", (e) => {
+      applyTheme(state.theme, state.customColor, e.target.value === "true");
+    });
+
     el.settingsForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const payload = {
@@ -653,7 +919,8 @@
         });
         const data = await res.json();
         if (data.ok) {
-          el.settingsFeedback.innerHTML = '<span style="color:var(--success);">✓ Connected and saved successfully!</span>';
+          el.settingsFeedback.innerHTML =
+            '<span style="color:var(--success);">✓ Connected and saved successfully!</span>';
           await checkStatus();
           await loadChannels();
           setTimeout(() => switchTab("grid"), 1200);
@@ -666,7 +933,8 @@
     });
 
     el.btnTestConn.addEventListener("click", async () => {
-      el.settingsFeedback.innerHTML = '<span style="color:var(--accent);">Probing NVR at ' + el.cfgHost.value + '...</span>';
+      el.settingsFeedback.innerHTML =
+        '<span style="color:var(--accent);">Probing NVR at ' + el.cfgHost.value + "...</span>";
       try {
         const res = await fetch("api/status");
         const d = await res.json();

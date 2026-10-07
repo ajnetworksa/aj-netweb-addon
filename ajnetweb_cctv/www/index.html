@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AJ Netweb CCTV & NVR Studio</title>
+  <title>AJ Netweb CCTV &amp; NVR Studio</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📹</text></svg>">
 </head>
@@ -22,7 +22,7 @@
           <h1>AJ Netweb CCTV Studio</h1>
           <span id="nvrBrandBadge" class="badge neutral">Connecting...</span>
         </div>
-        <div class="subtitle" id="nvrSubTitle">Hikvision &amp; Dahua Video Hub</div>
+        <div class="subtitle" id="nvrSubTitle">Hikvision &amp; Dahua Surveillance Hub</div>
       </div>
     </div>
 
@@ -76,7 +76,24 @@
         <button class="grid-btn" data-cols="4" title="Wall (4x4)">16</button>
       </div>
 
-      <!-- Live Stream Mode Switcher -->
+      <!-- Quick Theme Switcher -->
+      <div class="theme-select">
+        <select id="quickThemeSelect" title="Color Theme">
+          <option value="cyan">⚡ Cyber Cyan</option>
+          <option value="emerald">🌲 Emerald Night</option>
+          <option value="amber">🌕 Tactical Amber</option>
+          <option value="crimson">🚨 Crimson Alert</option>
+          <option value="titanium">🌌 Titanium Slate</option>
+          <option value="custom">🎨 Custom Color</option>
+        </select>
+      </div>
+
+      <!-- Custom Color Picker -->
+      <label class="theme-color-picker" id="colorPickerWrapper" title="Choose Custom Accent Color" style="display:none;">
+        <input type="color" id="headerColorPicker" value="#00e5ff">
+      </label>
+
+      <!-- Stream Mode Select -->
       <div class="mode-select">
         <select id="streamModeSelect" title="Stream Mode">
           <option value="mjpeg">Live MJPEG Stream</option>
@@ -92,7 +109,6 @@
     <!-- VIEW: LIVE GRID WALL -->
     <section id="viewGrid" class="view-panel active">
       <div id="cameraGrid" class="camera-grid cols-2">
-        <!-- Rendered dynamically via JavaScript -->
         <div class="empty-state">
           <div class="spinner"></div>
           <p>Connecting to NVR and discovering camera channels...</p>
@@ -107,39 +123,61 @@
         <div class="ptz-feed-container">
           <div class="feed-header">
             <select id="ptzChannelSelect" class="ptz-select"></select>
-            <div class="feed-tools">
+            <div class="tile-actions">
+              <button id="ptzSnapshotBtn" class="icon-btn" title="Download Screenshot">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+                </svg>
+              </button>
+              <button id="ptzFullscreenBtn" class="icon-btn" title="Fullscreen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                </svg>
+              </button>
               <span id="ptzStatusBadge" class="badge success">PTZ Ready</span>
-              <button id="ptzFullscreenBtn" class="tool-btn" title="Fullscreen">⛶</button>
             </div>
           </div>
-          <div class="feed-viewport">
+          <div class="feed-viewport" id="ptzViewport">
+            <div class="feed-osd">
+              <span id="ptzOsdTitle">LIVE CAMERA</span>
+              <span id="ptzOsdClock">--:--:--</span>
+            </div>
+            <div class="zoom-hud" id="ptzZoomHud">1.0x</div>
             <img id="ptzLiveImage" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>" alt="PTZ Live Feed">
-            <!-- On-screen directional overlay for touch/mouse drag -->
             <div class="ptz-screen-overlay" id="ptzOverlay"></div>
           </div>
         </div>
 
         <!-- Virtual Joystick & Controls Panel -->
         <div class="ptz-controls-panel">
-          <h3>PTZ Directional Joystick</h3>
-          <p class="hint">Hold down directional buttons or drag on screen to move camera</p>
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="2" x2="12" y2="6"></line>
+              <line x1="12" y1="18" x2="12" y2="22"></line>
+              <line x1="2" y1="12" x2="6" y2="12"></line>
+              <line x1="18" y1="12" x2="22" y2="12"></line>
+            </svg>
+            PTZ Joystick &amp; Controls
+          </h3>
+          <p class="hint">Hold down directional buttons or drag on camera view to steer. Keyboard arrow keys supported.</p>
 
           <!-- 8-way D-Pad -->
           <div class="dpad-grid">
             <button class="dpad-btn" data-code="LeftUp" title="Up Left">↖</button>
-            <button class="dpad-btn" data-code="Up" title="Up">▲</button>
+            <button class="dpad-btn" data-code="Up" title="Up (Key: ↑)">▲</button>
             <button class="dpad-btn" data-code="RightUp" title="Up Right">↗</button>
-            <button class="dpad-btn" data-code="Left" title="Left">◀</button>
-            <button class="dpad-btn center" data-code="Stop" title="Stop">●</button>
-            <button class="dpad-btn" data-code="Right" title="Right">▶</button>
+            <button class="dpad-btn" data-code="Left" title="Left (Key: ←)">◀</button>
+            <button class="dpad-btn center" data-code="Stop" title="Stop Movement">●</button>
+            <button class="dpad-btn" data-code="Right" title="Right (Key: →)">▶</button>
             <button class="dpad-btn" data-code="LeftDown" title="Down Left">↙</button>
-            <button class="dpad-btn" data-code="Down" title="Down">▼</button>
+            <button class="dpad-btn" data-code="Down" title="Down (Key: ↓)">▼</button>
             <button class="dpad-btn" data-code="RightDown" title="Down Right">↘</button>
           </div>
 
           <!-- Speed Slider -->
           <div class="control-row">
-            <label for="ptzSpeed">Speed: <span id="speedValue">5</span></label>
+            <label for="ptzSpeed">Speed: <span id="speedValue" style="color:var(--accent);">5</span></label>
             <input type="range" id="ptzSpeed" min="1" max="8" value="5">
           </div>
 
@@ -203,7 +241,7 @@
         <div class="playback-player-card">
           <div class="player-wrapper">
             <div id="pbPlayerPlaceholder" class="player-placeholder">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#484f58" stroke-width="1.5">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               <p>Select a recorded clip or click on the timeline to start playback</p>
@@ -225,9 +263,7 @@
               <span>24:00</span>
             </div>
             <div class="timeline-track" id="timelineTrack">
-              <!-- Dynamic recording segment blocks (green = continuous, red = motion) -->
               <div class="timeline-segments" id="timelineSegments"></div>
-              <!-- Scrubber needle -->
               <div class="timeline-needle" id="timelineNeedle">
                 <div class="needle-tooltip" id="needleTooltip">12:00:00</div>
               </div>
@@ -249,12 +285,51 @@
       </div>
     </section>
 
-    <!-- VIEW: SETTINGS -->
+    <!-- VIEW: SETTINGS & THEMES -->
     <section id="viewSettings" class="view-panel">
       <div class="settings-card">
-        <h2>NVR Connection Settings</h2>
-        <p class="hint">Configure your Hikvision or Dahua NVR IP, port, and credentials. Settings are saved to Home Assistant add-on options.</p>
+        <h2>Surveillance Studio Settings</h2>
+        <p class="hint">Configure your NVR connection, display preferences, and theme styling.</p>
 
+        <!-- Theme Engine Settings -->
+        <div class="settings-section-title">Color Theme &amp; Display Appearance</div>
+        <div class="form-row">
+          <label>Theme Style</label>
+          <div class="theme-options-grid">
+            <div class="theme-chip active" data-theme-val="cyan">
+              <span class="theme-preview-dot" style="background:#00e5ff;"></span> Cyber Cyan
+            </div>
+            <div class="theme-chip" data-theme-val="emerald">
+              <span class="theme-preview-dot" style="background:#00ff88;"></span> Emerald
+            </div>
+            <div class="theme-chip" data-theme-val="amber">
+              <span class="theme-preview-dot" style="background:#ffb703;"></span> Amber Gold
+            </div>
+            <div class="theme-chip" data-theme-val="crimson">
+              <span class="theme-preview-dot" style="background:#ff0055;"></span> Crimson
+            </div>
+            <div class="theme-chip" data-theme-val="titanium">
+              <span class="theme-preview-dot" style="background:#94a3b8;"></span> Titanium
+            </div>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="settingsCustomColor">Custom Accent Color</label>
+            <input type="color" id="settingsCustomColor" value="#00e5ff" style="height:38px; padding:2px; cursor:pointer;">
+          </div>
+          <div class="form-row">
+            <label for="settingsOledToggle">OLED Black Background</label>
+            <select id="settingsOledToggle">
+              <option value="false">Deep Glass Space (#070a12)</option>
+              <option value="true">Pure OLED Black (#000000)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- NVR Connection Form -->
+        <div class="settings-section-title">NVR Connection Parameters</div>
         <form id="settingsForm" class="settings-form">
           <div class="form-row">
             <label for="cfgBrand">NVR System Brand</label>
@@ -295,7 +370,7 @@
           <div class="form-row">
             <label for="cfgStreamQuality">Default Grid Stream Quality</label>
             <select id="cfgStreamQuality">
-              <option value="sub">Sub-stream (Recommended: Fast, Low Bandwidth)</option>
+              <option value="sub">Sub-stream (Recommended: Low Bandwidth, Fast Multi-View)</option>
               <option value="main">Main-stream (Full HD / 4K)</option>
             </select>
           </div>
