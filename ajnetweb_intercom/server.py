@@ -26,10 +26,16 @@ OPTIONS_FILE = "/data/options.json"
 DATA_DIR = "/data/intercom"
 VISITORS_DIR = "/data/intercom/visitors"
 HISTORY_FILE = "/data/intercom/visitor_history.json"
+HA_WWW_DIR = "/config/www/ajnetweb_intercom"
 WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8097))
 
 os.makedirs(VISITORS_DIR, exist_ok=True)
+try:
+    if os.path.exists("/config/www"):
+        os.makedirs(HA_WWW_DIR, exist_ok=True)
+except Exception as _e:
+    pass
 
 _state_lock = Lock()
 _active_client = None
@@ -37,6 +43,7 @@ _client_brand = None
 _config_cache = {}
 _event_subscribers = []  # List of SSE response queues
 _event_thread = None
+_ha_action_thread = None
 _last_ring_time = 0
 
 
@@ -59,6 +66,8 @@ def load_config() -> dict:
         "unlock_duration_sec": int(os.environ.get("UNLOCK_DURATION", 3) or 3),
         "auto_snapshot_on_ring": os.environ.get("AUTO_SNAPSHOT", "true").lower() == "true",
         "ha_notify_on_ring": os.environ.get("HA_NOTIFY", "true").lower() == "true",
+        "push_notify_mode": os.environ.get("PUSH_NOTIFY_MODE", "all_mobile_devices"),
+        "critical_push_sound": os.environ.get("CRITICAL_PUSH_SOUND", "true").lower() == "true",
         "log_level": os.environ.get("LOG_LEVEL", "info"),
     }
     if os.path.exists(OPTIONS_FILE):
@@ -217,6 +226,231 @@ def notify_homeassistant_event(event_name: str, data: dict):
         log.debug("HA event trigger failed: %s", e)
 
 
+def get_active_mobile_app_notifiers() -> list:
+    """
+    Dynamically discover all active Companion App notification services in Home Assistant.
+    Avoids hardcoding entity IDs so that when customers delete/reinstall apps or get
+    new phones/tablets, doorbell chimes ring automatically without editing any YAML scripts.
+    """
+    sup_token = os.environ.get("SUPERVISOR_TOKEN")
+    if not sup_token:
+        return []
+
+    services_url = "http://supervisor/core/api/services"
+    headers = {
+        "Authorization": f"Bearer {sup_token}",
+        "Content-Type": "application/json",
+    }
+    discovered = []
+    try:
+        import urllib.request
+        req = urllib.request.Request(services_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            for domain_item in data:
+                if domain_item.get("domain") == "notify":
+                    srv_dict = domain_item.get("services", {})
+                    for srv_name in srv_dict.keys():
+                        if srv_name.startswith("mobile_app_"):
+                            discovered.append(srv_name)
+    except Exception as e:
+        log.warning("Dynamic mobile app service discovery failed: %s", e)
+
+    return discovered
+
+
+def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate", snapshot_filename: str = None) -> list:
+    """
+    Broadcast high-priority critical doorbell push notifications to ALL dynamically
+    discovered mobile devices currently registered in Home Assistant (Hik-Connect / DMSS style).
+    Includes live visitor photo, critical sound, and instant lock-screen action buttons.
+    """
+    sup_token = os.environ.get("SUPERVISOR_TOKEN")
+    if not sup_token:
+        log.warning("Cannot send push notifications: SUPERVISOR_TOKEN not available")
+        return []
+
+    notifiers = get_active_mobile_app_notifiers()
+    log.info("Dynamically discovered %d active mobile app notify services: %s", len(notifiers), notifiers)
+
+    local_image_url = f"/local/ajnetweb_intercom/{snapshot_filename}" if snapshot_filename else "/local/ajnetweb_intercom/latest_ring.jpg"
+    door1 = _config_cache.get("door_1_name", "Main Gate")
+    door2 = _config_cache.get("door_2_name", "Pedestrian Door")
+    is_critical = _config_cache.get("critical_push_sound", True)
+
+    payload_data = {
+        "title": f"🔔 Doorbell Ringing - {door_name}",
+        "message": f"Visitor at {door_name} is calling... Tap to open or view.",
+        "data": {
+            "image": local_image_url,
+            "attachment": {
+                "url": local_image_url,
+                "content-type": "jpeg",
+                "hide-thumbnail": False,
+            },
+            "clickAction": "/ajnetweb_intercom",
+            "url": "/ajnetweb_intercom",
+            "ttl": 0,
+            "priority": "high",
+            "push": {
+                "sound": {
+                    "name": "default",
+                    "critical": 1 if is_critical else 0,
+                    "volume": 1.0,
+                },
+                "interruption-level": "critical" if is_critical else "time-sensitive",
+            },
+            "channel": "Doorbell",
+            "importance": "high",
+            "actions": [
+                {
+                    "action": "AJNETWEB_UNLOCK_1",
+                    "title": f"🔓 Unlock {door1}",
+                    "destructive": False,
+                },
+                {
+                    "action": "AJNETWEB_UNLOCK_2",
+                    "title": f"🔓 Unlock {door2}",
+                    "destructive": False,
+                },
+                {
+                    "action": "URI",
+                    "title": "📹 View Live Camera",
+                    "uri": "/ajnetweb_intercom",
+                },
+            ],
+        },
+    }
+
+    import urllib.request
+    successful_targets = []
+    targets = notifiers if notifiers else ["notify"]
+    for srv in targets:
+        try:
+            url = f"http://supervisor/core/api/services/notify/{srv}"
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload_data).encode("utf-8"),
+                headers={
+                    "Authorization": f"Bearer {sup_token}",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status in (200, 201):
+                    successful_targets.append(srv)
+                    log.info("Dispatched dynamic doorbell push to notify.%s (HTTP %s)", srv, resp.status)
+        except Exception as e:
+            log.error("Failed to push doorbell notification to notify.%s: %s", srv, e)
+
+    return successful_targets
+
+
+def handle_mobile_notification_action(action: str, ev_data: dict):
+    """Handle lock-screen action button taps (e.g. AJNETWEB_UNLOCK_1) from iOS/Android."""
+    if not action:
+        return
+
+    device_name = ev_data.get("device_id") or ev_data.get("source_device_id") or "Mobile Device"
+    log.info("Received Lock-Screen Action from %s: %s", device_name, action)
+
+    with _state_lock:
+        client = _active_client
+        cfg = dict(_config_cache)
+
+    if not client:
+        log.warning("Cannot execute lock screen action %s: Door station client not connected", action)
+        return
+
+    if action == "AJNETWEB_UNLOCK_1":
+        door_name = cfg.get("door_1_name", "Main Gate")
+        ok = client.unlock_door(1)
+        if ok:
+            log.info("Successfully unlocked %s via Mobile Lock-Screen Action", door_name)
+            record_visitor_event("door_unlock", f"Unlocked {door_name} (Mobile Lock-Screen Action)")
+            notify_homeassistant_event("ajnetweb_door_unlocked", {"door": 1, "name": door_name, "source": "mobile_action"})
+            broadcast_sse({"event": "door_unlocked", "door": 1, "name": door_name})
+    elif action == "AJNETWEB_UNLOCK_2":
+        door_name = cfg.get("door_2_name", "Pedestrian Door")
+        ok = client.unlock_door(2)
+        if ok:
+            log.info("Successfully unlocked %s via Mobile Lock-Screen Action", door_name)
+            record_visitor_event("door_unlock", f"Unlocked {door_name} (Mobile Lock-Screen Action)")
+            notify_homeassistant_event("ajnetweb_door_unlocked", {"door": 2, "name": door_name, "source": "mobile_action"})
+            broadcast_sse({"event": "door_unlocked", "door": 2, "name": door_name})
+
+
+def ha_action_listener_worker():
+    """
+    Background daemon listening for Home Assistant mobile_app_notification_action events.
+    When a user taps '🔓 Unlock Main Gate' directly on their phone lock screen,
+    this worker intercepts the action and immediately triggers the door relay strike.
+    Zero customer or installer YAML automations required!
+    """
+    sup_token = os.environ.get("SUPERVISOR_TOKEN")
+    if not sup_token:
+        log.info("Supervisor token not available; mobile action listener disabled.")
+        return
+
+    while True:
+        try:
+            import websocket
+
+            def on_message(ws, raw_msg):
+                try:
+                    msg = json.loads(raw_msg)
+                    mtype = msg.get("type")
+                    if mtype == "auth_required":
+                        ws.send(json.dumps({"type": "auth", "access_token": sup_token}))
+                    elif mtype == "auth_ok":
+                        log.info("Connected to Home Assistant WebSocket for dynamic lock-screen push actions.")
+                        ws.send(json.dumps({
+                            "id": 1,
+                            "type": "subscribe_events",
+                            "event_type": "mobile_app_notification_action",
+                        }))
+                        ws.send(json.dumps({
+                            "id": 2,
+                            "type": "subscribe_events",
+                            "event_type": "html5_notification.clicked",
+                        }))
+                    elif mtype == "event":
+                        ev_data = msg.get("event", {}).get("data", {})
+                        action = ev_data.get("action")
+                        handle_mobile_notification_action(action, ev_data)
+                except Exception as err:
+                    log.error("Error processing HA WebSocket event: %s", err)
+
+            def on_error(ws, error):
+                log.debug("HA WebSocket listener info: %s", error)
+
+            def on_close(ws, close_status_code, close_msg):
+                log.info("HA WebSocket closed (%s), reconnecting in 5s...", close_status_code)
+
+            ws = websocket.WebSocketApp(
+                "ws://supervisor/core/websocket",
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close,
+            )
+            ws.run_forever(ping_interval=20, ping_timeout=10)
+        except ImportError:
+            log.warning("websocket module not available; lock-screen action listener standing by.")
+            time.sleep(30)
+        except Exception as e:
+            log.warning("HA WebSocket worker encountered error: %s. Reconnecting in 5s...", e)
+            time.sleep(5)
+
+
+def start_ha_action_listener():
+    """Launch the background HA action listener thread."""
+    global _ha_action_thread
+    if _ha_action_thread is None or not _ha_action_thread.is_alive():
+        _ha_action_thread = threading.Thread(target=ha_action_listener_worker, daemon=True, name="ha-action-events")
+        _ha_action_thread.start()
+
+
 def on_door_event(event_info: dict):
     """Callback triggered whenever an event is received from Door Station."""
     global _last_ring_time
@@ -242,11 +476,32 @@ def on_door_event(event_info: dict):
                         f.write(snap)
                     snapshot_filename = fn
                     event_info["snapshot_url"] = f"api/visitors/image/{fn}"
+
+                    # Mirror snapshot to HA /config/www/ajnetweb_intercom so Companion App loads image
+                    try:
+                        if os.path.exists("/config/www"):
+                            os.makedirs(HA_WWW_DIR, exist_ok=True)
+                            with open(os.path.join(HA_WWW_DIR, "latest_ring.jpg"), "wb") as f:
+                                f.write(snap)
+                            with open(os.path.join(HA_WWW_DIR, fn), "wb") as f:
+                                f.write(snap)
+                    except Exception as err:
+                        log.debug("Could not mirror snapshot to HA www: %s", err)
             except Exception as e:
                 log.error("Failed to capture visitor snapshot: %s", e)
 
         record_visitor_event("doorbell_ring", "Doorbell button pressed", snapshot_filename)
         notify_homeassistant_event("ajnetweb_doorbell_ring", event_info)
+
+        # Dynamic Hik-Connect / DMSS Push Notification Broadcast
+        if _config_cache.get("push_notify_mode", "all_mobile_devices") == "all_mobile_devices":
+            door_name = _config_cache.get("door_1_name", "Main Gate")
+            threading.Thread(
+                target=dispatch_dynamic_doorbell_push,
+                args=(1, door_name, snapshot_filename),
+                daemon=True,
+                name="doorbell-push-broadcast",
+            ).start()
 
     elif ev == "door_unlocked":
         record_visitor_event("door_unlock", event_info.get("details", "Door opened"))
@@ -489,6 +744,18 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self.send_error(404, "Image not found")
             return
 
+        if path == "/api/notifications/devices":
+            devs = get_active_mobile_app_notifiers()
+            with _state_lock:
+                cfg = dict(_config_cache)
+            self._send_json({
+                "mode": cfg.get("push_notify_mode", "all_mobile_devices"),
+                "critical_sound": cfg.get("critical_push_sound", True),
+                "count": len(devs),
+                "devices": devs,
+            })
+            return
+
         if path == "/api/config":
             with _state_lock:
                 cfg = dict(_config_cache)
@@ -531,6 +798,43 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": ok, "door": door_id, "name": door_name})
             return
 
+        if path == "/api/notifications/test":
+            door_id = int(payload.get("door", 1))
+            with _state_lock:
+                cfg = dict(_config_cache)
+                client = _active_client
+            door_name = cfg.get(f"door_{door_id}_name", f"Door {door_id}")
+
+            test_snap_fn = None
+            if client:
+                try:
+                    img = client.get_snapshot()
+                    if img:
+                        test_snap_fn = f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                        fp = os.path.join(VISITORS_DIR, test_snap_fn)
+                        with open(fp, "wb") as f:
+                            f.write(img)
+                        try:
+                            if os.path.exists("/config/www"):
+                                os.makedirs(HA_WWW_DIR, exist_ok=True)
+                                with open(os.path.join(HA_WWW_DIR, "latest_ring.jpg"), "wb") as f:
+                                    f.write(img)
+                                with open(os.path.join(HA_WWW_DIR, test_snap_fn), "wb") as f:
+                                    f.write(img)
+                        except Exception:
+                            pass
+                except Exception as e:
+                    log.debug("Test snapshot failed: %s", e)
+
+            notified = dispatch_dynamic_doorbell_push(door_id, door_name, test_snap_fn)
+            self._send_json({
+                "ok": True,
+                "count": len(notified),
+                "notified_devices": notified,
+                "message": f"Test ring notification sent to {len(notified)} active device(s).",
+            })
+            return
+
         if path == "/api/call/action":
             action = payload.get("action", "hangUp")  # answer | reject | hangUp
             with _state_lock:
@@ -561,6 +865,7 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 def main():
     log.info("Starting AJ Netweb Intercom & Door Station Server on port %s...", PORT)
     init_client()
+    start_ha_action_listener()
     server = ThreadedHTTPServer(("0.0.0.0", PORT), IntercomRequestHandler)
     try:
         server.serve_forever()

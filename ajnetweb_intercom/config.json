@@ -1,8 +1,8 @@
 {
   "name": "AJ Netweb Intercom & Door Station Studio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "slug": "ajnetweb_intercom",
-  "description": "Professional Video Intercom & Door Station Controller for Hikvision and Dahua. Real-time doorbell chimes, instant door release relays, and visitor snapshot capture for Home Assistant.",
+  "description": "Professional Video Intercom & Door Station Controller for Hikvision and Dahua. Dynamic Hik-Connect/DMSS mobile push notifications, real-time chimes, instant door release relays, and visitor snapshot capture.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
   "arch": [
     "aarch64",
@@ -15,6 +15,10 @@
   "hassio_api": true,
   "hassio_role": "manager",
   "homeassistant_api": true,
+  "map": [
+    "config:rw",
+    "share:rw"
+  ],
   "options": {
     "brand": "auto",
     "host": "",
@@ -27,6 +31,8 @@
     "unlock_duration_sec": 3,
     "auto_snapshot_on_ring": true,
     "ha_notify_on_ring": true,
+    "push_notify_mode": "all_mobile_devices",
+    "critical_push_sound": true,
     "log_level": "info"
   },
   "schema": {
@@ -41,6 +47,8 @@
     "unlock_duration_sec": "int?",
     "auto_snapshot_on_ring": "bool?",
     "ha_notify_on_ring": "bool?",
+    "push_notify_mode": "list(all_mobile_devices|disabled)?",
+    "critical_push_sound": "bool?",
     "log_level": "list(debug|info|warning|error)"
   },
   "ingress": true,

@@ -31,6 +31,7 @@
     headerColorPicker: document.getElementById("headerColorPicker"),
     colorPickerWrapper: document.getElementById("colorPickerWrapper"),
     btnSoundToggle: document.getElementById("btnSoundToggle"),
+    btnNotifyToggle: document.getElementById("btnNotifyToggle"),
     // Call Banner
     callBanner: document.getElementById("callBanner"),
     btnQuickUnlock: document.getElementById("btnQuickUnlock"),
@@ -68,7 +69,55 @@
     settingsCustomColor: document.getElementById("settingsCustomColor"),
     settingsOledToggle: document.getElementById("settingsOledToggle"),
     themeChips: document.querySelectorAll(".theme-chip"),
+    // Dynamic Push Notification Settings
+    pushDevicesList: document.getElementById("pushDevicesList"),
+    btnRefreshDevices: document.getElementById("btnRefreshDevices"),
+    btnTestPushRing: document.getElementById("btnTestPushRing"),
+    pushTestFeedback: document.getElementById("pushTestFeedback"),
+    cfgPushMode: document.getElementById("cfgPushMode"),
+    cfgCriticalSound: document.getElementById("cfgCriticalSound"),
   };
+
+  // ------------------------------------------------------------------ Browser Push Notifications
+  function setupBrowserNotifications() {
+    if (!("Notification" in window)) {
+      if (el.btnNotifyToggle) el.btnNotifyToggle.style.display = "none";
+      return;
+    }
+
+    updateNotifyBtnState();
+
+    if (el.btnNotifyToggle) {
+      el.btnNotifyToggle.addEventListener("click", async () => {
+        if (Notification.permission === "granted") {
+          new Notification("🔔 AJ Netweb Intercom", {
+            body: "Browser chime notifications are active on this device!",
+            icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔔</text></svg>",
+          });
+        } else if (Notification.permission !== "denied") {
+          const perm = await Notification.requestPermission();
+          updateNotifyBtnState();
+          if (perm === "granted") {
+            new Notification("🔔 AJ Netweb Intercom", {
+              body: "Doorbell chime alerts enabled on this device!",
+              icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔔</text></svg>",
+            });
+          }
+        } else {
+          alert("Notifications are blocked in your browser settings. Please enable notifications for this site to receive doorbell alerts.");
+        }
+      });
+    }
+  }
+
+  function updateNotifyBtnState() {
+    if (!el.btnNotifyToggle || !("Notification" in window)) return;
+    const isGranted = Notification.permission === "granted";
+    el.btnNotifyToggle.classList.toggle("active", isGranted);
+    el.btnNotifyToggle.title = isGranted
+      ? "Browser Notifications Active (Click to test)"
+      : "Click to Enable Browser Doorbell Notifications";
+  }
 
   // ------------------------------------------------------------------ Web Audio Ding-Dong Chime
   function playDoorbellChime() {
@@ -112,10 +161,12 @@
     setupNavigation();
     setupDoorControls();
     setupSettings();
+    setupBrowserNotifications();
     startClock();
 
     await checkStatus();
     await loadVisitors();
+    loadDiscoveredDevices();
     initEventStream();
   }
 
@@ -390,6 +441,26 @@
       triggerRingUI();
       addActivityItem("ring", "Doorbell button pressed");
       loadVisitors();
+
+      // Native Web Browser Notification (Desktop & Mobile PWA)
+      if ("Notification" in window && Notification.permission === "granted") {
+        try {
+          const n = new Notification(`🔔 Doorbell Ringing - ${state.door1Name}`, {
+            body: "Visitor at the entrance is calling! Click to view live or unlock.",
+            icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔔</text></svg>",
+            image: ev.snapshot_url || "api/snapshot",
+            tag: "ajnetweb-doorbell",
+            requireInteraction: true,
+          });
+          n.onclick = () => {
+            window.focus();
+            switchTab("live");
+            n.close();
+          };
+        } catch (err) {
+          console.debug("Web notification display failed:", err);
+        }
+      }
     } else if (ev.event === "door_unlocked") {
       el.doorLockBadge.textContent = "Unlocked";
       el.doorLockBadge.className = "badge danger";
@@ -455,6 +526,41 @@
     });
   }
 
+  // ------------------------------------------------------------------ Dynamic Push Device Discovery
+  async function loadDiscoveredDevices() {
+    if (!el.pushDevicesList) return;
+    el.pushDevicesList.innerHTML = '<span class="device-chip-loading">Scanning Home Assistant Companion App services...</span>';
+    try {
+      const res = await fetch("api/notifications/devices");
+      const data = await res.json();
+
+      if (el.cfgPushMode && data.mode) el.cfgPushMode.value = data.mode;
+      if (el.cfgCriticalSound && data.critical_sound !== undefined) {
+        el.cfgCriticalSound.value = data.critical_sound ? "true" : "false";
+      }
+
+      if (!data.devices || !data.devices.length) {
+        el.pushDevicesList.innerHTML =
+          '<span class="device-chip-empty">No companion app devices detected. Open Home Assistant app on your iOS or Android phone to register.</span>';
+        return;
+      }
+
+      el.pushDevicesList.innerHTML = data.devices
+        .map((d) => {
+          const cleanName = d.replace(/^mobile_app_/, "").replace(/_/g, " ").toUpperCase();
+          return `
+            <div class="device-chip" title="Active HA Notify Service: notify.${d}">
+              <span class="device-chip-dot"></span>
+              <span>📱 ${cleanName}</span>
+            </div>
+          `;
+        })
+        .join("");
+    } catch (err) {
+      el.pushDevicesList.innerHTML = `<span class="device-chip-empty" style="color:var(--danger);">Scan failed: ${err.message}</span>`;
+    }
+  }
+
   // ------------------------------------------------------------------ Settings
   async function loadSettings() {
     try {
@@ -467,6 +573,11 @@
       if (el.cfgUsername) el.cfgUsername.value = cfg.username || "admin";
       if (el.cfgDoor1) el.cfgDoor1.value = cfg.door_1_name || "Main Gate";
       if (el.cfgDoor2) el.cfgDoor2.value = cfg.door_2_name || "Pedestrian Door";
+      if (el.cfgPushMode && cfg.push_notify_mode) el.cfgPushMode.value = cfg.push_notify_mode;
+      if (el.cfgCriticalSound && cfg.critical_push_sound !== undefined) {
+        el.cfgCriticalSound.value = cfg.critical_push_sound ? "true" : "false";
+      }
+      loadDiscoveredDevices();
     } catch (e) {
       console.error("Failed to load settings:", e);
     }
@@ -487,6 +598,41 @@
       applyTheme(state.theme, state.customColor, e.target.value === "true");
     });
 
+    if (el.btnRefreshDevices) {
+      el.btnRefreshDevices.addEventListener("click", () => {
+        loadDiscoveredDevices();
+      });
+    }
+
+    if (el.btnTestPushRing) {
+      el.btnTestPushRing.addEventListener("click", async () => {
+        if (el.pushTestFeedback) {
+          el.pushTestFeedback.innerHTML = '<span style="color:var(--accent);">Dispatching test ring &amp; snapshot...</span>';
+        }
+        try {
+          const res = await fetch("api/notifications/test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ door: 1 }),
+          });
+          const d = await res.json();
+          if (d.ok) {
+            if (el.pushTestFeedback) {
+              el.pushTestFeedback.innerHTML = `<span style="color:var(--success);">✓ ${d.message || "Test ring sent!"}</span>`;
+            }
+          } else {
+            if (el.pushTestFeedback) {
+              el.pushTestFeedback.innerHTML = `<span style="color:var(--danger);">${d.error || "Failed"}</span>`;
+            }
+          }
+        } catch (err) {
+          if (el.pushTestFeedback) {
+            el.pushTestFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
+          }
+        }
+      });
+    }
+
     el.settingsForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const payload = {
@@ -497,6 +643,8 @@
         username: el.cfgUsername.value.trim(),
         door_1_name: el.cfgDoor1.value.trim(),
         door_2_name: el.cfgDoor2.value.trim(),
+        push_notify_mode: el.cfgPushMode ? el.cfgPushMode.value : "all_mobile_devices",
+        critical_push_sound: el.cfgCriticalSound ? el.cfgCriticalSound.value === "true" : true,
       };
       if (el.cfgPassword.value) {
         payload.password = el.cfgPassword.value;

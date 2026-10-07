@@ -72,6 +72,14 @@
         <input type="color" id="headerColorPicker" value="#00e5ff">
       </label>
 
+      <!-- Browser Notification Permission Toggle -->
+      <button id="btnNotifyToggle" class="icon-btn" title="Enable Browser Push Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+      </button>
+
       <!-- Mute/Sound Toggle -->
       <button id="btnSoundToggle" class="icon-btn" title="Toggle Doorbell Chime Sound">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -295,6 +303,47 @@
             <div class="form-row">
               <label for="cfgDoor2">Door 2 Label</label>
               <input type="text" id="cfgDoor2" value="Pedestrian Door">
+            </div>
+          </div>
+
+          <!-- Dynamic Mobile Push Notifications (Hik-Connect / DMSS Engine) -->
+          <div class="settings-section-title">Dynamic Mobile Push Notifications (Hik-Connect / DMSS Engine)</div>
+          
+          <div class="settings-notice-box">
+            <div class="notice-icon">⚡</div>
+            <div class="notice-text">
+              <strong>Zero-Maintenance Architecture:</strong> Discovers all active iOS &amp; Android devices automatically. Reinstalling apps or adding new phones works immediately with zero manual automations or YAML editing.
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="device-discovery-header">
+              <label>Active Discovered Mobile Devices</label>
+              <button type="button" id="btnRefreshDevices" class="chip-refresh-btn" title="Rescan Home Assistant services">↻ Rescan</button>
+            </div>
+            <div id="pushDevicesList" class="devices-chips-container">
+              <span class="device-chip-loading">Scanning active Companion App devices...</span>
+            </div>
+            <div class="test-push-row">
+              <button type="button" id="btnTestPushRing" class="secondary-btn highlight-btn">🔔 Send Test Ring &amp; Push to All Devices</button>
+              <span id="pushTestFeedback" class="feedback-msg-inline"></span>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="cfgPushMode">Mobile Push Dispatch</label>
+              <select id="cfgPushMode">
+                <option value="all_mobile_devices">Broadcast to All Logged-in Devices (Hik-Connect / DMSS)</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="cfgCriticalSound">Critical Doorbell Chime</label>
+              <select id="cfgCriticalSound">
+                <option value="true">Critical Alert (Bypass Silent &amp; Do Not Disturb)</option>
+                <option value="false">Standard Sound</option>
+              </select>
             </div>
           </div>
 

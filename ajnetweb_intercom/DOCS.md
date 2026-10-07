@@ -19,27 +19,41 @@
    - Click **UNLOCK** to trigger your electric gate or door strike.
    - When a visitor presses the doorbell, your browser will chime, show an incoming call banner, and save a photo in the Visitor Gallery.
 
-## Home Assistant Automations Integration
+## Dynamic Mobile Push Notifications (Hik-Connect / DMSS Engine)
 
-### 1. Trigger Door Unlock from HA Dashboard or Script
-Use Home Assistant's REST command or Shell command:
+The add-on features an automated, zero-maintenance notification system modeled after commercial apps like **Hik-Connect** and **Dahua DMSS**:
+
+### Why It's Better Than Standard Home Assistant Automations:
+- **No Hardcoded Device Entity IDs**: Traditional HA scripts break whenever a user deletes/reinstalls the app or buys a new phone because the `notify.mobile_app_*` entity name changes.
+- **Automatic Device Discovery**: When someone presses the doorbell, the add-on dynamically discovers every active iOS & Android mobile companion app registered in Home Assistant in real time.
+- **Rich Actionable Lock-Screen Buttons**:
+  - `🔓 Unlock Main Gate`: Instantly opens relay 1 right from your lock screen.
+  - `🔓 Unlock Pedestrian Door`: Instantly opens relay 2.
+  - `📹 View Live Camera`: Deep-links directly to the Door Station video feed.
+- **Live Visitor Photo Attached**: High-resolution snapshot preview is mirrored to Home Assistant's local web server (`/local/ajnetweb_intercom/latest_ring.jpg`) and attached directly to the push notification.
+- **Critical Audio Chime**: Bypasses silent switches and Do Not Disturb on iOS and Android so you never miss a visitor.
+- **Zero YAML Automations Required**: A built-in Home Assistant WebSocket listener intercepts lock-screen action button taps (`mobile_app_notification_action`) and fires the door relay automatically.
+
+---
+
+## Home Assistant Automations & REST Integration (Optional)
+
+If you wish to trigger the door release from third-party scripts, Lovelace buttons, or Siri Shortcuts:
+
+### 1. Trigger Door Unlock via HTTP GET
 ```yaml
 rest_command:
-  unlock_front_gate:
+  unlock_main_gate:
     url: "http://127.0.0.1:8097/api/unlock?door=1"
+    method: GET
+
+  unlock_pedestrian_door:
+    url: "http://127.0.0.1:8097/api/unlock?door=2"
     method: GET
 ```
 
-### 2. Automate on Doorbell Ring Event
-Create an automation triggered by the native event:
-```yaml
-alias: "Doorbell Ring Notification"
-trigger:
-  - platform: event
-    event_type: ajnetweb_doorbell_ring
-action:
-  - service: notify.notify
-    data:
-      title: "Doorbell Ringing!"
-      message: "Someone is at the front door."
-```
+### 2. Native Event Bus Hooks
+The add-on fires events into Home Assistant Core on every action:
+- `ajnetweb_doorbell_ring`: Dispatched on doorbell button press (ideal for smart speaker chimes or flashing smart lights).
+- `ajnetweb_door_unlocked`: Dispatched on electric strike release with door ID, label, and trigger source.
+
