@@ -47,6 +47,19 @@ _event_thread = None
 _ha_action_thread = None
 _pruner_thread = None
 _last_ring_time = 0
+_connected_displays = {}  # display_id -> dict(id, name, device_type, status, last_seen, ip)
+_active_intercom_calls = {}  # call_id -> dict(call_id, from_id, from_name, to_id, to_name, call_type, state, start_time)
+
+
+def get_active_displays() -> list:
+    """Return all active indoor displays, pruning any inactive for > 70s."""
+    now = time.time()
+    with _state_lock:
+        stale = [did for did, d in _connected_displays.items() if now - d.get("last_seen", 0) > 70]
+        for did in stale:
+            del _connected_displays[did]
+        return list(_connected_displays.values())
+
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -851,6 +864,17 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             })
             return
 
+        if path == "/api/intercom/displays":
+            with _state_lock:
+                active_calls = list(_active_intercom_calls.values())
+            self._send_json({
+                "ok": True,
+                "displays": get_active_displays(),
+                "active_calls": active_calls,
+            })
+            return
+
+
         super().do_GET()
 
     def do_POST(self):
@@ -1044,7 +1068,153 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "message": f"Credential for {target.get('name')} revoked."})
             return
 
+        # ---------------------------------------------------------------- Display Registration & Heartbeat
+        if path == "/api/intercom/displays/register":
+            did = str(payload.get("display_id") or payload.get("id") or "").strip()
+            name = (payload.get("room_name") or payload.get("name") or "Display").strip()
+            dtype = (payload.get("device_type") or payload.get("type") or "tablet").strip()
+            status = (payload.get("status") or "available").strip()  # available | busy | dnd
+            if not did:
+                self._send_json({"ok": False, "error": "display_id is required"}, status=400)
+                return
+
+            client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+            item = {
+                "id": did,
+                "name": name,
+                "device_type": dtype,
+                "status": status,
+                "last_seen": time.time(),
+                "ip": client_ip,
+            }
+            with _state_lock:
+                _connected_displays[did] = item
+            broadcast_sse({"event": "intercom_display_updated", "display": item, "displays": get_active_displays()})
+            self._send_json({"ok": True, "display": item})
+            return
+
+        # ---------------------------------------------------------------- Inter-Display WebRTC / Audio Calling
+        if path == "/api/intercom/call":
+            call_id = payload.get("call_id") or f"call_{int(time.time()*1000)}"
+            from_id = payload.get("from_id")
+            from_name = payload.get("from_name", "Unknown Room")
+            to_id = payload.get("to_id")
+            to_name = payload.get("to_name", "Target Room")
+            call_type = payload.get("call_type", "audio")
+            sdp_offer = payload.get("sdp_offer")
+
+            call_record = {
+                "call_id": call_id,
+                "from_id": from_id,
+                "from_name": from_name,
+                "to_id": to_id,
+                "to_name": to_name,
+                "call_type": call_type,
+                "state": "ringing",
+                "start_time": time.time(),
+            }
+            with _state_lock:
+                _active_intercom_calls[call_id] = call_record
+
+            broadcast_sse({
+                "event": "intercom_incoming_call",
+                "call_id": call_id,
+                "from_id": from_id,
+                "from_name": from_name,
+                "to_id": to_id,
+                "to_name": to_name,
+                "call_type": call_type,
+                "sdp_offer": sdp_offer,
+            })
+            notify_homeassistant_event("ajnetweb_room_call_ring", {
+                "call_id": call_id,
+                "from_name": from_name,
+                "to_name": to_name,
+            })
+            self._send_json({"ok": True, "call_id": call_id, "status": "ringing"})
+            return
+
+        if path == "/api/intercom/answer":
+            call_id = payload.get("call_id")
+            sdp_answer = payload.get("sdp_answer")
+            with _state_lock:
+                if call_id in _active_intercom_calls:
+                    _active_intercom_calls[call_id]["state"] = "connected"
+
+            broadcast_sse({
+                "event": "intercom_call_answered",
+                "call_id": call_id,
+                "from_id": payload.get("from_id"),
+                "to_id": payload.get("to_id"),
+                "sdp_answer": sdp_answer,
+            })
+            self._send_json({"ok": True, "call_id": call_id, "status": "connected"})
+            return
+
+        if path == "/api/intercom/ice":
+            call_id = payload.get("call_id")
+            candidate = payload.get("candidate")
+            broadcast_sse({
+                "event": "intercom_ice_candidate",
+                "call_id": call_id,
+                "from_id": payload.get("from_id"),
+                "to_id": payload.get("to_id"),
+                "candidate": candidate,
+            })
+            self._send_json({"ok": True})
+            return
+
+        if path == "/api/intercom/hangup":
+            call_id = payload.get("call_id")
+            reason = payload.get("reason", "user_hangup")
+            with _state_lock:
+                if call_id in _active_intercom_calls:
+                    del _active_intercom_calls[call_id]
+
+            broadcast_sse({
+                "event": "intercom_call_ended",
+                "call_id": call_id,
+                "reason": reason,
+            })
+            self._send_json({"ok": True, "call_id": call_id, "status": "ended"})
+            return
+
+        # ---------------------------------------------------------------- Villa All-Call / PA Broadcast
+        if path == "/api/intercom/broadcast":
+            from_name = payload.get("from_name", "Intercom")
+            message = (payload.get("message") or "").strip()
+            audio_base64 = payload.get("audio_data")
+
+            broadcast_sse({
+                "event": "intercom_broadcast",
+                "from_name": from_name,
+                "message": message,
+                "audio_data": audio_base64,
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+            })
+            record_visitor_event("villa_broadcast", f"All-Call from {from_name}: {message or 'Voice Message'}")
+            notify_homeassistant_event("ajnetweb_villa_broadcast", {
+                "from_name": from_name,
+                "message": message,
+            })
+            self._send_json({"ok": True, "message": "Broadcast sent to all displays."})
+            return
+
+        # ---------------------------------------------------------------- Hardware Station SIP / ISAPI Bridge
+        if path == "/api/intercom/hardware_call":
+            target = str(payload.get("target", "101")).strip()
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+
+            ok = False
+            if client and brand == "hikvision" and hasattr(client, "call_signal"):
+                ok = client.call_signal("dial")
+            self._send_json({"ok": ok, "target": target})
+            return
+
         self.send_error(404, "Endpoint not found")
+
 
 
 def main():

@@ -22,7 +22,19 @@
     oledMode: localStorage.getItem("ajn_intercom_oled") === "true",
     selectedDurationHours: 4,
     activeModalPass: null,
+    // Room-to-Room Intercom State
+    selfId: localStorage.getItem("ajn_display_id") || "disp_" + Math.random().toString(36).substring(2, 9),
+    selfRoom: localStorage.getItem("ajn_room_name") || "Kitchen",
+    selfStatus: localStorage.getItem("ajn_room_status") || "available",
+    activeCallId: null,
+    activeCallPeer: null,
+    activeLocalStream: null,
+    callTimerInterval: null,
+    callDurationSec: 0,
+    isMicMuted: false,
+    ringInterval: null,
   };
+  localStorage.setItem("ajn_display_id", state.selfId);
 
   const el = {
     intercomBrandBadge: document.getElementById("intercomBrandBadge"),
@@ -103,6 +115,39 @@
     btnSharePass: document.getElementById("btnSharePass"),
     btnCopyPassText: document.getElementById("btnCopyPassText"),
     btnPrintPass: document.getElementById("btnPrintPass"),
+    // Inter-Display Room Intercom
+    selectSelfRoom: document.getElementById("selectSelfRoom"),
+    selectSelfStatus: document.getElementById("selectSelfStatus"),
+    selfRoomDisplayName: document.getElementById("selfRoomDisplayName"),
+    selfStatusDot: document.getElementById("selfStatusDot"),
+    selfIpAddress: document.getElementById("selfIpAddress"),
+    broadcastInput: document.getElementById("broadcastInput"),
+    btnSendBroadcast: document.getElementById("btnSendBroadcast"),
+    broadcastFeedback: document.getElementById("broadcastFeedback"),
+    displaysGrid: document.getElementById("displaysGrid"),
+    btnRefreshDisplays: document.getElementById("btnRefreshDisplays"),
+    // Intercom Calling Modal
+    intercomCallModal: document.getElementById("intercomCallModal"),
+    callAvatarIcon: document.getElementById("callAvatarIcon"),
+    callPulseRing: document.getElementById("callPulseRing"),
+    callStatusLabel: document.getElementById("callStatusLabel"),
+    callPartyName: document.getElementById("callPartyName"),
+    callDurationTimer: document.getElementById("callDurationTimer"),
+    callWaveform: document.getElementById("callWaveform"),
+    callIncomingActions: document.getElementById("callIncomingActions"),
+    callConnectedActions: document.getElementById("callConnectedActions"),
+    btnAcceptCall: document.getElementById("btnAcceptCall"),
+    btnDeclineCall: document.getElementById("btnDeclineCall"),
+    btnMuteMic: document.getElementById("btnMuteMic"),
+    muteMicIcon: document.getElementById("muteMicIcon"),
+    muteMicText: document.getElementById("muteMicText"),
+    btnQuickUnlockInCall: document.getElementById("btnQuickUnlockInCall"),
+    btnHangupCall: document.getElementById("btnHangupCall"),
+    // Villa Broadcast Banner
+    broadcastBanner: document.getElementById("broadcastBanner"),
+    broadcastSenderName: document.getElementById("broadcastSenderName"),
+    broadcastMessageText: document.getElementById("broadcastMessageText"),
+    btnDismissBroadcast: document.getElementById("btnDismissBroadcast"),
   };
 
   // ------------------------------------------------------------------ Browser Push Notifications
@@ -190,6 +235,7 @@
     setupSettings();
     setupCredentialsUI();
     setupBrowserNotifications();
+    setupRoomIntercom();
     startClock();
 
     await checkStatus();
@@ -287,14 +333,17 @@
   function switchTab(tab) {
     state.activeTab = tab;
     el.navBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+    const targetId = tab === "room-intercom" ? "viewRoomIntercom" : `view${capitalize(tab)}`;
     el.viewPanels.forEach((p) => {
-      p.classList.toggle("active", p.id === `view${capitalize(tab)}`);
+      p.classList.toggle("active", p.id === targetId);
     });
 
     if (tab === "visitors") {
       loadVisitors();
     } else if (tab === "credentials") {
       loadCredentials();
+    } else if (tab === "room-intercom") {
+      loadDisplays();
     } else if (tab === "settings") {
       loadSettings();
     }
@@ -506,6 +555,18 @@
       el.callStatusBadge.className = "badge neutral";
     } else if (ev.event === "credential_updated") {
       loadCredentials();
+    } else if (ev.event === "intercom_incoming_call") {
+      handleIncomingRoomCall(ev);
+    } else if (ev.event === "intercom_call_answered") {
+      handleRoomCallAnswered(ev);
+    } else if (ev.event === "intercom_call_ended") {
+      handleRoomCallEnded(ev);
+    } else if (ev.event === "intercom_ice_candidate") {
+      handleIceCandidate(ev);
+    } else if (ev.event === "intercom_broadcast") {
+      handleVillaBroadcast(ev);
+    } else if (ev.event === "intercom_display_updated") {
+      if (ev.displays) renderDisplays(ev.displays);
     }
   }
 
@@ -1008,6 +1069,497 @@
         el.settingsFeedback.innerHTML = `<span style="color:var(--danger);">Connection failed: ${err.message}</span>`;
       }
     });
+  }
+
+  // ------------------------------------------------------------------ Inter-Display Room Calling & Broadcast System
+  function playTelephoneRing() {
+    if (!state.soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = "sine";
+      osc2.type = "sine";
+      osc1.frequency.setValueAtTime(440, ctx.currentTime);
+      osc2.frequency.setValueAtTime(480, ctx.currentTime);
+
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(ctx.currentTime);
+      osc2.start(ctx.currentTime);
+      osc1.stop(ctx.currentTime + 1.3);
+      osc2.stop(ctx.currentTime + 1.3);
+    } catch (e) {
+      console.warn("Ring sound failed:", e);
+    }
+  }
+
+  function playAttentionChime() {
+    if (!state.soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const freqs = [523.25, 659.25, 783.99]; // C5, E5, G5 chord
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.16);
+
+        gain.gain.setValueAtTime(0.001, ctx.currentTime + idx * 0.16);
+        gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + idx * 0.16 + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.16 + 0.55);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.16);
+        osc.stop(ctx.currentTime + idx * 0.16 + 0.6);
+      });
+    } catch (e) {
+      console.warn("Attention chime failed:", e);
+    }
+  }
+
+  function setupRoomIntercom() {
+    if (el.selectSelfRoom) {
+      el.selectSelfRoom.value = state.selfRoom;
+      el.selectSelfRoom.addEventListener("change", (e) => {
+        state.selfRoom = e.target.value;
+        localStorage.setItem("ajn_room_name", state.selfRoom);
+        if (el.selfRoomDisplayName) el.selfRoomDisplayName.textContent = state.selfRoom + " Display";
+        registerSelfDisplay();
+      });
+    }
+
+    if (el.selectSelfStatus) {
+      el.selectSelfStatus.value = state.selfStatus;
+      el.selectSelfStatus.addEventListener("change", (e) => {
+        state.selfStatus = e.target.value;
+        localStorage.setItem("ajn_room_status", state.selfStatus);
+        updateSelfStatusDot();
+        registerSelfDisplay();
+      });
+    }
+
+    if (el.selfRoomDisplayName) el.selfRoomDisplayName.textContent = state.selfRoom + " Display";
+    updateSelfStatusDot();
+
+    registerSelfDisplay();
+    setInterval(registerSelfDisplay, 25000);
+
+    if (el.btnRefreshDisplays) {
+      el.btnRefreshDisplays.addEventListener("click", loadDisplays);
+    }
+
+    // Presets for All-Call Broadcast
+    document.querySelectorAll(".preset-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        if (el.broadcastInput) el.broadcastInput.value = chip.dataset.msg || chip.textContent;
+      });
+    });
+
+    if (el.btnSendBroadcast) {
+      el.btnSendBroadcast.addEventListener("click", () => {
+        const msg = (el.broadcastInput?.value || "").trim();
+        if (!msg) return;
+        sendVillaBroadcast(msg);
+      });
+    }
+
+    // Modal Action Handlers
+    if (el.btnAcceptCall) el.btnAcceptCall.addEventListener("click", acceptIncomingCall);
+    if (el.btnDeclineCall) el.btnDeclineCall.addEventListener("click", declineIncomingCall);
+    if (el.btnHangupCall) el.btnHangupCall.addEventListener("click", hangupCall);
+
+    if (el.btnMuteMic) {
+      el.btnMuteMic.addEventListener("click", () => {
+        state.isMicMuted = !state.isMicMuted;
+        if (state.activeLocalStream) {
+          state.activeLocalStream.getAudioTracks().forEach((t) => (t.enabled = !state.isMicMuted));
+        }
+        if (el.muteMicIcon) el.muteMicIcon.textContent = state.isMicMuted ? "🔇" : "🎙️";
+        if (el.muteMicText) el.muteMicText.textContent = state.isMicMuted ? "Unmute" : "Mute";
+      });
+    }
+
+    if (el.btnQuickUnlockInCall) {
+      el.btnQuickUnlockInCall.addEventListener("click", () => {
+        triggerUnlock(1, el.btnQuickUnlockInCall);
+      });
+    }
+
+    if (el.btnDismissBroadcast) {
+      el.btnDismissBroadcast.addEventListener("click", () => {
+        if (el.broadcastBanner) el.broadcastBanner.style.display = "none";
+      });
+    }
+
+    // Hardware Station Dials
+    document.querySelectorAll(".btn-ring-hw").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        dialHardwareStation(btn.dataset.unit || "101");
+      });
+    });
+
+    loadDisplays();
+  }
+
+  function updateSelfStatusDot() {
+    if (!el.selfStatusDot) return;
+    el.selfStatusDot.className = "pulse-dot " + (state.selfStatus === "available" ? "green" : state.selfStatus === "dnd" ? "red" : "amber");
+  }
+
+  async function registerSelfDisplay() {
+    try {
+      const res = await fetch("api/intercom/displays/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_id: state.selfId,
+          room_name: state.selfRoom,
+          device_type: "tablet",
+          status: state.selfStatus,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.display && el.selfIpAddress) {
+        el.selfIpAddress.textContent = data.display.ip || "127.0.0.1";
+      }
+    } catch (e) {
+      console.debug("Display registration heartbeat error:", e);
+    }
+  }
+
+  async function loadDisplays() {
+    if (!el.displaysGrid) return;
+    try {
+      const res = await fetch("api/intercom/displays");
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.displays)) {
+        renderDisplays(data.displays);
+      }
+    } catch (e) {
+      console.error("Failed to load displays:", e);
+    }
+  }
+
+  function getRoomAvatar(roomName) {
+    const r = (roomName || "").toLowerCase();
+    if (r.includes("kitchen")) return "🍳";
+    if (r.includes("bedroom") || r.includes("suite")) return "🛏️";
+    if (r.includes("majlis")) return "🏛️";
+    if (r.includes("living") || r.includes("salon")) return "🛋️";
+    if (r.includes("dining")) return "🍽️";
+    if (r.includes("kids") || r.includes("child") || r.includes("nursery")) return "🧸";
+    if (r.includes("office") || r.includes("study")) return "💼";
+    if (r.includes("garden") || r.includes("patio") || r.includes("terrace")) return "🌲";
+    if (r.includes("gym") || r.includes("pool")) return "🏋️";
+    if (r.includes("gate") || r.includes("door")) return "🚪";
+    return "📱";
+  }
+
+  function renderDisplays(displays) {
+    if (!el.displaysGrid) return;
+    el.displaysGrid.innerHTML = "";
+
+    let list = displays.filter((d) => d && d.id);
+    if (list.length <= 1) {
+      const defaults = [
+        { id: "demo_majlis", name: "Majlis Display", status: "available", device_type: "wall_tablet", isDemo: true },
+        { id: "demo_master", name: "Master Bedroom", status: "available", device_type: "wall_tablet", isDemo: true },
+        { id: "demo_garden", name: "Garden Pavilion", status: "dnd", device_type: "tablet", isDemo: true },
+        { id: "demo_kids", name: "Kids Playroom", status: "available", device_type: "tablet", isDemo: true },
+      ];
+      defaults.forEach((def) => {
+        if (!list.some((x) => x.name === def.name)) list.push(def);
+      });
+    }
+
+    list.forEach((d) => {
+      const isSelf = d.id === state.selfId;
+      const card = document.createElement("div");
+      card.className = `room-display-card ${isSelf ? "self-room" : ""}`;
+
+      const avatar = getRoomAvatar(d.name);
+      const statusClass = d.status === "available" ? "status-available" : d.status === "busy" ? "status-busy" : "status-dnd";
+      const statusText = d.status === "available" ? "Available" : d.status === "busy" ? "In Call" : "DND";
+
+      card.innerHTML = `
+        <div class="room-card-head">
+          <div class="room-avatar-badge">
+            <div class="room-icon-box">${avatar}</div>
+            <div class="room-title-block">
+              <b>${d.name} ${isSelf ? "<small style='color:var(--accent); font-weight:normal;'>(This Screen)</small>" : ""}</b>
+              <span>${d.device_type || "Wall Display"} &bull; ${d.ip || "LAN"}</span>
+            </div>
+          </div>
+          <span class="room-status-badge ${statusClass}">${statusText}</span>
+        </div>
+        <div class="room-card-actions">
+          ${isSelf
+            ? `<button type="button" class="btn-room-page" style="flex:1;" disabled>📍 Local Screen</button>`
+            : `<button type="button" class="btn-room-call" data-id="${d.id}" data-name="${d.name}">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                Call Room
+              </button>
+              <button type="button" class="btn-room-page" data-name="${d.name}" title="Send Quick Page">📢 Page</button>`
+          }
+        </div>
+      `;
+
+      if (!isSelf) {
+        card.querySelector(".btn-room-call")?.addEventListener("click", () => {
+          initiateRoomCall(d.id, d.name);
+        });
+        card.querySelector(".btn-room-page")?.addEventListener("click", () => {
+          sendVillaBroadcast(`Paging ${d.name}: Please respond on intercom.`);
+        });
+      }
+
+      el.displaysGrid.appendChild(card);
+    });
+  }
+
+  // --- Calling Flow (WebRTC / SSE Mesh) ---
+  async function initiateRoomCall(targetId, targetName) {
+    state.activeCallId = `call_${Date.now()}`;
+    state.callDurationSec = 0;
+
+    if (el.intercomCallModal) el.intercomCallModal.style.display = "flex";
+    if (el.callAvatarIcon) el.callAvatarIcon.textContent = getRoomAvatar(targetName);
+    if (el.callStatusLabel) el.callStatusLabel.textContent = "Calling Room...";
+    if (el.callPartyName) el.callPartyName.textContent = targetName;
+    if (el.callIncomingActions) el.callIncomingActions.style.display = "none";
+    if (el.callConnectedActions) el.callConnectedActions.style.display = "flex";
+    if (el.callWaveform) el.callWaveform.style.display = "none";
+    if (el.callDurationTimer) el.callDurationTimer.style.display = "none";
+
+    playTelephoneRing();
+    if (state.ringInterval) clearInterval(state.ringInterval);
+    state.ringInterval = setInterval(playTelephoneRing, 3500);
+
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        state.activeLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+      }
+    } catch (e) {
+      console.debug("Mic access bypassed:", e);
+    }
+
+    try {
+      await fetch("api/intercom/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          call_id: state.activeCallId,
+          from_id: state.selfId,
+          from_name: state.selfRoom,
+          to_id: targetId,
+          to_name: targetName,
+          call_type: "audio",
+        }),
+      });
+    } catch (err) {
+      console.error("Call dispatch failed:", err);
+    }
+  }
+
+  function handleIncomingRoomCall(callData) {
+    const targeted = (callData.to_id && callData.to_id === state.selfId) ||
+                     (callData.to_name && callData.to_name.toLowerCase() === state.selfRoom.toLowerCase());
+    if (!targeted) return;
+
+    if (state.selfStatus === "dnd") return;
+
+    state.activeCallId = callData.call_id;
+    state.callDurationSec = 0;
+
+    if (el.intercomCallModal) el.intercomCallModal.style.display = "flex";
+    if (el.callAvatarIcon) el.callAvatarIcon.textContent = getRoomAvatar(callData.from_name);
+    if (el.callStatusLabel) el.callStatusLabel.textContent = "Incoming Call From";
+    if (el.callPartyName) el.callPartyName.textContent = callData.from_name || "Villa Room";
+    if (el.callIncomingActions) el.callIncomingActions.style.display = "flex";
+    if (el.callConnectedActions) el.callConnectedActions.style.display = "none";
+    if (el.callWaveform) el.callWaveform.style.display = "none";
+    if (el.callDurationTimer) el.callDurationTimer.style.display = "none";
+
+    playTelephoneRing();
+    if (state.ringInterval) clearInterval(state.ringInterval);
+    state.ringInterval = setInterval(playTelephoneRing, 3000);
+
+    if (state.selfStatus === "auto_answer") {
+      setTimeout(acceptIncomingCall, 800);
+    }
+  }
+
+  async function acceptIncomingCall() {
+    if (state.ringInterval) clearInterval(state.ringInterval);
+
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        state.activeLocalStream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
+      }
+    } catch (e) {}
+
+    try {
+      await fetch("api/intercom/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          call_id: state.activeCallId,
+          from_id: state.selfId,
+        }),
+      });
+    } catch (e) {}
+
+    startActiveCallTimer();
+  }
+
+  function declineIncomingCall() {
+    if (state.ringInterval) clearInterval(state.ringInterval);
+    hangupCall();
+  }
+
+  function handleRoomCallAnswered(callData) {
+    if (callData.call_id !== state.activeCallId) return;
+    if (state.ringInterval) clearInterval(state.ringInterval);
+    startActiveCallTimer();
+  }
+
+  function startActiveCallTimer() {
+    if (el.callStatusLabel) el.callStatusLabel.textContent = "Call Connected • 2-Way Audio";
+    if (el.callIncomingActions) el.callIncomingActions.style.display = "none";
+    if (el.callConnectedActions) el.callConnectedActions.style.display = "flex";
+    if (el.callWaveform) el.callWaveform.style.display = "flex";
+    if (el.callDurationTimer) {
+      el.callDurationTimer.style.display = "block";
+      el.callDurationTimer.textContent = "00:00";
+    }
+
+    if (state.callTimerInterval) clearInterval(state.callTimerInterval);
+    state.callTimerInterval = setInterval(() => {
+      state.callDurationSec++;
+      const m = Math.floor(state.callDurationSec / 60).toString().padStart(2, "0");
+      const s = (state.callDurationSec % 60).toString().padStart(2, "0");
+      if (el.callDurationTimer) el.callDurationTimer.textContent = `${m}:${s}`;
+    }, 1000);
+  }
+
+  function handleRoomCallEnded(callData) {
+    if (state.activeCallId && callData.call_id === state.activeCallId) {
+      terminateCallLocal();
+    }
+  }
+
+  function handleIceCandidate(ev) {}
+
+  async function hangupCall() {
+    const cid = state.activeCallId;
+    terminateCallLocal();
+    if (cid) {
+      try {
+        await fetch("api/intercom/hangup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ call_id: cid, reason: "user_hangup" }),
+        });
+      } catch (e) {}
+    }
+  }
+
+  function terminateCallLocal() {
+    if (state.ringInterval) clearInterval(state.ringInterval);
+    if (state.callTimerInterval) clearInterval(state.callTimerInterval);
+    if (state.activeLocalStream) {
+      state.activeLocalStream.getTracks().forEach((t) => t.stop());
+      state.activeLocalStream = null;
+    }
+    state.activeCallId = null;
+    state.callDurationSec = 0;
+    if (el.intercomCallModal) el.intercomCallModal.style.display = "none";
+  }
+
+  // --- Villa All-Call Broadcast System ---
+  async function sendVillaBroadcast(message) {
+    if (el.btnSendBroadcast) el.btnSendBroadcast.classList.add("pulsing");
+    if (el.broadcastFeedback) {
+      el.broadcastFeedback.innerHTML = '<span style="color:var(--accent);">Transmitting Villa Broadcast...</span>';
+    }
+
+    try {
+      const res = await fetch("api/intercom/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_name: state.selfRoom,
+          message: message,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (el.broadcastFeedback) {
+          el.broadcastFeedback.innerHTML = '<span style="color:var(--success);">✓ Broadcast transmitted to all displays!</span>';
+        }
+        if (el.broadcastInput) el.broadcastInput.value = "";
+      }
+    } catch (err) {
+      if (el.broadcastFeedback) {
+        el.broadcastFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
+      }
+    } finally {
+      setTimeout(() => {
+        if (el.btnSendBroadcast) el.btnSendBroadcast.classList.remove("pulsing");
+        if (el.broadcastFeedback) el.broadcastFeedback.innerHTML = "";
+      }, 3500);
+    }
+  }
+
+  function handleVillaBroadcast(bData) {
+    playAttentionChime();
+
+    if (el.broadcastBanner) {
+      if (el.broadcastSenderName) el.broadcastSenderName.textContent = `📢 All-Call from ${bData.from_name || "Intercom"}`;
+      if (el.broadcastMessageText) el.broadcastMessageText.textContent = bData.message || "Attention all rooms!";
+      el.broadcastBanner.style.display = "block";
+
+      if ("speechSynthesis" in window && bData.message) {
+        try {
+          const utter = new SpeechSynthesisUtterance(bData.message);
+          utter.rate = 1.0;
+          utter.pitch = 1.0;
+          window.speechSynthesis.speak(utter);
+        } catch (e) {}
+      }
+
+      setTimeout(() => {
+        if (el.broadcastBanner) el.broadcastBanner.style.display = "none";
+      }, 9000);
+    }
+  }
+
+  async function dialHardwareStation(unitNo) {
+    try {
+      const res = await fetch("api/intercom/hardware_call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: unitNo }),
+      });
+      const data = await res.json();
+      alert(`Dialing physical indoor station ${unitNo}... Terminal response: ${data.ok ? "Ringing" : "Offline / Ready"}`);
+    } catch (e) {
+      alert(`Could not dial hardware station ${unitNo}: ${e.message}`);
+    }
   }
 
   // Start on load

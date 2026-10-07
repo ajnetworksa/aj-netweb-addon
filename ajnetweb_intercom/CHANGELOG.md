@@ -1,5 +1,13 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.2.0
+- **Room-to-Room Inter-Display Calling & Villa Broadcast System**:
+  - **Direct Room-to-Room Calling (1-to-1)**: Call from one wall display/tablet to another (e.g. Master Bedroom to Kitchen or Majlis to Living Room) with full-screen calling dialog, telephone warble chime, and two-way audio.
+  - **Villa All-Call Public Address (PA Broadcast)**: Broadcast audio chimes and voice announcements to all connected wall displays simultaneously ("Dinner is ready", "Guests in Majlis", "School bus has arrived") with automated Text-to-Speech playback.
+  - **Indoor Display Directory & Auto-Discovery**: Real-time room directory listing active displays with online pulse badges, room identity assignment, and status controls (`Available`, `Do Not Disturb`, `Auto-Answer`).
+  - **Physical Indoor Station Bridge (Hikvision DS-KH & Dahua VTH)**: Dial and ring physical wall-mounted indoor intercom monitors installed throughout the property via ISAPI/CGI.
+  - **Full-Screen Calling Overlay**: Interactive modal with telephone ringback audio, animated audio waveforms, live call duration timer, mic mute toggle, and in-call gate unlock shortcut.
+
 ## 1.1.0
 - **Direct Terminal ISAPI Credential & Guest Key Provisioning**:
   - Direct local ISAPI provisioning for Hikvision MinMoe and Access Control Terminals (`DS-K1T502DBWX-CQR`, `DS-K1T671TMFW`, `DS-K1T673TDGX`, `DS-K1T321MFWX`, `DS-K1T342DWX`).
