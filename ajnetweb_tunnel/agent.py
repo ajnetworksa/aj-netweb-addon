@@ -30,7 +30,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.2")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.3")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -48,7 +48,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.2.2"
+        AGENT_VERSION = "1.2.3"
     return AGENT_VERSION
 
 LABELS = {
@@ -58,6 +58,7 @@ LABELS = {
     "update_addon": "Update add-on", "update_all_addons": "Update all add-ons", "restart_addon": "Restart add-on",
     "backup_full": "Create full backup", "core_logs": "Fetch Home Assistant log", "reboot_host": "Reboot device",
     "update_agent": "Update AJ Netweb app", "diagnostics": "Network diagnostics",
+    "diag_exec": "Diagnostic console command",
     "apply_template": "Apply configuration template", "backup_upload": "Cloud backup now",
     "backup_restore": "Restore cloud backup", "temp_access": "Temporary technician login",
     "revoke_temp_access": "Remove temporary logins", "consent_off": "Installer access turned off by owner",
@@ -233,13 +234,54 @@ def collect() -> dict:
     def name(e):
         return (e.get("attributes") or {}).get("friendly_name") or e.get("entity_id")
 
+    batteries = []
+    signals = []
+    for e in ents:
+        attrs = e.get("attributes") or {}
+        eid = str(e.get("entity_id", ""))
+        dc = attrs.get("device_class")
+        st_val = e.get("state")
+        # Check battery
+        if dc == "battery" or eid.endswith("_battery") or "battery_level" in attrs:
+            val_raw = attrs.get("battery_level") if "battery_level" in attrs else st_val
+            try:
+                val = float(val_raw)
+                batteries.append({
+                    "entity_id": eid,
+                    "name": name(e),
+                    "level": round(val),
+                    "state": st_val,
+                })
+            except (ValueError, TypeError):
+                pass
+        # Check signal / link quality
+        if "linkquality" in eid or "signal_strength" in eid or "lqi" in attrs or "rssi" in attrs:
+            s_raw = (attrs.get("lqi") or attrs.get("rssi")) if ("lqi" in attrs or "rssi" in attrs) else st_val
+            try:
+                s_val = float(s_raw)
+                signals.append({
+                    "entity_id": eid,
+                    "name": name(e),
+                    "value": round(s_val),
+                    "unit": attrs.get("unit_of_measurement", "LQI"),
+                })
+            except (ValueError, TypeError):
+                pass
+
+    batteries.sort(key=lambda x: x["level"])
+    signals.sort(key=lambda x: x["value"])
+
     entities = {"total": len(ents), "unavailable": len(unavailable), "cameras": len(cams),
                 "cameras_unavailable": sum(1 for c in cams if c.get("state") == "unavailable"),
+                "low_battery_count": sum(1 for b in batteries if b["level"] < 20),
+                "weak_signal_count": sum(1 for s in signals if s["value"] < 50),
                 "domains": dict(sorted(domains.items(), key=lambda kv: -kv[1])[:20])}
-    if allowed:  # device names are only shared when the owner allows installer management
+    if allowed:  # device names and details are shared when the owner allows installer management
         entities["cameras_list"] = [{"entity_id": c["entity_id"], "name": name(c), "state": c.get("state")}
                                     for c in cams[:60]]
         entities["unavailable_list"] = [{"entity_id": e["entity_id"], "name": name(e)} for e in unavailable[:40]]
+        entities["batteries"] = batteries[:50]
+        entities["signals"] = signals[:30]
 
     res = {
         "collected_at": now_iso(),
@@ -379,6 +421,30 @@ def execute(cmd: dict) -> tuple[str, str, str]:
         _last_diag.update(diag)
         return "ok", (f"hub {_last_diag.get('hub_tcp_ms')} ms, down {_last_diag.get('download_mbps')} Mbit/s, "
                       f"up {_last_diag.get('upload_mbps')} Mbit/s"), json.dumps(_last_diag, indent=2)
+    if kind == "diag_exec":
+        raw_cmd = (args.get("command") or "").strip()
+        if not raw_cmd:
+            return "error", "no command specified", ""
+        ALLOWED_PREFIXES = (
+            "ha ", "ping ", "traceroute ", "ip ", "uptime", "free", "df",
+            "cat /etc/resolv.conf", "top -b", "netstat", "curl -I", "curl -sI"
+        )
+        if not any(raw_cmd.startswith(p) for p in ALLOWED_PREFIXES):
+            return "rejected", f"command '{raw_cmd[:40]}' is not permitted in the diagnostic console", ""
+        try:
+            res = subprocess.run(
+                raw_cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=min(int(args.get("timeout") or 25), 45)
+            )
+            out = res.stdout + ("\n--- STDERR ---\n" + res.stderr if res.stderr else "")
+            return "ok" if res.returncode == 0 else "error", f"exit code {res.returncode}", out
+        except subprocess.TimeoutExpired:
+            return "error", "command timed out after 30s", ""
+        except Exception as ex:
+            return "error", str(ex), ""
     if kind == "apply_template":
         tpl = server("GET", f"/api/v1/agent/templates/{int(args['template_id'])}", timeout=60)
         return F.apply_template(supervisor, tpl)

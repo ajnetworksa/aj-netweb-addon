@@ -18,7 +18,7 @@ umask 077
 readonly DATA=/data/ajn
 readonly NGX_CONF=/tmp/ajn-nginx.conf
 readonly LOCAL_PORT=18123
-readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.2}"
+readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.3}"
 export AGENT_VERSION
 mkdir -p "${DATA}" && chmod 700 "${DATA}"
 # Never act on a stale cached copy of the options (e.g. right after the license key was changed)
@@ -487,7 +487,7 @@ except Exception:
     pass
 out = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    'agent_version': os.environ.get('AGENT_VERSION', '1.2.2'),
+    'agent_version': os.environ.get('AGENT_VERSION', '1.2.3'),
     'instance_uid': st.get('instance_uid'),
     'site_name': st.get('site_name'),
     'public_url': st.get('public_url'),

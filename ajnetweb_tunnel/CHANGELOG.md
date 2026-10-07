@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3
+- Live Battery Health and Signal Quality (LQI / RSSI) telemetry monitoring.
+- Interactive Remote Diagnostic Console with safety allowlist for installers.
+- Speed benchmark throughput tests (download & upload Mbps).
+- Accurate version synchronization across Ingress UI and Server Admin Panel.
+
 ## 1.2.2
 - Fix sidebar ingress status page loading (`Permission denied` and empty fields).
 - Add live Server Ping / Latency metric badge in the UI and telemetry.

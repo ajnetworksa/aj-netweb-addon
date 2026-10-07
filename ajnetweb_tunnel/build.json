@@ -6,6 +6,6 @@
   "args": {
     "FRP_VERSION": "0.71.0",
     "AJN_SERVER": "",
-    "AJN_AGENT_VERSION": "1.2.2"
+    "AJN_AGENT_VERSION": "1.2.3"
   }
 }
