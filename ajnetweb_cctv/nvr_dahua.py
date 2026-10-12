@@ -300,13 +300,25 @@ class DahuaClient:
                     elif "Type" in k:
                         cur_item["type"] = "motion" if "m" in v.lower() else "continuous"
                         if "start" in cur_item and "end" in cur_item:
+                            st = cur_item["start"]
+                            et = cur_item["end"]
+                            st_short = st.split(" ")[-1] if " " in st else st
+                            et_short = et.split(" ")[-1] if " " in et else et
+                            dur = int(cur_item.get("length", 0))
+                            user_q = urllib.parse.quote(self.username, safe="")
+                            pwd_q = urllib.parse.quote(self.password, safe="")
+                            pb_rtsp = f"rtsp://{user_q}:{pwd_q}@{self.host}:{self.rtsp_port}/cam/playback?channel={channel_id}&starttime={st.replace(' ', '%20')}&endtime={et.replace(' ', '%20')}"
                             results.append({
                                 "channel": channel_id,
-                                "start": cur_item["start"],
-                                "end": cur_item["end"],
+                                "start": st,
+                                "end": et,
+                                "start_time": st_short,
+                                "end_time": et_short,
+                                "duration_sec": dur,
                                 "type": cur_item.get("type", "continuous"),
                                 "path": cur_item.get("path", ""),
-                                "length": cur_item.get("length", 0),
+                                "playback_uri": pb_rtsp,
+                                "length": dur,
                             })
                             cur_item = {}
         except Exception as e:

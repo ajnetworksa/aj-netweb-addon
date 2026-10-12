@@ -811,7 +811,7 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
 
         # ---------------------------------------------------------------- Device Discovery (SADP & ONVIF)
-        if path == "/api/discover":
+        if path in ("/api/discover", "/api/discover/scan"):
             force = query.get("refresh", ["0"])[0] == "1"
             try:
                 devs = scan_network(timeout_sec=2.5, force_refresh=force)
@@ -1481,6 +1481,15 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                 data["door_stations"] = [d for d in data["door_stations"] if d.get("id") != dev_id]
             save_intercom_devices(data)
             self._send_json({"ok": True, "message": f"Device {dev_id} removed"})
+            return
+
+        if path in ("/api/discover", "/api/discover/scan"):
+            try:
+                devs = scan_network(timeout_sec=2.5, force_refresh=True)
+                self._send_json({"ok": True, "devices": devs, "count": len(devs)})
+            except Exception as e:
+                log.error("Network discovery error: %s", e)
+                self._send_json({"ok": False, "error": str(e), "devices": []}, status=500)
             return
 
         if path == "/api/discover/adopt":

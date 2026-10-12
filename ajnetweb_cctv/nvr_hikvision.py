@@ -302,8 +302,8 @@ class HikvisionClient:
         end_iso = f"{date_str}T23:59:59Z"
         track_id = f"{channel_id}01"
 
-        search_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<CMSearchDescription version="2.0" xmlns="http://www.hikvision.com/ver20/XMLSchema">
+        search_xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<CMSearchDescription>
     <searchID>{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{channel_id}</searchID>
     <trackList>
         <trackID>{track_id}</trackID>
@@ -328,18 +328,46 @@ class HikvisionClient:
                     if "}" in elem.tag:
                         elem.tag = elem.tag.split("}", 1)[1]
 
-                for match in root.findall(".//searchMatch"):
-                    st = match.findtext(".//startTime")
-                    et = match.findtext(".//endTime")
+                # Match both searchMatchItem and searchMatch
+                items = root.findall(".//searchMatchItem") or root.findall(".//searchMatch")
+                for match in items:
+                    st = match.findtext(".//startTime") or ""
+                    et = match.findtext(".//endTime") or ""
                     pb_uri = match.findtext(".//playbackURI") or ""
-                    meta = match.findtext(".//mediaSegmentDescriptor/contentType") or "video"
+                    meta = match.findtext(".//contentType") or "video"
+
+                    # Calculate duration in seconds and format HH:MM:SS
+                    duration = 0
+                    start_time_str = st
+                    end_time_str = et
+                    try:
+                        if "T" in st:
+                            start_time_str = st.split("T")[1].replace("Z", "")[:8]
+                        if "T" in et:
+                            end_time_str = et.split("T")[1].replace("Z", "")[:8]
+
+                        from datetime import datetime as dt_parser
+                        t1 = dt_parser.fromisoformat(st.replace("Z", "+00:00"))
+                        t2 = dt_parser.fromisoformat(et.replace("Z", "+00:00"))
+                        duration = max(0, int((t2 - t1).total_seconds()))
+                    except Exception:
+                        pass
+
+                    # Embed credentials into RTSP URL for easy one-click external playing
+                    user_quoted = urllib.parse.quote(self.username, safe="")
+                    pwd_quoted = urllib.parse.quote(self.password, safe="")
+                    if pb_uri.startswith("rtsp://") and "@" not in pb_uri:
+                        pb_uri = pb_uri.replace("rtsp://", f"rtsp://{user_quoted}:{pwd_quoted}@")
 
                     if st and et:
                         results.append({
                             "channel": channel_id,
                             "start": st,
                             "end": et,
-                            "type": "motion" if "motion" in pb_uri.lower() else "continuous",
+                            "start_time": start_time_str,
+                            "end_time": end_time_str,
+                            "duration_sec": duration,
+                            "type": "motion" if ("motion" in pb_uri.lower() or "event" in pb_uri.lower()) else "continuous",
                             "playback_uri": pb_uri,
                             "media_type": meta,
                         })

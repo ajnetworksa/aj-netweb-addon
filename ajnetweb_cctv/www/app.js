@@ -312,6 +312,10 @@
 
     if (tab === "ptz") {
       updatePtzLiveFeed();
+    } else if (tab === "playback") {
+      if (!state.recordings.length && state.configured) {
+        searchRecordings();
+      }
     } else if (tab === "settings") {
       loadSettings();
     } else if (tab === "discover") {
@@ -829,6 +833,20 @@
     const mins = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
     const secs = String(totalSec % 60).padStart(2, "0");
     el.needleTooltip.textContent = `${hrs}:${mins}:${secs}`;
+
+    // If recordings exist, highlight matching clip under needle
+    if (state.recordings && state.recordings.length) {
+      const match = state.recordings.find((c) => {
+        const s = parseTimeToSec(c.start_time);
+        const en = parseTimeToSec(c.end_time);
+        return totalSec >= s && totalSec <= en;
+      });
+      if (match) {
+        document.querySelectorAll(".clip-card").forEach((card) => {
+          card.classList.toggle("active", card.dataset.start === match.start);
+        });
+      }
+    }
   }
 
   async function searchRecordings() {
@@ -843,6 +861,9 @@
         state.recordings = res.data.results || [];
         renderTimeline(state.recordings);
         renderClipsList(state.recordings);
+        if (state.recordings.length > 0) {
+          playClip(state.recordings[0]);
+        }
       } else {
         el.clipsList.innerHTML = `<div class="empty-clips">No recordings found: ${res.error || "Empty"}</div>`;
       }
@@ -852,6 +873,7 @@
   }
 
   function parseTimeToSec(tStr) {
+    if (!tStr) return 0;
     const match = tStr.match(/(\d{2}):(\d{2}):(\d{2})/);
     if (match) {
       return parseInt(match[1], 10) * 3600 + parseInt(match[2], 10) * 60 + parseInt(match[3], 10);
@@ -861,14 +883,23 @@
 
   function renderTimeline(clips) {
     el.timelineSegments.innerHTML = clips
-      .map((c) => {
+      .map((c, idx) => {
         const sSec = parseTimeToSec(c.start_time);
         const eSec = parseTimeToSec(c.end_time);
         const leftPct = (sSec / 86400) * 100;
-        const widthPct = Math.max(0.2, ((eSec - sSec) / 86400) * 100);
-        return `<div class="timeline-segment ${c.type}" style="left:${leftPct}%; width:${widthPct}%;" title="${c.start_time} - ${c.end_time}"></div>`;
+        const widthPct = Math.max(0.25, ((eSec - sSec) / 86400) * 100);
+        return `<div class="timeline-segment timeline-block ${c.type}" data-idx="${idx}" style="left:${leftPct}%; width:${widthPct}%; cursor:pointer;" title="${c.start_time} - ${c.end_time} (${c.type})"></div>`;
       })
       .join("");
+
+    el.timelineSegments.querySelectorAll(".timeline-segment").forEach((seg) => {
+      seg.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(seg.dataset.idx, 10);
+        const clip = clips[idx];
+        if (clip) playClip(clip);
+      });
+    });
   }
 
   function renderClipsList(clips) {
@@ -881,12 +912,15 @@
     el.clipsList.innerHTML = clips
       .map(
         (c, idx) => `
-      <div class="clip-item" data-idx="${idx}">
-        <div class="clip-head">
-          <span class="clip-badge ${c.type}">${c.type.toUpperCase()}</span>
-          <span class="clip-duration">${c.duration_sec || 0}s</span>
+      <div class="clip-item clip-card" data-idx="${idx}" data-start="${escapeHtml(c.start || '')}">
+        <div class="clip-head clip-time" style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; color:var(--text-primary);">${c.start_time} — ${c.end_time}</span>
+          <span class="clip-badge ${c.type}" style="padding:2px 7px; border-radius:4px; font-size:0.68rem; font-weight:800; text-transform:uppercase; ${c.type === 'motion' ? 'background:#ef4444; color:#fff;' : 'background:#10b981; color:#050811;'}">${c.type}</span>
         </div>
-        <div class="clip-time">${c.start_time} — ${c.end_time}</div>
+        <div class="clip-meta" style="display:flex; justify-content:space-between; margin-top:5px; font-size:0.75rem; color:var(--text-muted);">
+          <span>⏱ ${c.duration_sec || 0}s duration</span>
+          <span style="color:var(--accent); font-weight:600;">CH ${c.channel}</span>
+        </div>
       </div>
     `
       )
@@ -896,19 +930,103 @@
       item.addEventListener("click", () => {
         const idx = parseInt(item.dataset.idx, 10);
         const clip = clips[idx];
-        playClip(clip);
+        if (clip) playClip(clip);
       });
     });
   }
 
   function playClip(clip) {
-    if (clip.playback_uri) {
-      el.pbPlayerPlaceholder.style.display = "none";
-      el.pbVideo.style.display = "block";
-      el.pbVideo.src = clip.playback_uri;
-      el.pbVideo.play().catch(() => {});
-    } else {
-      alert(`Clip ${clip.start_time} selected. RTSP direct stream requires HLS/WebRTC proxy.`);
+    if (!clip) return;
+
+    // Highlight active clip in list
+    document.querySelectorAll(".clip-card").forEach((card) => {
+      card.classList.toggle("active", card.dataset.start === clip.start);
+    });
+
+    // Move timeline needle to clip start
+    if (clip.start_time) {
+      const sSec = parseTimeToSec(clip.start_time);
+      const pct = (sSec / 86400) * 100;
+      if (el.timelineNeedle) el.timelineNeedle.style.left = `${pct}%`;
+      if (el.needleTooltip) el.needleTooltip.textContent = clip.start_time;
+    }
+
+    // Hide HTML video element (browsers cannot stream native RTSP directly)
+    if (el.pbVideo) el.pbVideo.style.display = "none";
+
+    // Show rich player placeholder
+    if (el.pbPlayerPlaceholder) {
+      el.pbPlayerPlaceholder.style.display = "flex";
+      const rtspUri = clip.playback_uri || "";
+      const vlcUri = rtspUri ? (rtspUri.startsWith("rtsp://") ? `vlc://${rtspUri}` : rtspUri) : "";
+      const chId = clip.channel || el.pbChannelSelect?.value || 1;
+
+      el.pbPlayerPlaceholder.innerHTML = `
+        <div class="clip-player-card" style="width:100%; max-width:680px; padding:20px; text-align:center;">
+          <div style="position:relative; display:inline-block; max-width:100%; margin-bottom:16px;">
+            <img src="api/snapshot/${chId}?_t=${Date.now()}" 
+                 alt="Clip Snapshot Preview"
+                 style="max-width:100%; max-height:260px; border-radius:10px; border:1px solid var(--border-color); box-shadow:0 8px 30px rgba(0,0,0,0.6); object-fit:contain;" />
+            <div style="position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:700; color:var(--text-primary); border:1px solid rgba(255,255,255,0.1);">
+              📹 Channel ${chId} · Recorded Segment Preview
+            </div>
+            <div style="position:absolute; bottom:10px; right:10px; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); padding:4px 10px; border-radius:6px; font-size:0.75rem; font-weight:800; color:${clip.type === 'motion' ? '#ef4444' : '#10b981'}; border:1px solid rgba(255,255,255,0.1);">
+              ${clip.type.toUpperCase()} · ${clip.duration_sec || 0}s
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap;">
+            <div style="font-family:var(--font-mono); font-size:1.15rem; font-weight:800; color:var(--text-primary);">
+              ⏱ ${clip.start_time} — ${clip.end_time}
+            </div>
+            <span class="badge ${clip.type === 'motion' ? 'danger' : 'success'}" style="text-transform:uppercase; font-size:0.75rem;">
+              ${clip.type}
+            </span>
+          </div>
+
+          <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:12px; margin-bottom:16px; text-align:left;">
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">
+              Direct NVR RTSP Playback Stream
+            </div>
+            <div style="font-family:var(--font-mono); font-size:0.78rem; color:var(--accent); word-break:break-all; background:rgba(0,0,0,0.4); padding:8px 10px; border-radius:5px; border:1px solid var(--border-color);">
+              ${escapeHtml(rtspUri || 'RTSP URI not provided by NVR')}
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+            <button id="btnCopyRtspClip" class="primary-btn" style="padding:10px 18px; font-size:0.85rem;">
+              📋 Copy RTSP Stream URL
+            </button>
+            <a href="${escapeHtml(vlcUri)}" id="btnOpenVlcClip" class="primary-btn" style="padding:10px 18px; font-size:0.85rem; background:#ff8800; color:#fff; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+              ▶ Open in VLC Player
+            </a>
+            <a href="api/snapshot/${chId}?download=1" download="snapshot_ch${chId}.jpg" class="primary-btn" style="padding:10px 18px; font-size:0.85rem; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-color); text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+              📷 Download Snapshot
+            </a>
+          </div>
+
+          <div style="margin-top:14px; font-size:0.75rem; color:var(--text-muted); line-height:1.4;">
+            ℹ️ <em>Web browsers cannot stream native RTSP directly without transcoding. Use the buttons above to copy the direct URL or stream smoothly in VLC / MPC-HC / PotPlayer.</em>
+          </div>
+        </div>
+      `;
+
+      const copyBtn = document.getElementById("btnCopyRtspClip");
+      if (copyBtn && rtspUri) {
+        copyBtn.addEventListener("click", () => {
+          navigator.clipboard?.writeText(rtspUri).then(() => {
+            const orig = copyBtn.textContent;
+            copyBtn.textContent = "✅ Copied RTSP Stream URL!";
+            copyBtn.style.background = "var(--success)";
+            setTimeout(() => {
+              copyBtn.textContent = orig;
+              copyBtn.style.background = "";
+            }, 2000);
+          }).catch(() => {
+            prompt("Copy RTSP URL manually:", rtspUri);
+          });
+        });
+      }
     }
   }
 
