@@ -15,7 +15,14 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from threading import Lock
 
-from device_discovery import scan_network
+try:
+    from device_discovery import scan_network
+except ImportError:
+    log = logging.getLogger("cctv.server")
+    log.warning("device_discovery module not found; SADP discovery fallback active.")
+    def scan_network(*args, **kwargs):
+        return []
+
 from nvr_dahua import DahuaClient
 from nvr_hikvision import HikvisionClient
 

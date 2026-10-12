@@ -13,8 +13,8 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY run.sh /run.sh
-COPY dashboard_engine.py /app/dashboard_engine.py
-COPY server.py /app/server.py
+COPY *.py /app/
+COPY blueprints /app/blueprints
 COPY www /app/www
 
 RUN chmod a+x /run.sh

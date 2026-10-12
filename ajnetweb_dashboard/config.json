@@ -1,8 +1,8 @@
 {
   "name": "AJ Netweb Dashboard Suite",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "slug": "ajnetweb_dashboard",
-  "description": "Automated Room-Aware Lovelace Dashboard Generator with 5 Curated Aesthetics. Native-first architecture, zero-HACS dependencies, bundled AJ Netweb Card Suite, and 1-click deployment.",
+  "description": "Automated Room-Aware Lovelace Dashboard Generator featuring Apple HomeKit Frosted Glass (iOS 18) and 5 Curated Aesthetics. Native-first sections architecture, zero-HACS dependencies, bundled card suite, and 1-click deployment.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
   "arch": [
     "aarch64",
@@ -24,13 +24,13 @@
     "share:rw"
   ],
   "options": {
-    "default_theme": "cyber_luxury",
+    "default_theme": "apple_frosted_glass",
     "dashboard_url": "ajnetweb",
     "dashboard_title": "AJ Netweb Smart Home",
     "auto_register_resources": true
   },
   "schema": {
-    "default_theme": "list(cyber_luxury|scandinavian_minimal|modern_bento|oled_stealth|hotel_suite)",
+    "default_theme": "list(apple_frosted_glass|cyber_luxury|scandinavian_minimal|modern_bento|oled_stealth|hotel_suite)",
     "dashboard_url": "str",
     "dashboard_title": "str",
     "auto_register_resources": "bool"

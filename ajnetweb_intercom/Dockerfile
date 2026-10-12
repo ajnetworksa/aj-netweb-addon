@@ -12,9 +12,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY run.sh /run.sh
-COPY server.py /app/server.py
-COPY intercom_hikvision.py /app/intercom_hikvision.py
-COPY intercom_dahua.py /app/intercom_dahua.py
+COPY *.py /app/
 COPY www /app/www
 
 RUN chmod a+x /run.sh

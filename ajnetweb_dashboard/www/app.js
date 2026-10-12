@@ -6,7 +6,7 @@
   "use strict";
 
   const state = {
-    selectedTheme: "cyber_luxury",
+    selectedTheme: "apple_frosted_glass",
     discoveredAreas: [],
     selectedAreaIds: new Set(),
   };
@@ -187,8 +187,9 @@
     if (el.btnPreview) {
       el.btnPreview.addEventListener("click", async () => {
         const theme = state.selectedTheme;
-        const title = el.cfgTitle.value || "AJ Netweb Dashboard";
-        const res = await safeFetchJson(`api/preview?theme=${encodeURIComponent(theme)}&title=${encodeURIComponent(title)}`);
+        const title = el.cfgTitle.value || "Apple Smart Home";
+        const url = el.cfgUrl.value || "ajnetweb";
+        const res = await safeFetchJson(`api/preview?theme=${encodeURIComponent(theme)}&title=${encodeURIComponent(title)}&url=${encodeURIComponent(url)}`);
         if (res.ok && res.data && res.data.config) {
           el.previewCode.textContent = JSON.stringify(res.data.config, null, 2);
           el.previewModal.style.display = "flex";

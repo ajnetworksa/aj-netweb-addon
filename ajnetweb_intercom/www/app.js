@@ -687,8 +687,8 @@
   // ------------------------------------------------------------------ Visitor Gallery
   async function loadVisitors() {
     try {
-      const res = await fetch("api/visitors");
-      const list = await res.json();
+      const res = await safeFetchJson("api/visitors");
+      const list = res.ok && Array.isArray(res.data) ? res.data : [];
       renderVisitors(list);
     } catch (e) {
       console.error("Failed to load visitors:", e);
@@ -785,9 +785,8 @@
   async function loadCredentials() {
     if (!el.passesList) return;
     try {
-      const res = await fetch("api/credentials");
-      const data = await res.json();
-      const list = data.credentials || [];
+      const res = await safeFetchJson("api/credentials");
+      const list = (res.ok && res.data && res.data.credentials) || [];
 
       if (!list.length) {
         el.passesList.innerHTML = `
@@ -944,7 +943,7 @@
         el.passFeedback.innerHTML = '<span style="color:var(--accent);">Pushing credentials to terminal...</span>';
 
         try {
-          const res = await fetch("api/credentials/create", {
+          const res = await safeFetchJson("api/credentials/create", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -955,8 +954,8 @@
               card_no: cardNo,
             }),
           });
-          const data = await res.json();
-          if (data.ok && data.credential) {
+          const data = res.data || {};
+          if (res.ok && data.ok && data.credential) {
             el.passFeedback.innerHTML = '<span style="color:var(--success);">✓ Pass issued successfully!</span>';
             el.passForm.reset();
             if (el.durationChips && el.durationChips[0]) el.durationChips[0].classList.add("active");
@@ -964,7 +963,7 @@
             loadCredentials();
             openPassModal(data.credential);
           } else {
-            el.passFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || "Failed to issue pass"}</span>`;
+            el.passFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || res.error || "Failed to issue pass"}</span>`;
           }
         } catch (err) {
           el.passFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
@@ -1028,8 +1027,8 @@
     if (!el.pushDevicesList) return;
     el.pushDevicesList.innerHTML = '<span class="device-chip-loading">Scanning Home Assistant Companion App services...</span>';
     try {
-      const res = await fetch("api/notifications/devices");
-      const data = await res.json();
+      const res = await safeFetchJson("api/notifications/devices");
+      const data = res.data || {};
 
       if (el.cfgPushMode && data.mode) el.cfgPushMode.value = data.mode;
       if (el.cfgCriticalSound && data.critical_sound !== undefined) {
@@ -1061,8 +1060,8 @@
   // ------------------------------------------------------------------ Settings
   async function loadSettings() {
     try {
-      const res = await fetch("api/config");
-      const cfg = await res.json();
+      const res = await safeFetchJson("api/config");
+      const cfg = res.data || {};
       if (el.cfgBrand) el.cfgBrand.value = cfg.brand || "auto";
       if (el.cfgHost) el.cfgHost.value = cfg.host || "";
       if (el.cfgHttpPort) el.cfgHttpPort.value = cfg.http_port || 80;
@@ -1107,19 +1106,19 @@
           el.pushTestFeedback.innerHTML = '<span style="color:var(--accent);">Dispatching test ring &amp; snapshot...</span>';
         }
         try {
-          const res = await fetch("api/notifications/test", {
+          const res = await safeFetchJson("api/notifications/test", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ door: 1 }),
           });
-          const d = await res.json();
-          if (d.ok) {
+          const d = res.data || {};
+          if (res.ok && d.ok) {
             if (el.pushTestFeedback) {
               el.pushTestFeedback.innerHTML = `<span style="color:var(--success);">✓ ${d.message || "Test ring sent!"}</span>`;
             }
           } else {
             if (el.pushTestFeedback) {
-              el.pushTestFeedback.innerHTML = `<span style="color:var(--danger);">${d.error || "Failed"}</span>`;
+              el.pushTestFeedback.innerHTML = `<span style="color:var(--danger);">${d.error || res.error || "Failed"}</span>`;
             }
           }
         } catch (err) {
@@ -1149,19 +1148,19 @@
 
       el.settingsFeedback.innerHTML = '<span style="color:var(--accent);">Saving & connecting...</span>';
       try {
-        const res = await fetch("api/config", {
+        const res = await safeFetchJson("api/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = await res.json();
-        if (data.ok) {
+        const data = res.data || {};
+        if (res.ok && data.ok) {
           el.settingsFeedback.innerHTML =
             '<span style="color:var(--success);">✓ Connected and saved successfully!</span>';
           await checkStatus();
           setTimeout(() => switchTab("live"), 1200);
         } else {
-          el.settingsFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || "Save failed"}</span>`;
+          el.settingsFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || res.error || "Save failed"}</span>`;
         }
       } catch (err) {
         el.settingsFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
@@ -2080,7 +2079,7 @@
 
   async function registerSelfDisplay() {
     try {
-      const res = await fetch("api/intercom/displays/register", {
+      const res = await safeFetchJson("api/intercom/displays/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2090,8 +2089,8 @@
           status: state.selfStatus,
         }),
       });
-      const data = await res.json();
-      if (data.ok && data.display && el.selfIpAddress) {
+      const data = res.data || {};
+      if (res.ok && data.ok && data.display && el.selfIpAddress) {
         el.selfIpAddress.textContent = data.display.ip || "127.0.0.1";
       }
     } catch (e) {
@@ -2102,9 +2101,9 @@
   async function loadDisplays() {
     if (!el.displaysGrid) return;
     try {
-      const res = await fetch("api/intercom/displays");
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.displays)) {
+      const res = await safeFetchJson("api/intercom/displays");
+      const data = res.data || {};
+      if (res.ok && data.ok && Array.isArray(data.displays)) {
         renderDisplays(data.displays);
       }
     } catch (e) {
@@ -2370,7 +2369,7 @@
     }
 
     try {
-      const res = await fetch("api/intercom/broadcast", {
+      const res = await safeFetchJson("api/intercom/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2378,12 +2377,16 @@
           message: message,
         }),
       });
-      const data = await res.json();
-      if (data.ok) {
+      const data = res.data || {};
+      if (res.ok && data.ok) {
         if (el.broadcastFeedback) {
           el.broadcastFeedback.innerHTML = '<span style="color:var(--success);">✓ Broadcast transmitted to all displays!</span>';
         }
         if (el.broadcastInput) el.broadcastInput.value = "";
+      } else {
+        if (el.broadcastFeedback) {
+          el.broadcastFeedback.innerHTML = `<span style="color:var(--danger);">${data.error || res.error || "Failed"}</span>`;
+        }
       }
     } catch (err) {
       if (el.broadcastFeedback) {
@@ -2422,13 +2425,13 @@
 
   async function dialHardwareStation(unitNo) {
     try {
-      const res = await fetch("api/intercom/hardware_call", {
+      const res = await safeFetchJson("api/intercom/hardware_call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target: unitNo }),
       });
-      const data = await res.json();
-      alert(`Dialing physical indoor station ${unitNo}... Terminal response: ${data.ok ? "Ringing" : "Offline / Ready"}`);
+      const data = res.data || {};
+      alert(`Dialing physical indoor station ${unitNo}... Terminal response: ${res.ok && data.ok ? "Ringing" : "Offline / Ready"}`);
     } catch (e) {
       alert(`Could not dial hardware station ${unitNo}: ${e.message}`);
     }

@@ -71,11 +71,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/preview":
-            theme_key = query.get("theme", ["cyber_luxury"])[0]
-            title = query.get("title", ["Smart Residence"])[0]
+            theme_key = query.get("theme", ["apple_frosted_glass"])[0]
+            title = query.get("title", ["Apple Smart Home"])[0]
+            url_path = query.get("url", ["ajnetweb"])[0]
             try:
                 layout = engine.discover_house_layout()
-                preview_cfg = engine.generate_dashboard(theme_key, title, layout["areas"])
+                preview_cfg = engine.generate_dashboard(theme_key, title, layout["areas"], url_path=url_path)
                 self._send_json({"ok": True, "theme": theme_key, "config": preview_cfg})
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, status=500)
@@ -103,7 +104,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/deploy":
-            theme = payload.get("theme", "cyber_luxury")
+            theme = payload.get("theme", "apple_frosted_glass")
             dashboard_url = payload.get("dashboard_url", "ajnetweb")
             title = payload.get("title", "AJ Netweb Smart Home")
             selected_areas = payload.get("selected_areas")

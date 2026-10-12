@@ -241,6 +241,10 @@ body {
   justify-content: space-between;
 }
 
+.apple-bg {
+  background: radial-gradient(circle at top right, rgba(91, 138, 168, 0.45), transparent 70%),
+              linear-gradient(135deg, #1e2638 0%, #0f172a 100%);
+}
 .cyber-bg { background: linear-gradient(135deg, #070a12 0%, #0f172a 100%); }
 .scandi-bg { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
 .bento-bg { background: linear-gradient(135deg, #18181b 0%, #27272a 100%); }

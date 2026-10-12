@@ -277,17 +277,94 @@ class DashboardEngine:
         return None
 
     # ------------------------------------------------------------------ Theme Generator Engine
-    def generate_dashboard(self, theme_key: str, title: str, areas: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def ensure_frosted_glass_theme(self) -> bool:
+        """
+        Installs authentic Apple-grade Frosted Glass theme into /config/themes/
+        so that Lovelace cards render with translucent blur, saturation boost, and 18px rounded tiles.
+        """
+        theme_dirs = ["/config/themes/Frosted Glass", "/homeassistant/themes/Frosted Glass"]
+        target_dir = "/config/themes/Frosted Glass"
+        for d in theme_dirs:
+            if os.path.exists(os.path.join(d, "Frosted Glass.yaml")):
+                return True
+            if os.path.exists(os.path.dirname(d)):
+                target_dir = d
+
+        theme_content = """# Frosted Glass Theme for Home Assistant (AJ Netweb Edition)
+Frosted Glass:
+  modes:
+    light:
+      card-mod-theme: "Frosted Glass Light"
+      primary-color: "#5B8AA8"
+      primary-background-color: "#F5F5FA"
+      card-background-color: "rgba(255, 255, 255, 0.75)"
+      secondary-background-color: "rgba(240, 240, 248, 0.85)"
+      text-primary-color: "rgba(19, 21, 54, 0.98)"
+      app-header-backdrop-filter: "blur(6px) saturate(1.2)"
+      app-header-background-color: "rgba(234, 235, 238, 0.2)"
+      sidebar-background-color: "rgba(254, 244, 242, 0.7)"
+      card-mod-card: |
+        ha-card {
+          background: rgba(255, 255, 255, 0.75) !important;
+          backdrop-filter: blur(12px) saturate(1.2) !important;
+          -webkit-backdrop-filter: blur(12px) saturate(1.2) !important;
+          border-radius: 18px !important;
+          border: 1px solid rgba(255, 255, 255, 0.4) !important;
+          box-shadow: 0 12px 20px rgba(0, 0, 0, 0.08) !important;
+        }
+
+    dark:
+      card-mod-theme: "Frosted Glass Dark"
+      primary-color: "#5B8AA8"
+      primary-background-color: "#121316"
+      card-background-color: "rgba(28, 29, 33, 0.80)"
+      secondary-background-color: "rgba(22, 23, 30, 0.90)"
+      text-primary-color: "rgba(234, 235, 238, 0.98)"
+      app-header-backdrop-filter: "blur(8px) saturate(1.2)"
+      app-header-background-color: "rgba(20, 20, 25, 0.3)"
+      sidebar-background-color: "rgba(20, 20, 25, 0.7)"
+      card-mod-card: |
+        ha-card {
+          background: rgba(28, 29, 33, 0.80) !important;
+          backdrop-filter: blur(14px) saturate(1.2) !important;
+          -webkit-backdrop-filter: blur(14px) saturate(1.2) !important;
+          border-radius: 18px !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35) !important;
+        }
+"""
+        try:
+            os.makedirs(target_dir, exist_ok=True)
+            theme_file = os.path.join(target_dir, "Frosted Glass.yaml")
+            with open(theme_file, "w", encoding="utf-8") as f:
+                f.write(theme_content)
+            log.info("Installed Frosted Glass theme to %s", theme_file)
+            self.reload_themes()
+            return True
+        except Exception as e:
+            log.warning("Could not write Frosted Glass theme: %s", e)
+            return False
+
+    def reload_themes(self):
+        """Call Home Assistant service to reload themes immediately."""
+        try:
+            self._call_ws("call_service", {"domain": "frontend", "service": "reload_themes", "service_data": {}})
+        except Exception:
+            pass
+
+    def generate_dashboard(self, theme_key: str, title: str, areas: List[Dict[str, Any]], url_path: str = "ajnetweb") -> Dict[str, Any]:
         """
         Generates a complete, native-first Lovelace Dashboard structure for the specified theme.
         Supported themes:
-        1. 'cyber_luxury' (Cyber Glassmorphism)
-        2. 'scandinavian_minimal' (Minimalist Scandinavian)
-        3. 'modern_bento' (Modern Bento Grid / Apple Home)
-        4. 'oled_stealth' (Pure OLED Stealth)
-        5. 'hotel_suite' (Boutique Hotel Hub)
+        1. 'apple_frosted_glass' (Flagship Apple HomeKit iOS 18 Frosted Glass)
+        2. 'cyber_luxury' (Cyber Glassmorphism)
+        3. 'scandinavian_minimal' (Minimalist Scandinavian)
+        4. 'modern_bento' (Modern Bento Grid / Apple Home)
+        5. 'oled_stealth' (Pure OLED Stealth)
+        6. 'hotel_suite' (Boutique Hotel Hub)
         """
         theme_generators = {
+            "apple_frosted_glass": self._gen_apple_frosted_glass,
             "cyber_luxury": self._gen_cyber_luxury,
             "scandinavian_minimal": self._gen_scandinavian_minimal,
             "modern_bento": self._gen_modern_bento,
@@ -295,8 +372,511 @@ class DashboardEngine:
             "hotel_suite": self._gen_hotel_suite,
         }
 
-        gen = theme_generators.get(theme_key, self._gen_cyber_luxury)
+        gen = theme_generators.get(theme_key, self._gen_apple_frosted_glass)
+        if theme_key == "apple_frosted_glass":
+            return gen(title, areas, url_path)
         return gen(title, areas)
+
+    def _gen_apple_frosted_glass(self, title: str, areas: List[Dict[str, Any]], url_path: str = "ajnetweb") -> Dict[str, Any]:
+        """
+        Flagship Apple HomeKit Frosted Glass Theme (iOS 18 Glassmorphism).
+        Native Home Assistant Sections layout with 18px rounded pill tiles,
+        quick glance overview chips, room groups with area controls,
+        climate thermostat dials, and dedicated subviews for Cameras,
+        Doorbell, Climate, Lighting, and Server.
+        """
+        self.ensure_frosted_glass_theme()
+        views = []
+        clean_url = url_path.replace("_", "-").strip("/") or "ajnetweb"
+
+        # Collect global entities across all areas
+        all_lights = []
+        all_climates = []
+        all_cameras = []
+        all_covers = []
+        all_locks = []
+        all_sensors = []
+        all_binary_sensors = []
+        all_switches = []
+
+        for a in areas:
+            all_lights.extend(a.get("lights", []))
+            all_climates.extend(a.get("climates", []))
+            all_cameras.extend(a.get("cameras", []))
+            all_covers.extend(a.get("covers", []))
+            all_locks.extend(a.get("locks", []))
+            all_sensors.extend(a.get("sensors", []))
+            all_binary_sensors.extend(a.get("binary_sensors", []))
+            all_switches.extend(a.get("switches", []))
+
+        # Best candidate entities for glance tiles
+        light_ent = next((l["entity_id"] for l in all_lights if "all" in l["entity_id"] or "count" in l["entity_id"]), None)
+        if not light_ent and all_lights:
+            light_ent = all_lights[0]["entity_id"]
+
+        smoke_ent = next((b["entity_id"] for b in all_binary_sensors if b.get("device_class") in ("smoke", "safety", "gas") or "smoke" in b["entity_id"]), None)
+        if not smoke_ent and all_binary_sensors:
+            smoke_ent = all_binary_sensors[0]["entity_id"]
+
+        climate_ent = all_climates[0]["entity_id"] if all_climates else None
+        camera_ent = all_cameras[0]["entity_id"] if all_cameras else None
+        doorbell_ent = next((c["entity_id"] for c in all_cameras if "door" in c["entity_id"].lower() or "bell" in c["entity_id"].lower()), camera_ent)
+        lock_ent = all_locks[0]["entity_id"] if all_locks else next((s["entity_id"] for s in all_switches if "door" in s["name"].lower() or "gate" in s["name"].lower() or "lock" in s["name"].lower()), None)
+        server_ent = next((s["entity_id"] for s in all_sensors if "speedtest" in s["entity_id"] or "download" in s["entity_id"] or "cpu" in s["entity_id"]), None)
+
+        # ------------------------------------------------------------- 1. MAIN HOME VIEW
+        home_sections = []
+
+        # SECTION 0: Residence Overview Glance Bar (12-column sections grid)
+        glance_cards = [
+            {
+                "type": "heading",
+                "heading": title or "Apple Smart Home",
+                "heading_style": "title",
+                "icon": "mdi:home-apple",
+            }
+        ]
+
+        # 1. Active Lights Count Tile
+        if light_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": light_ent,
+                "name": " Lights",
+                "icon": "mdi:ceiling-light-multiple-outline",
+                "color": "accent",
+                "vertical": True,
+                "features_position": "bottom",
+                "tap_action": {"action": "navigate", "navigation_path": f"/{clean_url}/lights"},
+            })
+
+        # 2. Safety & Alarm Tile
+        if smoke_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": smoke_ent,
+                "name": "Alarm & Safety",
+                "icon": "mdi:smoke-detector-variant",
+                "color": "lime",
+                "vertical": True,
+                "features_position": "bottom",
+                "state_content": "state",
+            })
+
+        # 3. Climate / Air Con Tile
+        if climate_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": climate_ent,
+                "name": "Air Con",
+                "icon": "mdi:air-conditioner",
+                "color": "light-blue",
+                "vertical": True,
+                "features_position": "bottom",
+                "tap_action": {"action": "navigate", "navigation_path": f"/{clean_url}/climate"},
+            })
+
+        # 4. CCTV Cameras Tile
+        if camera_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": camera_ent,
+                "name": "CCTV Cameras",
+                "icon": "mdi:cctv",
+                "color": "indigo",
+                "vertical": True,
+                "features_position": "bottom",
+                "tap_action": {"action": "navigate", "navigation_path": f"/{clean_url}/camera"},
+            })
+
+        # 5. Video Doorbell & Gate Tile
+        if doorbell_ent or lock_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": doorbell_ent or lock_ent,
+                "name": "Video Doorbell",
+                "icon": "mdi:doorbell-video",
+                "color": "green",
+                "vertical": True,
+                "features_position": "bottom",
+                "tap_action": {"action": "navigate", "navigation_path": f"/{clean_url}/doorbell"},
+            })
+
+        # 6. Server & Updates Tile
+        if server_ent:
+            glance_cards.append({
+                "type": "tile",
+                "grid_options": {"columns": 3, "rows": 2},
+                "entity": server_ent,
+                "name": "Server & Updates",
+                "icon": "mdi:server",
+                "color": "cyan",
+                "vertical": True,
+                "features_position": "bottom",
+                "tap_action": {"action": "navigate", "navigation_path": f"/{clean_url}/server"},
+            })
+
+        home_sections.append({
+            "type": "grid",
+            "cards": glance_cards,
+        })
+
+        # ROOM SECTIONS (1 section per room)
+        for a in areas:
+            if a.get("total_devices", 0) == 0:
+                continue
+            room_cards = []
+
+            # Heading with Subtitle Style + Badges
+            room_heading = {
+                "type": "heading",
+                "heading": a["name"],
+                "icon": a["icon"],
+                "heading_style": "subtitle",
+            }
+            if a.get("climates"):
+                room_heading["badges"] = [
+                    {"type": "entity", "entity": a["climates"][0]["entity_id"], "icon": "mdi:air-conditioner", "color": "light-blue"}
+                ]
+            room_cards.append(room_heading)
+
+            # Native Area Card with Quick Light/Switch Controls & Tap to Navigate to Room Subview
+            room_cards.append({
+                "type": "area",
+                "area": a["id"],
+                "features": [{"type": "area-controls", "controls": ["light", "switch"]}],
+                "tap_action": {"action": "navigate", "navigation_path": a["id"]},
+            })
+
+            # Room Lights (6x1 horizontal tiles with brightness sliders)
+            for lt in a.get("lights", [])[:6]:
+                feats = [{"type": "light-brightness"}]
+                if lt.get("domain") == "light":
+                    feats.append({"type": "light-color-temp"})
+                room_cards.append({
+                    "type": "tile",
+                    "entity": lt["entity_id"],
+                    "name": lt["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                    "features": feats,
+                })
+
+            # Room Climates (Native Thermostat Card with 9x5 Grid)
+            for cl in a.get("climates", [])[:1]:
+                room_cards.append({
+                    "type": "thermostat",
+                    "entity": cl["entity_id"],
+                    "name": cl["name"],
+                    "grid_options": {"columns": 9, "rows": 5},
+                    "features": [
+                        {"type": "climate-hvac-modes", "style": "icons", "hvac_modes": ["off", "cool", "heat", "fan_only", "dry"]},
+                        {"type": "climate-fan-modes", "style": "dropdown", "fan_modes": ["high", "medium", "low", "auto"]},
+                    ],
+                })
+
+            # Room Curtains / Covers (6x3 vertical tiles with slider)
+            for cv in a.get("covers", [])[:2]:
+                room_cards.append({
+                    "type": "tile",
+                    "entity": cv["entity_id"],
+                    "name": cv["name"],
+                    "vertical": True,
+                    "grid_options": {"columns": 6, "rows": 3},
+                    "features": [{"type": "cover-open-close"}],
+                })
+
+            # Room Switches
+            for sw in a.get("switches", [])[:3]:
+                room_cards.append({
+                    "type": "tile",
+                    "entity": sw["entity_id"],
+                    "name": sw["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                })
+
+            # Room Media Players
+            for md in a.get("media", [])[:1]:
+                room_cards.append({
+                    "type": "tile",
+                    "entity": md["entity_id"],
+                    "name": md["name"],
+                    "features": [{"type": "media-player-volume-slider"}],
+                })
+
+            # Room Locks
+            for lk in a.get("locks", [])[:1]:
+                room_cards.append({
+                    "type": "tile",
+                    "entity": lk["entity_id"],
+                    "name": lk["name"],
+                    "color": "purple",
+                    "features": [{"type": "lock-commands"}],
+                })
+
+            home_sections.append({
+                "type": "grid",
+                "cards": room_cards,
+            })
+
+        # Home View Badges
+        home_badges = []
+        if climate_ent:
+            home_badges.append({"type": "entity", "entity": climate_ent, "icon": "mdi:air-conditioner", "color": "green", "show_name": False, "show_state": True})
+        if smoke_ent:
+            home_badges.append({"type": "entity", "entity": smoke_ent, "icon": "mdi:fire", "show_name": False, "show_state": True})
+
+        views.append({
+            "title": "Home",
+            "path": "home",
+            "icon": "mdi:home",
+            "type": "sections",
+            "max_columns": 3,
+            "theme": "Frosted Glass",
+            "badges": home_badges,
+            "sections": home_sections,
+        })
+
+        # ------------------------------------------------------------- 2. CAMERAS VIEW
+        if all_cameras:
+            cam_cards = []
+            for cam in all_cameras:
+                cam_cards.append({
+                    "type": "picture-entity",
+                    "entity": cam["entity_id"],
+                    "name": cam["name"],
+                    "camera_view": "live",
+                    "show_state": True,
+                })
+            views.append({
+                "title": "Cameras",
+                "path": "camera",
+                "icon": "mdi:cctv",
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "sections": [{"type": "grid", "cards": cam_cards}],
+            })
+
+        # ------------------------------------------------------------- 3. DOORBELL & ACCESS VIEW
+        if doorbell_ent or lock_ent or all_locks:
+            door_cards = [
+                {
+                    "type": "heading",
+                    "heading": "Doorbell & Gate Controls",
+                    "heading_style": "title",
+                    "icon": "mdi:doorbell-video",
+                }
+            ]
+            if doorbell_ent:
+                door_cards.append({
+                    "type": "picture-entity",
+                    "entity": doorbell_ent,
+                    "name": "Doorbell Live Feed",
+                    "camera_view": "live",
+                    "show_state": True,
+                })
+            for lk in all_locks:
+                door_cards.append({
+                    "type": "tile",
+                    "entity": lk["entity_id"],
+                    "name": lk["name"],
+                    "color": "green",
+                    "features": [{"type": "lock-commands"}],
+                })
+            views.append({
+                "title": "Doorbell",
+                "path": "doorbell",
+                "icon": "mdi:doorbell",
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "badges": [{"type": "entity", "entity": lock_ent, "icon": "mdi:door-open", "color": "light-green"}] if lock_ent else [],
+                "sections": [{"type": "grid", "cards": door_cards}],
+            })
+
+        # ------------------------------------------------------------- 4. CLIMATE HUB VIEW
+        if all_climates:
+            clim_sections = []
+            for cl in all_climates:
+                clim_sections.append({
+                    "type": "grid",
+                    "cards": [
+                        {
+                            "type": "heading",
+                            "heading": cl["name"],
+                            "heading_style": "subtitle",
+                            "icon": "mdi:air-conditioner",
+                        },
+                        {
+                            "type": "thermostat",
+                            "entity": cl["entity_id"],
+                            "name": cl["name"],
+                            "grid_options": {"columns": 12, "rows": 5},
+                            "features": [
+                                {"type": "climate-hvac-modes", "style": "icons", "hvac_modes": ["off", "cool", "heat", "fan_only", "dry"]},
+                                {"type": "climate-fan-modes", "style": "dropdown", "fan_modes": ["high", "medium", "low", "auto"]},
+                            ],
+                        },
+                    ],
+                })
+            views.append({
+                "title": "Climate",
+                "path": "climate",
+                "icon": "mdi:thermostat",
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "sections": clim_sections,
+            })
+
+        # ------------------------------------------------------------- 5. LIGHTING STUDIO VIEW
+        if all_lights:
+            light_sections = []
+            for a in areas:
+                if not a.get("lights"):
+                    continue
+                lcards = [
+                    {
+                        "type": "heading",
+                        "heading": a["name"],
+                        "heading_style": "subtitle",
+                        "icon": a["icon"],
+                    }
+                ]
+                for lt in a["lights"]:
+                    feats = [{"type": "light-brightness"}]
+                    if lt.get("domain") == "light":
+                        feats.append({"type": "light-color-temp"})
+                    lcards.append({
+                        "type": "tile",
+                        "entity": lt["entity_id"],
+                        "name": lt["name"],
+                        "vertical": False,
+                        "grid_options": {"columns": 6, "rows": 1},
+                        "features": feats,
+                    })
+                light_sections.append({"type": "grid", "cards": lcards})
+            views.append({
+                "title": "Lights",
+                "path": "lights",
+                "icon": "mdi:lightbulb-group",
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "sections": light_sections,
+            })
+
+        # ------------------------------------------------------------- 6. SERVER VIEW
+        if server_ent:
+            server_cards = [
+                {
+                    "type": "heading",
+                    "heading": "Network Performance & Speed",
+                    "heading_style": "subtitle",
+                    "icon": "mdi:speedometer",
+                }
+            ]
+            for s in all_sensors:
+                if any(k in s["entity_id"].lower() for k in ("speedtest", "latency", "ping", "download", "upload", "cpu", "memory")):
+                    server_cards.append({
+                        "type": "tile",
+                        "entity": s["entity_id"],
+                        "name": s["name"],
+                        "vertical": False,
+                        "grid_options": {"columns": 6, "rows": 2},
+                        "features": [{"type": "trend-graph"}],
+                    })
+            views.append({
+                "title": "Server",
+                "path": "server",
+                "icon": "mdi:server",
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "sections": [{"type": "grid", "cards": server_cards}],
+            })
+
+        # ------------------------------------------------------------- 7. INDIVIDUAL ROOM SUBVIEWS
+        for a in areas:
+            if a.get("total_devices", 0) == 0:
+                continue
+            rview_cards = [
+                {
+                    "type": "heading",
+                    "heading": f"{a['name']} Controls",
+                    "heading_style": "title",
+                    "icon": a["icon"],
+                }
+            ]
+            for lt in a.get("lights", []):
+                feats = [{"type": "light-brightness"}]
+                if lt.get("domain") == "light":
+                    feats.append({"type": "light-color-temp"})
+                rview_cards.append({
+                    "type": "tile",
+                    "entity": lt["entity_id"],
+                    "name": lt["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                    "features": feats,
+                })
+            for cl in a.get("climates", []):
+                rview_cards.append({
+                    "type": "thermostat",
+                    "entity": cl["entity_id"],
+                    "name": cl["name"],
+                    "grid_options": {"columns": 9, "rows": 5},
+                    "features": [
+                        {"type": "climate-hvac-modes", "style": "icons", "hvac_modes": ["off", "cool", "heat"]},
+                        {"type": "climate-fan-modes", "style": "dropdown", "fan_modes": ["high", "medium", "low", "auto"]},
+                    ],
+                })
+            for cv in a.get("covers", []):
+                rview_cards.append({
+                    "type": "tile",
+                    "entity": cv["entity_id"],
+                    "name": cv["name"],
+                    "vertical": True,
+                    "grid_options": {"columns": 6, "rows": 3},
+                    "features": [{"type": "cover-open-close"}],
+                })
+            for sw in a.get("switches", []):
+                rview_cards.append({
+                    "type": "tile",
+                    "entity": sw["entity_id"],
+                    "name": sw["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                })
+            for md in a.get("media", []):
+                rview_cards.append({
+                    "type": "tile",
+                    "entity": md["entity_id"],
+                    "name": md["name"],
+                    "features": [{"type": "media-player-volume-slider"}],
+                })
+
+            rbadges = []
+            if a.get("climates"):
+                rbadges.append({"type": "entity", "entity": a["climates"][0]["entity_id"], "icon": "mdi:air-conditioner", "color": "green"})
+
+            views.append({
+                "title": a["name"],
+                "path": a["id"],
+                "icon": a["icon"],
+                "subview": True,
+                "type": "sections",
+                "theme": "Frosted Glass",
+                "badges": rbadges,
+                "sections": [{"type": "grid", "cards": rview_cards}],
+            })
+
+        return {
+            "title": title or "Apple Smart Home",
+            "views": views,
+        }
 
     def _gen_cyber_luxury(self, title: str, areas: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Cyber Luxury Glassmorphism Theme (Dark obsidian, cyan glow, neon cards)."""
@@ -752,13 +1332,17 @@ class DashboardEngine:
         dashboard_cfg = self.generate_dashboard(theme_key, title, active_areas)
 
         clean_url = re.sub(r"[^a-zA-Z0-9_\-]", "", dashboard_url.strip().lower()) or "ajnetweb"
+        url_path = clean_url.replace("_", "-")
+        storage_slug = clean_url.replace("-", "_")
 
-        # Write Lovelace configuration directly to .storage/lovelace.{url}
-        storage_file = os.path.join(STORAGE_DIR, f"lovelace.{clean_url}")
+        dashboard_cfg = self.generate_dashboard(theme_key, title, active_areas, url_path=url_path)
+
+        # Write Lovelace configuration directly to .storage/lovelace.{storage_slug}
+        storage_file = os.path.join(STORAGE_DIR, f"lovelace.{storage_slug}")
         storage_payload = {
             "version": 1,
             "minor_version": 1,
-            "key": f"lovelace.{clean_url}",
+            "key": f"lovelace.{storage_slug}",
             "data": {
                 "config": dashboard_cfg,
             },
@@ -775,9 +1359,10 @@ class DashboardEngine:
 
         # Register dashboard entry in .storage/lovelace_dashboards
         dash_index_file = os.path.join(STORAGE_DIR, "lovelace_dashboards")
+        dash_icon = "mdi:apple" if "apple" in theme_key else "mdi:view-dashboard-variant"
         try:
             if os.path.exists(dash_index_file):
-                with open(dash_index_file, "r") as f:
+                with open(dash_index_file, "r", encoding="utf-8") as f:
                     dash_data = json.load(f)
             else:
                 dash_data = {"version": 1, "minor_version": 1, "key": "lovelace_dashboards", "data": {"items": []}}
@@ -786,18 +1371,20 @@ class DashboardEngine:
             # Update or append
             found = False
             for itm in items:
-                if itm.get("url_path") == clean_url:
+                if itm.get("url_path") == url_path or itm.get("id") == storage_slug:
+                    itm["url_path"] = url_path
                     itm["title"] = title
                     itm["mode"] = "storage"
-                    itm["icon"] = "mdi:view-dashboard-variant"
+                    itm["icon"] = dash_icon
+                    itm["show_in_sidebar"] = True
                     found = True
                     break
             if not found:
                 items.append({
-                    "id": f"dash_{clean_url}_{int(time.time())}",
-                    "url_path": clean_url,
+                    "id": storage_slug,
+                    "url_path": url_path,
                     "title": title,
-                    "icon": "mdi:view-dashboard-variant",
+                    "icon": dash_icon,
                     "mode": "storage",
                     "show_in_sidebar": True,
                     "require_admin": False,
@@ -806,15 +1393,18 @@ class DashboardEngine:
 
             with open(dash_index_file, "w", encoding="utf-8") as f:
                 json.dump(dash_data, f, indent=2)
-            log.info("Registered dashboard '%s' in lovelace_dashboards", clean_url)
+            log.info("Registered dashboard '%s' in lovelace_dashboards", url_path)
         except Exception as e:
             log.warning("Could not update lovelace_dashboards registry: %s", e)
 
+        self.reload_themes()
+
         return {
             "ok": True,
-            "url_path": clean_url,
+            "url_path": url_path,
+            "storage_slug": storage_slug,
             "title": title,
             "theme": theme_key,
-            "dashboard_url": f"/{clean_url}",
-            "message": f"Dashboard '{title}' deployed successfully at /{clean_url}!",
+            "dashboard_url": f"/{url_path}",
+            "message": f"Dashboard '{title}' deployed successfully at /{url_path}!",
         }

@@ -12,9 +12,7 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY run.sh /run.sh
-COPY server.py /app/server.py
-COPY nvr_hikvision.py /app/nvr_hikvision.py
-COPY nvr_dahua.py /app/nvr_dahua.py
+COPY *.py /app/
 COPY www /app/www
 
 RUN chmod a+x /run.sh
