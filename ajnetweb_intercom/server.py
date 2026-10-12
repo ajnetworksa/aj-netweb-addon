@@ -827,6 +827,9 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 </svg>"""
         return svg.encode("utf-8")
 
+    def do_HEAD(self):
+        return self.do_GET()
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
