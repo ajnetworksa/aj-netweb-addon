@@ -8,6 +8,7 @@ import re
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import uuid
 
 try:
     import requests
@@ -304,7 +305,7 @@ class HikvisionClient:
 
         search_xml = f"""<?xml version="1.0" encoding="utf-8"?>
 <CMSearchDescription>
-    <searchID>{datetime.utcnow().strftime('%Y%m%d%H%M%S')}-{channel_id}</searchID>
+    <searchID>{str(uuid.uuid4())}</searchID>
     <trackList>
         <trackID>{track_id}</trackID>
     </trackList>
