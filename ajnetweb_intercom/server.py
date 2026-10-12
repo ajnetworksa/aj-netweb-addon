@@ -16,8 +16,10 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from threading import Lock
 
+from device_discovery import scan_network
 from intercom_dahua import DahuaIntercomClient
 from intercom_hikvision import HikvisionIntercomClient
+
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("intercom.server")
@@ -45,6 +47,12 @@ _config_cache = {}
 _event_subscribers = []  # List of SSE response queues
 _event_thread = None
 _ha_action_thread = None
+DEVICES_FILE = "/data/intercom_devices.json"
+
+_door_stations_list = []
+_indoor_stations_list = []
+_door_clients = {}
+_active_station_id = None
 _pruner_thread = None
 _last_ring_time = 0
 _connected_displays = {}  # display_id -> dict(id, name, device_type, status, last_seen, ip)
@@ -52,14 +60,34 @@ _active_intercom_calls = {}  # call_id -> dict(call_id, from_id, from_name, to_i
 
 
 def get_active_displays() -> list:
-    """Return all active indoor displays, pruning any inactive for > 70s."""
+    """Return all active indoor displays (both registered hardware panels and browser kiosks), pruning inactive."""
     now = time.time()
     with _state_lock:
         stale = [did for did, d in _connected_displays.items() if now - d.get("last_seen", 0) > 70]
         for did in stale:
             del _connected_displays[did]
-        return list(_connected_displays.values())
 
+        all_displays = list(_connected_displays.values())
+
+        # Include configured hardware indoor stations (e.g. DS-KH9510 or Android Wall Panels)
+        for ind in _indoor_stations_list:
+            if not ind.get("enabled", True):
+                continue
+            iid = ind.get("id") or f"indoor_{ind.get('host')}"
+            if not any(d.get("id") == iid for d in all_displays):
+                all_displays.append({
+                    "id": iid,
+                    "name": ind.get("name") or ind.get("room") or "Indoor Touch Display",
+                    "room": ind.get("room") or "Living Room",
+                    "device_type": "hardware_panel",
+                    "model": ind.get("model") or "Indoor Station",
+                    "status": "ready",
+                    "ip": ind.get("host", ""),
+                    "hardware": True,
+                    "brand": ind.get("brand", "hikvision"),
+                    "last_seen": now,
+                })
+        return all_displays
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -110,70 +138,161 @@ def save_config(new_cfg: dict):
     init_client(cur)
 
 
-def init_client(cfg: dict = None):
-    """Initialize or update Door Station client and start background listener."""
-    global _active_client, _client_brand, _config_cache
-    with _state_lock:
-        if cfg is None:
-            cfg = load_config()
-        _config_cache = cfg
+def load_intercom_devices() -> dict:
+    """Load door stations and indoor stations from /data/intercom_devices.json."""
+    data = {"door_stations": [], "indoor_stations": []}
+    if os.path.exists(DEVICES_FILE):
+        try:
+            with open(DEVICES_FILE, "r") as f:
+                d = json.load(f)
+                if isinstance(d, dict):
+                    data["door_stations"] = d.get("door_stations", [])
+                    data["indoor_stations"] = d.get("indoor_stations", [])
+        except Exception as e:
+            log.warning("Could not read intercom_devices.json: %s", e)
 
-        host = cfg.get("host", "").strip()
-        if not host:
-            _active_client = None
-            _client_brand = None
-            log.info("No Door Station host configured yet.")
-            return
+    cfg = load_config()
+    host = cfg.get("host", "").strip()
+    if not data["door_stations"] and host:
+        data["door_stations"] = [{
+            "id": "door_primary",
+            "name": "Main Gate Villa",
+            "host": host,
+            "brand": cfg.get("brand", "auto"),
+            "http_port": int(cfg.get("http_port", 80) or 80),
+            "rtsp_port": int(cfg.get("rtsp_port", 554) or 554),
+            "username": cfg.get("username", "admin"),
+            "password": cfg.get("password", ""),
+            "door_1_name": cfg.get("door_1_name", "Main Gate"),
+            "door_2_name": cfg.get("door_2_name", "Pedestrian Door"),
+            "enabled": True,
+        }]
+        save_intercom_devices(data)
+    return data
 
-        brand = cfg.get("brand", "auto").lower()
-        http_port = int(cfg.get("http_port", 80) or 80)
-        rtsp_port = int(cfg.get("rtsp_port", 554) or 554)
-        user = cfg.get("username", "admin").strip()
-        pwd = cfg.get("password", "")
 
-        log.info("Connecting to Door Station at %s:%s (brand preference: %s)...", host, http_port, brand)
+def save_intercom_devices(data: dict):
+    """Save devices list and re-initialize all intercom connections."""
+    try:
+        os.makedirs(os.path.dirname(DEVICES_FILE), exist_ok=True)
+        with open(DEVICES_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        log.error("Could not write intercom_devices.json: %s", e)
+    init_all_intercom_devices(data)
 
-        client = None
-        detected_brand = None
 
-        if brand == "hikvision":
-            client = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd)
-            detected_brand = "hikvision"
-        elif brand == "dahua":
-            client = DahuaIntercomClient(host, http_port, rtsp_port, user, pwd)
-            detected_brand = "dahua"
-        else:  # Auto-detection
+def _connect_door_station(dev: dict):
+    host = dev.get("host", "").strip()
+    if not host:
+        return None, None
+    brand = dev.get("brand", "auto").lower()
+    http_port = int(dev.get("http_port", 80) or 80)
+    rtsp_port = int(dev.get("rtsp_port", 554) or 554)
+    user = dev.get("username", "admin").strip()
+    pwd = dev.get("password", "")
+
+    client = None
+    detected_brand = None
+
+    if brand == "hikvision":
+        client = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd)
+        detected_brand = "hikvision"
+    elif brand == "dahua":
+        client = DahuaIntercomClient(host, http_port, rtsp_port, user, pwd)
+        detected_brand = "dahua"
+    else:  # Auto detect
+        try:
+            hk = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd, timeout=3)
+            info = hk.get_device_info()
+            if info.get("model") != "Unknown Intercom" or info.get("serial") != "Unknown":
+                client = hk
+                detected_brand = "hikvision"
+        except Exception:
+            pass
+
+        if not client:
             try:
-                hk = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd, timeout=3)
-                info = hk.get_device_info()
-                if info.get("model") != "Unknown Intercom" or info.get("serial") != "Unknown":
-                    client = hk
-                    detected_brand = "hikvision"
-                    log.info("Auto-detected Hikvision Door Station: %s", info.get("model"))
+                dh = DahuaIntercomClient(host, http_port, rtsp_port, user, pwd, timeout=3)
+                info = dh.get_device_info()
+                if info.get("model") != "Unknown" or info.get("serial") != "Unknown":
+                    client = dh
+                    detected_brand = "dahua"
             except Exception:
                 pass
 
-            if not client:
-                try:
-                    dh = DahuaIntercomClient(host, http_port, rtsp_port, user, pwd, timeout=3)
-                    info = dh.get_device_info()
-                    if info.get("model") != "Unknown" or info.get("serial") != "Unknown":
-                        client = dh
-                        detected_brand = "dahua"
-                        log.info("Auto-detected Dahua VTO Door Station: %s", info.get("model"))
-                except Exception:
-                    pass
+        if not client:
+            client = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd)
+            detected_brand = "hikvision"
 
-            if not client:
-                log.info("Auto-detection undetermined; defaulting to Hikvision ISAPI client.")
-                client = HikvisionIntercomClient(host, http_port, rtsp_port, user, pwd)
-                detected_brand = "hikvision"
+    return client, detected_brand
 
-        _active_client = client
-        _client_brand = detected_brand
 
-    # Restart background event monitoring thread
+def init_all_intercom_devices(data: dict = None):
+    """Initialize all Door Station clients and load indoor stations."""
+    global _door_stations_list, _indoor_stations_list, _door_clients, _active_client, _client_brand, _active_station_id, _config_cache
+    with _state_lock:
+        if data is None:
+            data = load_intercom_devices()
+        _door_stations_list = data.get("door_stations", [])
+        _indoor_stations_list = data.get("indoor_stations", [])
+        _config_cache = load_config()
+
+        new_clients = {}
+        primary_client = None
+        primary_brand = None
+        primary_id = None
+
+        for dev in _door_stations_list:
+            dev_id = dev.get("id") or f"door_{int(time.time()*1000)}"
+            dev["id"] = dev_id
+            if not dev.get("enabled", True):
+                continue
+
+            try:
+                cl, br = _connect_door_station(dev)
+                if cl:
+                    new_clients[dev_id] = {
+                        "client": cl,
+                        "brand": br,
+                        "device": dev,
+                    }
+                    if primary_client is None:
+                        primary_client = cl
+                        primary_brand = br
+                        primary_id = dev_id
+            except Exception as e:
+                log.error("Failed to connect door station %s (%s): %s", dev.get("name"), dev.get("host"), e)
+
+        _door_clients = new_clients
+        _active_client = primary_client
+        _client_brand = primary_brand
+        if not _active_station_id or _active_station_id not in _door_clients:
+            _active_station_id = primary_id
+        log.info("Initialized %d door stations and %d indoor stations.", len(new_clients), len(_indoor_stations_list))
+
     start_event_listener()
+
+
+def resolve_door_station(station_id_raw: str = None):
+    """Resolve specific door station client by ID, or return active primary station."""
+    with _state_lock:
+        if station_id_raw and station_id_raw in _door_clients:
+            info = _door_clients[station_id_raw]
+            return info["client"], info["brand"], info["device"]
+
+        if _active_station_id and _active_station_id in _door_clients:
+            info = _door_clients[_active_station_id]
+            return info["client"], info["brand"], info["device"]
+
+        if _active_client:
+            return _active_client, _client_brand, _door_stations_list[0] if _door_stations_list else {}
+        return None, None, {}
+
+
+def init_client(cfg: dict = None):
+    """Backward compatibility alias."""
+    init_all_intercom_devices()
 
 
 # ------------------------------------------------------------------ Background Event Listener
@@ -637,7 +756,7 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         """Strip Home Assistant Ingress base path if present."""
         raw_path = urllib.parse.urlparse(self.path).path
         if "/api/" in raw_path:
-            return raw_path[raw_path.find("/api/"):]
+            return raw_path[raw_path.rfind("/api/"):]
         return raw_path
 
     def _send_json(self, data: dict, status: int = 200):
@@ -675,44 +794,109 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
 
-        # ---------------------------------------------------------------- Status
+        # ---------------------------------------------------------------- Device Discovery (SADP & ONVIF)
+        if path == "/api/discover":
+            force = query.get("refresh", ["0"])[0] == "1"
+            try:
+                devs = scan_network(timeout_sec=2.5, force_refresh=force)
+                self._send_json({"ok": True, "devices": devs, "count": len(devs)})
+            except Exception as e:
+                log.error("Network discovery error: %s", e)
+                self._send_json({"ok": False, "error": str(e), "devices": []}, status=500)
+            return
+
+        # ---------------------------------------------------------------- Status & Multi-Device
         if path == "/api/status":
             with _state_lock:
-                client = _active_client
-                brand = _client_brand
-                cfg = _config_cache
+                doors = list(_door_stations_list)
+                indoors = list(_indoor_stations_list)
+                act_id = _active_station_id
+                client, brand, active_dev = resolve_door_station(act_id)
+                cfg = dict(_config_cache)
 
-            if not client:
+            configured = bool(doors or indoors or client)
+            if not configured:
                 self._send_json({
                     "configured": False,
+                    "door_stations_count": 0,
+                    "indoor_stations_count": 0,
                     "brand": cfg.get("brand", "auto"),
                     "host": cfg.get("host", ""),
-                    "message": "Door station not configured. Open Settings to connect.",
+                    "message": "No intercom stations configured. Open SADP Scanner to discover and adopt devices.",
                 })
                 return
 
-            try:
-                info = client.get_device_info()
-                call_st = client.get_call_status()
-                self._send_json({
-                    "configured": True,
-                    "brand": brand,
-                    "host": cfg.get("host"),
-                    "http_port": cfg.get("http_port"),
-                    "rtsp_port": cfg.get("rtsp_port"),
-                    "door_1_name": cfg.get("door_1_name", "Main Gate"),
-                    "door_2_name": cfg.get("door_2_name", "Pedestrian Door"),
-                    "device_info": info,
-                    "call_status": call_st.get("status", "idle"),
-                })
-            except Exception as e:
-                self._send_json({"configured": True, "error": str(e), "brand": brand})
+            info = {}
+            call_st = {"status": "idle"}
+            if client:
+                try:
+                    info = client.get_device_info()
+                    call_st = client.get_call_status()
+                except Exception:
+                    pass
+
+            self._send_json({
+                "configured": True,
+                "door_stations_count": len(doors),
+                "indoor_stations_count": len(indoors),
+                "active_station_id": act_id,
+                "active_station_name": active_dev.get("name", "Door Station"),
+                "brand": brand or "auto",
+                "host": active_dev.get("host", cfg.get("host", "")),
+                "http_port": active_dev.get("http_port", 80),
+                "rtsp_port": active_dev.get("rtsp_port", 554),
+                "door_1_name": active_dev.get("door_1_name", "Main Gate"),
+                "door_2_name": active_dev.get("door_2_name", "Pedestrian Door"),
+                "device_info": info,
+                "call_status": call_st.get("status", "idle"),
+                "door_stations": [
+                    {
+                        "id": d.get("id"),
+                        "name": d.get("name", "Door Station"),
+                        "host": d.get("host"),
+                        "brand": d.get("brand"),
+                        "online": d.get("id") in _door_clients,
+                        "door_1_name": d.get("door_1_name", "Door 1"),
+                        "door_2_name": d.get("door_2_name", "Door 2"),
+                    }
+                    for d in doors
+                ],
+                "indoor_stations": indoors,
+            })
+            return
+
+        if path == "/api/devices":
+            with _state_lock:
+                safe_doors = []
+                for d in _door_stations_list:
+                    c = dict(d)
+                    c["has_password"] = bool(c.get("password"))
+                    if "password" in c:
+                        c["password"] = "••••••••" if c["password"] else ""
+                    c["online"] = c.get("id") in _door_clients
+                    safe_doors.append(c)
+
+                safe_indoors = []
+                for ind in _indoor_stations_list:
+                    c = dict(ind)
+                    c["has_password"] = bool(c.get("password"))
+                    if "password" in c:
+                        c["password"] = "••••••••" if c["password"] else ""
+                    c["online"] = True
+                    safe_indoors.append(c)
+
+            self._send_json({
+                "ok": True,
+                "door_stations": safe_doors,
+                "indoor_stations": safe_indoors,
+                "active_station_id": _active_station_id,
+            })
             return
 
         # ---------------------------------------------------------------- Snapshot & MJPEG
         if path == "/api/snapshot":
-            with _state_lock:
-                client = _active_client
+            st_id = query.get("station_id", [None])[0]
+            client, brand, dev = resolve_door_station(st_id)
             if client:
                 try:
                     img = client.get_snapshot()
@@ -720,14 +904,14 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                         self._send_image(img, "image/jpeg")
                         return
                 except Exception as e:
-                    log.debug("Snapshot failed: %s", e)
+                    log.debug("Snapshot failed for station %s: %s", st_id, e)
 
             self._send_image(self._placeholder_jpeg(), "image/svg+xml")
             return
 
         if path == "/api/mjpeg":
-            with _state_lock:
-                client = _active_client
+            st_id = query.get("station_id", [None])[0]
+            client, brand, dev = resolve_door_station(st_id)
             if not client:
                 self.send_error(503, "Door Station not connected")
                 return
@@ -738,11 +922,12 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache, private")
             self.end_headers()
 
+            ph = self._placeholder_jpeg()
             try:
                 while True:
                     img = client.get_snapshot()
                     if not img:
-                        img = self._placeholder_jpeg()
+                        img = ph
                     self.wfile.write(b"--frame\r\n")
                     self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
                     self.wfile.write(img)
@@ -889,21 +1074,21 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/unlock":
             door_id = int(payload.get("door", 1))
-            with _state_lock:
-                client = _active_client
-                cfg = _config_cache
+            st_id = payload.get("station_id")
+            client, brand, dev = resolve_door_station(st_id)
 
             if not client:
                 self._send_json({"ok": False, "error": "Door station not connected"}, status=503)
                 return
 
             ok = client.unlock_door(door_id)
-            door_name = cfg.get(f"door_{door_id}_name", f"Door {door_id}")
+            door_name = dev.get(f"door_{door_id}_name", f"Door {door_id}")
+            st_name = dev.get("name", "Door Station")
             if ok:
-                record_visitor_event("door_unlock", f"Unlocked {door_name} (Remote)")
-                notify_homeassistant_event("ajnetweb_door_unlocked", {"door": door_id, "name": door_name})
-                broadcast_sse({"event": "door_unlocked", "door": door_id, "name": door_name})
-            self._send_json({"ok": ok, "door": door_id, "name": door_name})
+                record_visitor_event("door_unlock", f"Unlocked {door_name} ({st_name})")
+                notify_homeassistant_event("ajnetweb_door_unlocked", {"door": door_id, "name": door_name, "station": st_name})
+                broadcast_sse({"event": "door_unlocked", "door": door_id, "name": door_name, "station_id": dev.get("id")})
+            self._send_json({"ok": ok, "door": door_id, "name": door_name, "station": st_name})
             return
 
         if path == "/api/notifications/test":
@@ -1210,10 +1395,200 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             ok = False
             if client and brand == "hikvision" and hasattr(client, "call_signal"):
                 ok = client.call_signal("dial")
-            self._send_json({"ok": ok, "target": target})
+        if path == "/api/intercom/station/active":
+            st_id = payload.get("station_id", "").strip()
+            global _active_station_id
+            with _state_lock:
+                if st_id in _door_clients or any(d.get("id") == st_id for d in _door_stations_list):
+                    _active_station_id = st_id
+            self._send_json({"ok": True, "active_station_id": _active_station_id})
             return
 
-        self.send_error(404, "Endpoint not found")
+        if path == "/api/devices":
+            cat = payload.get("category", "door_station")  # door_station | indoor_station
+            dev_id = payload.get("id") or f"{cat}_{int(time.time()*1000)}"
+            host = payload.get("host", "").strip()
+            if not host:
+                self._send_json({"ok": False, "error": "Device host IP is required"}, status=400)
+                return
+
+            data = load_intercom_devices()
+            target_list = data["door_stations"] if cat == "door_station" else data["indoor_stations"]
+            existing = next((d for d in target_list if d.get("id") == dev_id or d.get("host") == host), None)
+
+            pwd = payload.get("password", "")
+            if existing and pwd == "••••••••":
+                pwd = existing.get("password", "")
+
+            updated = {
+                "id": existing["id"] if existing else dev_id,
+                "name": payload.get("name") or (f"Station {host}"),
+                "host": host,
+                "brand": payload.get("brand", "auto").lower(),
+                "http_port": int(payload.get("http_port", 80) or 80),
+                "rtsp_port": int(payload.get("rtsp_port", 554) or 554),
+                "username": payload.get("username", "admin").strip(),
+                "password": pwd,
+                "enabled": payload.get("enabled", True),
+            }
+            if cat == "door_station":
+                updated["door_1_name"] = payload.get("door_1_name", "Main Gate")
+                updated["door_2_name"] = payload.get("door_2_name", "Pedestrian Door")
+            else:
+                updated["room"] = payload.get("room", "Living Room")
+                updated["model"] = payload.get("model", "Indoor Touch Display")
+
+            if existing:
+                if cat == "door_station":
+                    data["door_stations"] = [updated if d.get("id") == existing["id"] else d for d in data["door_stations"]]
+                else:
+                    data["indoor_stations"] = [updated if d.get("id") == existing["id"] else d for d in data["indoor_stations"]]
+            else:
+                target_list.append(updated)
+
+            save_intercom_devices(data)
+            self._send_json({"ok": True, "message": f"Saved {cat} {updated['name']}", "device": updated})
+            return
+
+        if path == "/api/devices/delete":
+            dev_id = payload.get("id", "").strip()
+            cat = payload.get("category", "door_station")
+            data = load_intercom_devices()
+            if cat == "indoor_station":
+                data["indoor_stations"] = [d for d in data["indoor_stations"] if d.get("id") != dev_id]
+            else:
+                data["door_stations"] = [d for d in data["door_stations"] if d.get("id") != dev_id]
+            save_intercom_devices(data)
+            self._send_json({"ok": True, "message": f"Device {dev_id} removed"})
+            return
+
+        if path == "/api/discover/adopt":
+            batch_list = payload.get("devices")
+            default_user = payload.get("default_username", "admin").strip()
+            default_pwd = payload.get("default_password", "")
+
+            data = load_intercom_devices()
+            adopted_count = 0
+
+            if isinstance(batch_list, list) and batch_list:
+                for item in batch_list:
+                    ip = item.get("ip", "").strip()
+                    if not ip:
+                        continue
+                    brand = item.get("brand", "auto").lower()
+                    model = item.get("model", "")
+                    cat = item.get("category", "")
+                    h_port = int(item.get("http_port", 80) or 80)
+                    r_port = int(item.get("rtsp_port", 554) or 554)
+                    u_name = (item.get("username") or default_user).strip()
+                    p_word = item.get("password") if item.get("password") is not None else default_pwd
+
+                    is_indoor = cat == "indoor_station" or "KH" in model.upper() or "DISPLAY" in model.upper() or "PANEL" in model.upper()
+
+                    if is_indoor:
+                        existing = next((d for d in data["indoor_stations"] if d.get("host") == ip), None)
+                        entry = {
+                            "id": existing["id"] if existing else f"indoor_{int(time.time()*1000)}_{adopted_count}",
+                            "name": f"{brand.capitalize()} {model}" if model else f"Indoor Display ({ip})",
+                            "room": item.get("room") or "Living Room",
+                            "model": model or "Indoor Touch Display",
+                            "host": ip,
+                            "brand": brand,
+                            "http_port": h_port,
+                            "rtsp_port": r_port,
+                            "username": u_name,
+                            "password": p_word,
+                            "enabled": True,
+                        }
+                        if existing:
+                            data["indoor_stations"] = [entry if d.get("host") == ip else d for d in data["indoor_stations"]]
+                        else:
+                            data["indoor_stations"].append(entry)
+                    else:
+                        existing = next((d for d in data["door_stations"] if d.get("host") == ip), None)
+                        entry = {
+                            "id": existing["id"] if existing else f"door_{int(time.time()*1000)}_{adopted_count}",
+                            "name": f"{brand.capitalize()} {model}" if model else f"Door Station ({ip})",
+                            "host": ip,
+                            "brand": brand,
+                            "http_port": h_port,
+                            "rtsp_port": r_port,
+                            "username": u_name,
+                            "password": p_word,
+                            "door_1_name": item.get("door_1_name", "Main Gate"),
+                            "door_2_name": item.get("door_2_name", "Pedestrian Door"),
+                            "enabled": True,
+                        }
+                        if existing:
+                            data["door_stations"] = [entry if d.get("host") == ip else d for d in data["door_stations"]]
+                        else:
+                            data["door_stations"].append(entry)
+                    adopted_count += 1
+            else:
+                ip = payload.get("ip", "").strip()
+                if not ip:
+                    self._send_json({"ok": False, "error": "Device IP address is required"}, status=400)
+                    return
+                brand = payload.get("brand", "auto").lower()
+                model = payload.get("model", "")
+                cat = payload.get("category", "")
+                h_port = int(payload.get("http_port", 80) or 80)
+                r_port = int(payload.get("rtsp_port", 554) or 554)
+                u_name = payload.get("username", "admin").strip()
+                p_word = payload.get("password", "")
+
+                is_indoor = cat == "indoor_station" or "KH" in model.upper() or "DISPLAY" in model.upper() or "PANEL" in model.upper()
+                if is_indoor:
+                    existing = next((d for d in data["indoor_stations"] if d.get("host") == ip), None)
+                    entry = {
+                        "id": existing["id"] if existing else f"indoor_{int(time.time()*1000)}",
+                        "name": f"{brand.capitalize()} {model}" if model else f"Indoor Display ({ip})",
+                        "room": payload.get("room", "Living Room"),
+                        "model": model or "Indoor Touch Display",
+                        "host": ip,
+                        "brand": brand,
+                        "http_port": h_port,
+                        "rtsp_port": r_port,
+                        "username": u_name,
+                        "password": p_word,
+                        "enabled": True,
+                    }
+                    if existing:
+                        data["indoor_stations"] = [entry if d.get("host") == ip else d for d in data["indoor_stations"]]
+                    else:
+                        data["indoor_stations"].append(entry)
+                else:
+                    existing = next((d for d in data["door_stations"] if d.get("host") == ip), None)
+                    entry = {
+                        "id": existing["id"] if existing else f"door_{int(time.time()*1000)}",
+                        "name": f"{brand.capitalize()} {model}" if model else f"Door Station ({ip})",
+                        "host": ip,
+                        "brand": brand,
+                        "http_port": h_port,
+                        "rtsp_port": r_port,
+                        "username": u_name,
+                        "password": p_word,
+                        "door_1_name": payload.get("door_1_name", "Main Gate"),
+                        "door_2_name": payload.get("door_2_name", "Pedestrian Door"),
+                        "enabled": True,
+                    }
+                    if existing:
+                        data["door_stations"] = [entry if d.get("host") == ip else d for d in data["door_stations"]]
+                    else:
+                        data["door_stations"].append(entry)
+                adopted_count = 1
+
+            save_intercom_devices(data)
+            self._send_json({
+                "ok": True,
+                "count": adopted_count,
+                "door_stations": len(data["door_stations"]),
+                "indoor_stations": len(data["indoor_stations"]),
+                "message": f"Successfully adopted {adopted_count} device(s) into Intercom Studio!",
+            })
+            return
+
+        self._send_json({"ok": False, "error": f"Endpoint '{path}' not found"}, status=404)
 
 
 

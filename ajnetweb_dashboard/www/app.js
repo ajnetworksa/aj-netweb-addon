@@ -33,30 +33,62 @@
     previewCode: document.getElementById("previewCode"),
   };
 
+  /**
+   * Safe fetch helper that guarantees graceful JSON parsing and never crashes on plain-text/HTML errors.
+   */
+  async function safeFetchJson(url, options = {}) {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (parseErr) {
+        return {
+          ok: false,
+          status: res.status,
+          error: `HTTP ${res.status}: ${text.slice(0, 150) || "Empty or invalid response"}`,
+          data: null,
+        };
+      }
+      if (!res.ok) {
+        return {
+          ok: false,
+          status: res.status,
+          error: (data && (data.error || data.message)) || `Server returned HTTP ${res.status}`,
+          data,
+        };
+      }
+      return { ok: true, status: res.status, data };
+    } catch (netErr) {
+      return {
+        ok: false,
+        status: 0,
+        error: `Network error: ${netErr.message}`,
+        data: null,
+      };
+    }
+  }
+
   async function loadDiscovery() {
     el.roomsGrid.innerHTML = '<div class="loading-state">Scanning Home Assistant room &amp; entity registries...</div>';
-    try {
-      const res = await fetch("api/discovery");
-      const data = await res.json();
-      if (!data.ok || !data.layout) {
-        el.roomsGrid.innerHTML = `<div class="loading-state" style="color:var(--danger);">Discovery failed: ${data.error || "Unknown error"}</div>`;
-        return;
-      }
-
-      const l = data.layout;
-      el.kpiRooms.textContent = l.areas_count;
-      el.kpiLights.textContent = l.lights_count;
-      el.kpiClimates.textContent = l.climates_count;
-      el.kpiCovers.textContent = l.covers_count;
-      el.kpiCameras.textContent = (l.cameras_count || 0) + (l.locks_count || 0);
-
-      state.discoveredAreas = l.areas || [];
-      state.selectedAreaIds = new Set(state.discoveredAreas.map((a) => a.id));
-
-      renderRooms();
-    } catch (err) {
-      el.roomsGrid.innerHTML = `<div class="loading-state" style="color:var(--danger);">Error connecting to Discovery API: ${err.message}</div>`;
+    const res = await safeFetchJson("api/discovery");
+    if (!res.ok || !res.data || !res.data.layout) {
+      el.roomsGrid.innerHTML = `<div class="loading-state" style="color:var(--danger);">Discovery failed: ${escapeHtml(res.error || "Unable to reach Discovery API")}</div>`;
+      return;
     }
+
+    const l = res.data.layout;
+    el.kpiRooms.textContent = l.areas_count;
+    el.kpiLights.textContent = l.lights_count;
+    el.kpiClimates.textContent = l.climates_count;
+    el.kpiCovers.textContent = l.covers_count;
+    el.kpiCameras.textContent = (l.cameras_count || 0) + (l.locks_count || 0);
+
+    state.discoveredAreas = l.areas || [];
+    state.selectedAreaIds = new Set(state.discoveredAreas.map((a) => a.id));
+
+    renderRooms();
   }
 
   function renderRooms() {
@@ -69,15 +101,15 @@
       .map((a) => {
         const isChecked = state.selectedAreaIds.has(a.id);
         const counts = [];
-        if (a.lights.length) counts.push(`💡 ${a.lights.length} Lights`);
-        if (a.climates.length) counts.push(`❄️ ${a.climates.length} AC`);
-        if (a.covers.length) counts.push(`🪟 ${a.covers.length} Shades`);
-        if (a.cameras.length) counts.push(`📹 ${a.cameras.length} Cam`);
-        if (a.locks.length) counts.push(`🔒 ${a.locks.length} Lock`);
-        if (a.media.length) counts.push(`🎵 ${a.media.length} Audio`);
+        if (a.lights && a.lights.length) counts.push(`💡 ${a.lights.length} Lights`);
+        if (a.climates && a.climates.length) counts.push(`❄️ ${a.climates.length} AC`);
+        if (a.covers && a.covers.length) counts.push(`🪟 ${a.covers.length} Shades`);
+        if (a.cameras && a.cameras.length) counts.push(`📹 ${a.cameras.length} Cam`);
+        if (a.locks && a.locks.length) counts.push(`🔒 ${a.locks.length} Lock`);
+        if (a.media && a.media.length) counts.push(`🎵 ${a.media.length} Audio`);
 
         return `
-          <div class="room-card-item ${isChecked ? 'selected' : ''}" data-id="${a.id}">
+          <div class="room-card-item ${isChecked ? 'selected' : ''}" data-id="${escapeHtml(a.id)}">
             <input type="checkbox" class="room-checkbox" ${isChecked ? 'checked' : ''} />
             <div class="room-info">
               <div class="room-name">${escapeHtml(a.name)}</div>
@@ -156,17 +188,12 @@
       el.btnPreview.addEventListener("click", async () => {
         const theme = state.selectedTheme;
         const title = el.cfgTitle.value || "AJ Netweb Dashboard";
-        try {
-          const res = await fetch(`api/preview?theme=${encodeURIComponent(theme)}&title=${encodeURIComponent(title)}`);
-          const data = await res.json();
-          if (data.ok) {
-            el.previewCode.textContent = JSON.stringify(data.config, null, 2);
-            el.previewModal.style.display = "flex";
-          } else {
-            alert("Preview generation failed: " + data.error);
-          }
-        } catch (e) {
-          alert("Preview failed: " + e.message);
+        const res = await safeFetchJson(`api/preview?theme=${encodeURIComponent(theme)}&title=${encodeURIComponent(title)}`);
+        if (res.ok && res.data && res.data.config) {
+          el.previewCode.textContent = JSON.stringify(res.data.config, null, 2);
+          el.previewModal.style.display = "flex";
+        } else {
+          alert("Preview generation failed: " + (res.error || "Unknown error"));
         }
       });
     }
@@ -195,37 +222,32 @@
         el.deployFeedback.className = "deploy-feedback show";
         el.deployFeedback.innerHTML = '<span style="color:var(--accent);">⚡ Deploying dashboard to Home Assistant &amp; bundling card suite...</span>';
 
-        try {
-          const res = await fetch("api/deploy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              theme,
-              title,
-              dashboard_url: url,
-              selected_areas: areas,
-            }),
-          });
-          const data = await res.json();
-          if (data.ok) {
-            el.deployFeedback.className = "deploy-feedback show success";
-            el.deployFeedback.innerHTML = `
-              <div style="font-weight:700; margin-bottom:6px;">✓ Dashboard deployed successfully!</div>
-              <div style="font-size:0.85rem; margin-bottom:12px;">The dashboard has been written directly to Home Assistant storage and registered in your sidebar.</div>
-              <a href="/${data.url_path}" target="_blank" class="primary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
-                🚀 Open Dashboard in Home Assistant (/${data.url_path})
-              </a>
-            `;
-          } else {
-            el.deployFeedback.className = "deploy-feedback show error";
-            el.deployFeedback.innerHTML = `✕ Deployment failed: ${data.error || "Unknown error"}`;
-          }
-        } catch (err) {
+        const res = await safeFetchJson("api/deploy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            theme,
+            title,
+            dashboard_url: url,
+            selected_areas: areas,
+          }),
+        });
+
+        if (res.ok && res.data && res.data.ok) {
+          const d = res.data;
+          el.deployFeedback.className = "deploy-feedback show success";
+          el.deployFeedback.innerHTML = `
+            <div style="font-weight:700; margin-bottom:6px;">✓ Dashboard deployed successfully!</div>
+            <div style="font-size:0.85rem; margin-bottom:12px;">The dashboard has been written directly to Home Assistant storage and registered in your sidebar.</div>
+            <a href="/${escapeHtml(d.url_path)}" target="_blank" class="primary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
+              🚀 Open Dashboard in Home Assistant (/${escapeHtml(d.url_path)})
+            </a>
+          `;
+        } else {
           el.deployFeedback.className = "deploy-feedback show error";
-          el.deployFeedback.innerHTML = `✕ Error: ${err.message}`;
-        } finally {
-          el.btnDeploy.disabled = false;
+          el.deployFeedback.innerHTML = `✕ Deployment failed: ${escapeHtml(res.error || (res.data && res.data.error) || "Unknown error")}`;
         }
+        el.btnDeploy.disabled = false;
       });
     }
   }
@@ -252,29 +274,24 @@
         feedback.className = "deploy-feedback";
         feedback.textContent = "";
       }
-      try {
-        const res = await fetch("/api/blueprints/install", { method: "POST" });
-        const data = await res.json();
-        if (data.ok) {
-          if (feedback) {
-            feedback.className = "deploy-feedback show success";
-            feedback.innerHTML = `✓ 3 GCC Luxury Villa Blueprints synchronized into Home Assistant (<code>/config/blueprints/automation/ajnetweb/</code>). Available now in HA Settings → Automations → Blueprints!`;
-          }
-        } else {
-          if (feedback) {
-            feedback.className = "deploy-feedback show error";
-            feedback.textContent = `✕ Failed to install blueprints: ${data.error || "Unknown error"}`;
-          }
+
+      // Notice: relative path api/blueprints/install to work seamlessly under Ingress!
+      const res = await safeFetchJson("api/blueprints/install", { method: "POST" });
+      if (res.ok && res.data && res.data.ok) {
+        const count = (res.data.installed && res.data.installed.length) || 3;
+        if (feedback) {
+          feedback.className = "deploy-feedback show success";
+          feedback.innerHTML = `✓ ${count} GCC Luxury Villa Blueprints synchronized into Home Assistant (<code>/config/blueprints/automation/ajnetweb/</code>). Available now in HA Settings → Automations → Blueprints!`;
         }
-      } catch (err) {
+      } else {
         if (feedback) {
           feedback.className = "deploy-feedback show error";
-          feedback.textContent = `✕ Network error: ${err.message}`;
+          feedback.textContent = `✕ Failed to install blueprints: ${res.error || (res.data && res.data.error) || "Unknown error"}`;
         }
-      } finally {
-        btnSync.disabled = false;
-        btnSync.textContent = "📥 Sync All Blueprints to HA";
       }
+
+      btnSync.disabled = false;
+      btnSync.textContent = "📥 Sync All Blueprints to HA";
     });
   }
 
@@ -287,4 +304,3 @@
 
   window.addEventListener("DOMContentLoaded", init);
 })();
-

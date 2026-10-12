@@ -336,7 +336,7 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
     def _normalize_path(self) -> str:
         raw_path = urllib.parse.urlparse(self.path).path
         if "/api/" in raw_path:
-            return raw_path[raw_path.find("/api/"):]
+            return raw_path[raw_path.rfind("/api/"):]
         return raw_path
 
     def _send_json(self, data: any, status: int = 200):

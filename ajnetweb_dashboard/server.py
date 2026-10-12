@@ -35,7 +35,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def _normalize_path(self) -> str:
         raw_path = urllib.parse.urlparse(self.path).path
         if "/api/" in raw_path:
-            return raw_path[raw_path.find("/api/"):]
+            return raw_path[raw_path.rfind("/api/"):]
         return raw_path
 
     def _send_json(self, data: dict, status: int = 200):
@@ -122,7 +122,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": ok, "message": "Resources installed to /config/www/ajnetweb/"})
             return
 
-        self.send_error(404, "Endpoint not found")
+        self._send_json({"ok": False, "error": f"Endpoint '{path}' not found"}, status=404)
 
 
 def main():

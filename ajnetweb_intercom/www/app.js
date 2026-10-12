@@ -6,6 +6,43 @@
 (function () {
   "use strict";
 
+  /**
+   * Safe fetch helper that guarantees graceful JSON parsing and never crashes on plain-text/HTML errors.
+   */
+  async function safeFetchJson(url, options = {}) {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (parseErr) {
+        return {
+          ok: false,
+          status: res.status,
+          error: `HTTP ${res.status}: ${text.slice(0, 150) || "Invalid server response"}`,
+          data: null,
+        };
+      }
+      if (!res.ok) {
+        return {
+          ok: false,
+          status: res.status,
+          error: (data && (data.error || data.message)) || `Server returned HTTP ${res.status}`,
+          data,
+        };
+      }
+      return { ok: true, status: res.status, data };
+    } catch (netErr) {
+      return {
+        ok: false,
+        status: 0,
+        error: `Network error: ${netErr.message}`,
+        data: null,
+      };
+    }
+  }
+
   const state = {
     configured: false,
     brand: "auto",
@@ -16,6 +53,17 @@
     callTimeout: null,
     clockTimer: null,
     eventSource: null,
+    // Discovery State
+    discoveredDevices: [],
+    selectedDeviceIps: new Set(),
+    batchAdopting: false,
+    filterCategory: "all",
+    searchQuery: "",
+    selectedAdoptingDevice: null,
+    // Multi-Device Stations
+    doorStations: [],
+    indoorStations: [],
+    activeDoorStationId: null,
     // Theme
     theme: localStorage.getItem("ajn_intercom_theme") || "cyan",
     customColor: localStorage.getItem("ajn_intercom_custom_color") || "#00e5ff",
@@ -148,6 +196,62 @@
     broadcastSenderName: document.getElementById("broadcastSenderName"),
     broadcastMessageText: document.getElementById("broadcastMessageText"),
     btnDismissBroadcast: document.getElementById("btnDismissBroadcast"),
+    // Live Station Switcher
+    stationSwitcherBar: document.getElementById("stationSwitcherBar"),
+    stationSwitcherPills: document.getElementById("stationSwitcherPills"),
+    // SADP & ONVIF Discovery Elements
+    btnRefreshScan: document.getElementById("btnRefreshScan"),
+    btnQuickScan: document.getElementById("btnQuickScan"),
+    btnSelectAllDiscover: document.getElementById("btnSelectAllDiscover"),
+    btnBatchAdopt: document.getElementById("btnBatchAdopt"),
+    batchCountNum: document.getElementById("batchCountNum"),
+    discoverFilterPills: document.getElementById("discoverFilterPills"),
+    discoverSearchInput: document.getElementById("discoverSearchInput"),
+    discoverDeviceList: document.getElementById("discoverDeviceList"),
+    badgeCountAll: document.getElementById("badgeCountAll"),
+    badgeCountDoor: document.getElementById("badgeCountDoor"),
+    badgeCountIndoor: document.getElementById("badgeCountIndoor"),
+    badgeCountNvr: document.getElementById("badgeCountNvr"),
+    badgeCountCam: document.getElementById("badgeCountCam"),
+    // Adoption Modal Elements
+    adoptModal: document.getElementById("adoptModal"),
+    adoptModalTitle: document.getElementById("adoptModalTitle"),
+    adoptSummary: document.getElementById("adoptSummary"),
+    adoptUsername: document.getElementById("adoptUsername"),
+    adoptPassword: document.getElementById("adoptPassword"),
+    btnAdoptModalClose: document.getElementById("btnAdoptModalClose"),
+    btnAdoptCancel: document.getElementById("btnAdoptCancel"),
+    adoptForm: document.getElementById("adoptForm"),
+    adoptFeedback: document.getElementById("adoptFeedback"),
+    // Settings Managed Stations
+    btnAddManualDoorStation: document.getElementById("btnAddManualDoorStation"),
+    btnAddManualIndoorStation: document.getElementById("btnAddManualIndoorStation"),
+    configuredDoorStationsList: document.getElementById("configuredDoorStationsList"),
+    configuredIndoorStationsList: document.getElementById("configuredIndoorStationsList"),
+    // Manual Station Modal
+    manualStationModal: document.getElementById("manualStationModal"),
+    manualStationModalTitle: document.getElementById("manualStationModalTitle"),
+    manualStationModalBadge: document.getElementById("manualStationModalBadge"),
+    btnManualStationModalClose: document.getElementById("btnManualStationModalClose"),
+    manualStationForm: document.getElementById("manualStationForm"),
+    manualStationCategory: document.getElementById("manualStationCategory"),
+    manualStationId: document.getElementById("manualStationId"),
+    manualStationName: document.getElementById("manualStationName"),
+    manualStationHost: document.getElementById("manualStationHost"),
+    manualStationBrand: document.getElementById("manualStationBrand"),
+    manualStationRoomRow: document.getElementById("manualStationRoomRow"),
+    manualStationRoom: document.getElementById("manualStationRoom"),
+    manualStationModelRow: document.getElementById("manualStationModelRow"),
+    manualStationModel: document.getElementById("manualStationModel"),
+    manualStationHttpPort: document.getElementById("manualStationHttpPort"),
+    manualStationRtspPort: document.getElementById("manualStationRtspPort"),
+    manualStationUsername: document.getElementById("manualStationUsername"),
+    manualStationPassword: document.getElementById("manualStationPassword"),
+    manualStationDoorsRow: document.getElementById("manualStationDoorsRow"),
+    manualStationDoor1: document.getElementById("manualStationDoor1"),
+    manualStationDoor2: document.getElementById("manualStationDoor2"),
+    btnManualStationCancel: document.getElementById("btnManualStationCancel"),
+    manualStationFeedback: document.getElementById("manualStationFeedback"),
   };
 
   // ------------------------------------------------------------------ Browser Push Notifications
@@ -232,12 +336,15 @@
     applyTheme(state.theme, state.customColor, state.oledMode);
     setupNavigation();
     setupDoorControls();
+    setupDiscoveryUI();
+    setupManagedStationsUI();
     setupSettings();
     setupCredentialsUI();
     setupBrowserNotifications();
     setupRoomIntercom();
     startClock();
 
+    await loadConfiguredStations();
     await checkStatus();
     await loadVisitors();
     loadCredentials();
@@ -344,8 +451,11 @@
       loadCredentials();
     } else if (tab === "room-intercom") {
       loadDisplays();
+    } else if (tab === "discover") {
+      if (!state.discoveredDevices.length) startDeviceDiscovery();
     } else if (tab === "settings") {
       loadSettings();
+      loadConfiguredStations();
     }
   }
 
@@ -356,15 +466,16 @@
   // ------------------------------------------------------------------ Status
   async function checkStatus() {
     try {
-      const res = await fetch("api/status");
-      const data = await res.json();
-      state.configured = data.configured;
+      const res = await safeFetchJson("api/status");
+      const data = res.data || {};
+      const hasDoorStations = Array.isArray(state.doorStations) && state.doorStations.length > 0;
+      state.configured = Boolean(data.configured || hasDoorStations);
       state.brand = data.brand || "auto";
 
-      if (!data.configured) {
+      if (!state.configured) {
         el.intercomBrandBadge.textContent = "Not Configured";
         el.intercomBrandBadge.className = "badge warning";
-        el.intercomSubTitle.textContent = "Please configure Door Station IP in Settings";
+        el.intercomSubTitle.textContent = "Please configure Door Station in Settings or SADP Scanner";
         switchTab("settings");
         return;
       }
@@ -375,12 +486,12 @@
       if (el.labelDoor2) el.labelDoor2.textContent = state.door2Name;
       if (el.btnQuickUnlock) el.btnQuickUnlock.innerHTML = `🔓 Unlock ${state.door1Name}`;
 
-      const brandTitle = data.brand === "hikvision" ? "Hikvision ISAPI" : "Dahua VTO";
+      const brandTitle = data.brand === "hikvision" ? "Hikvision ISAPI" : data.brand === "dahua" ? "Dahua VTO" : "Intercom Online";
       el.intercomBrandBadge.textContent = brandTitle;
       el.intercomBrandBadge.className = "badge success";
 
-      const devName = data.device_info?.device_name || data.device_info?.model || "Door Station";
-      el.intercomSubTitle.textContent = `${devName} · ${data.host || ""} · Online`;
+      const devName = data.device_info?.device_name || data.device_info?.model || (hasDoorStations ? state.doorStations[0].name : "Door Station");
+      el.intercomSubTitle.textContent = `${devName} · ${data.host || (hasDoorStations ? state.doorStations[0].host : "")} · Online`;
 
       updateCallStatus(data.call_status);
     } catch (e) {
@@ -429,14 +540,17 @@
     el.doorLockBadge.className = "badge danger";
 
     try {
-      const res = await fetch("api/unlock", {
+      const res = await safeFetchJson("api/unlock", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ door: doorId }),
+        body: JSON.stringify({
+          door: doorId,
+          station_id: state.activeDoorStationId || undefined,
+        }),
       });
-      const data = await res.json();
-      if (data.ok) {
-        addActivityItem("unlock", `Unlocked ${data.name || `Door ${doorId}`}`);
+      const data = res.data;
+      if (res.ok && data && data.ok) {
+        addActivityItem("unlock", `Unlocked ${data.name || `Door ${doorId}`} (${data.station || "Intercom"})`);
       }
     } catch (e) {
       console.error("Unlock failed:", e);
@@ -1058,8 +1172,8 @@
       el.settingsFeedback.innerHTML =
         '<span style="color:var(--accent);">Probing Door Station at ' + el.cfgHost.value + "...</span>";
       try {
-        const res = await fetch("api/status");
-        const d = await res.json();
+        const res = await safeFetchJson("api/status");
+        const d = res.data || {};
         if (d.configured) {
           el.settingsFeedback.innerHTML = `<span style="color:var(--success);">✓ Door Station Online! Brand: ${d.brand}, Model: ${d.device_info?.model || "VTO"}</span>`;
         } else {
@@ -1069,6 +1183,750 @@
         el.settingsFeedback.innerHTML = `<span style="color:var(--danger);">Connection failed: ${err.message}</span>`;
       }
     });
+  }
+
+  // ------------------------------------------------------------------ SADP & ONVIF Device Scanner
+  function setupDiscoveryUI() {
+    if (el.btnRefreshScan) {
+      el.btnRefreshScan.addEventListener("click", startDeviceDiscovery);
+    }
+    if (el.btnQuickScan) {
+      el.btnQuickScan.addEventListener("click", () => {
+        switchTab("discover");
+        startDeviceDiscovery();
+      });
+    }
+
+    if (el.discoverFilterPills) {
+      el.discoverFilterPills.querySelectorAll(".filter-pill").forEach((pill) => {
+        pill.addEventListener("click", () => {
+          el.discoverFilterPills.querySelectorAll(".filter-pill").forEach((p) => p.classList.remove("active"));
+          pill.classList.add("active");
+          state.filterCategory = pill.dataset.filter || "all";
+          renderDiscoveredDevices();
+        });
+      });
+    }
+
+    if (el.discoverSearchInput) {
+      el.discoverSearchInput.addEventListener("input", (e) => {
+        state.searchQuery = e.target.value.toLowerCase().trim();
+        renderDiscoveredDevices();
+      });
+    }
+
+    if (el.btnSelectAllDiscover) {
+      el.btnSelectAllDiscover.addEventListener("click", () => {
+        const filtered = getFilteredDiscoveredDevices();
+        const allSelected = filtered.length > 0 && filtered.every((d) => state.selectedDeviceIps.has(d.ip));
+        if (allSelected) {
+          filtered.forEach((d) => state.selectedDeviceIps.delete(d.ip));
+        } else {
+          filtered.forEach((d) => state.selectedDeviceIps.add(d.ip));
+        }
+        updateBatchAdoptUi();
+        renderDiscoveredDevices();
+      });
+    }
+
+    if (el.btnBatchAdopt) {
+      el.btnBatchAdopt.addEventListener("click", () => {
+        openBatchAdoptModal();
+      });
+    }
+
+    if (el.btnAdoptModalClose) el.btnAdoptModalClose.addEventListener("click", closeAdoptModal);
+    if (el.btnAdoptCancel) el.btnAdoptCancel.addEventListener("click", closeAdoptModal);
+    if (el.adoptForm) el.adoptForm.addEventListener("submit", handleAdoptSubmit);
+  }
+
+  function getFilteredDiscoveredDevices() {
+    let list = state.discoveredDevices || [];
+    if (state.filterCategory !== "all") {
+      list = list.filter((d) => d.category === state.filterCategory);
+    }
+    if (state.searchQuery) {
+      const q = state.searchQuery;
+      list = list.filter(
+        (d) =>
+          (d.ip && d.ip.toLowerCase().includes(q)) ||
+          (d.mac && d.mac.toLowerCase().includes(q)) ||
+          (d.brand && d.brand.toLowerCase().includes(q)) ||
+          (d.model && d.model.toLowerCase().includes(q)) ||
+          (d.category && d.category.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }
+
+  async function startDeviceDiscovery() {
+    if (el.discoverDeviceList) {
+      el.discoverDeviceList.innerHTML = `
+        <div class="scanning-placeholder">
+          <div class="radar-scan-anim">
+            <div class="radar-circle circle-1"></div>
+            <div class="radar-circle circle-2"></div>
+            <div class="radar-circle circle-3"></div>
+            <div class="radar-sweep"></div>
+          </div>
+          <p>Scanning local subnet for Hikvision &amp; ONVIF Intercom units...</p>
+        </div>
+      `;
+    }
+
+    if (el.btnRefreshScan) {
+      el.btnRefreshScan.classList.add("pulsing");
+      el.btnRefreshScan.disabled = true;
+    }
+
+    try {
+      const res = await safeFetchJson("api/discover/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeout: 3.5 }),
+      });
+
+      if (res.ok && res.data && Array.isArray(res.data.devices)) {
+        state.discoveredDevices = res.data.devices;
+        updateDiscoveryCounts(res.data.devices);
+        renderDiscoveredDevices();
+      } else {
+        if (el.discoverDeviceList) {
+          el.discoverDeviceList.innerHTML = `
+            <div class="scanning-placeholder">
+              <p style="color:var(--danger);">Scan failed: ${res.error || "No response"}</p>
+            </div>
+          `;
+        }
+      }
+    } catch (e) {
+      if (el.discoverDeviceList) {
+        el.discoverDeviceList.innerHTML = `
+          <div class="scanning-placeholder">
+            <p style="color:var(--danger);">Scan error: ${e.message}</p>
+          </div>
+        `;
+      }
+    } finally {
+      if (el.btnRefreshScan) {
+        el.btnRefreshScan.classList.remove("pulsing");
+        el.btnRefreshScan.disabled = false;
+      }
+    }
+  }
+
+  function updateDiscoveryCounts(devices) {
+    if (el.badgeCountAll) el.badgeCountAll.textContent = devices.length;
+    if (el.badgeCountDoor)
+      el.badgeCountDoor.textContent = devices.filter((d) => d.category === "door_station").length;
+    if (el.badgeCountIndoor)
+      el.badgeCountIndoor.textContent = devices.filter((d) => d.category === "indoor_station").length;
+    if (el.badgeCountNvr)
+      el.badgeCountNvr.textContent = devices.filter((d) => d.category === "nvr").length;
+    if (el.badgeCountCam)
+      el.badgeCountCam.textContent = devices.filter((d) => d.category === "camera").length;
+
+    if (el.btnSelectAllDiscover) {
+      el.btnSelectAllDiscover.style.display = devices.length ? "inline-block" : "none";
+    }
+  }
+
+  function renderDiscoveredDevices() {
+    if (!el.discoverDeviceList) return;
+    const filtered = getFilteredDiscoveredDevices();
+
+    if (!filtered.length) {
+      el.discoverDeviceList.innerHTML = `
+        <div class="scanning-placeholder">
+          <p>No devices matching filter criteria.</p>
+        </div>
+      `;
+      updateBatchAdoptUi();
+      return;
+    }
+
+    el.discoverDeviceList.innerHTML = filtered
+      .map((d) => {
+        const isSelected = state.selectedDeviceIps.has(d.ip);
+        const isDoor = d.category === "door_station";
+        const isIndoor = d.category === "indoor_station";
+        const isNvr = d.category === "nvr";
+        const icon = isDoor ? "🚪" : isIndoor ? "📟" : isNvr ? "📼" : "📷";
+        const catLabel = isDoor
+          ? "Door Station"
+          : isIndoor
+          ? "Indoor Display"
+          : isNvr
+          ? "NVR System"
+          : "IP Camera";
+
+        const brandPillClass =
+          d.brand === "Hikvision"
+            ? "badge cyber"
+            : d.brand === "Dahua"
+            ? "badge warning"
+            : "badge neutral";
+
+        return `
+          <div class="device-card ${isSelected ? "selected" : ""}" data-ip="${escapeHtml(d.ip)}">
+            <div class="device-card-header">
+              <div class="device-icon-type">
+                <div class="device-select-cb-wrap">
+                  <input type="checkbox" class="device-select-cb" data-ip="${escapeHtml(d.ip)}" ${isSelected ? "checked" : ""} />
+                </div>
+                <div class="device-cat-icon">${icon}</div>
+                <div class="device-title-block">
+                  <b>${escapeHtml(d.model || d.brand)}</b>
+                  <span>${escapeHtml(catLabel)}</span>
+                </div>
+              </div>
+              <div class="device-badge-group">
+                <span class="${brandPillClass}">${escapeHtml(d.brand)}</span>
+                <span class="badge ${d.activated !== false ? "success" : "warning"}">
+                  ${d.activated !== false ? "Active" : "Inactive"}
+                </span>
+              </div>
+            </div>
+
+            <div class="device-details-table">
+              <div class="detail-item">
+                <span>IP Address</span>
+                <b>${escapeHtml(d.ip)}</b>
+              </div>
+              <div class="detail-item">
+                <span>MAC Address</span>
+                <b>${escapeHtml(d.mac || "—")}</b>
+              </div>
+              <div class="detail-item">
+                <span>Ports</span>
+                <b>HTTP ${d.http_port || 80} / RTSP ${d.rtsp_port || 554}</b>
+              </div>
+              <div class="detail-item">
+                <span>Firmware / Protocol</span>
+                <b>${escapeHtml(d.firmware || d.protocol || "SADP")}</b>
+              </div>
+            </div>
+
+            <div class="device-card-actions">
+              <button class="primary-btn btn-adopt-card" data-ip="${escapeHtml(d.ip)}">
+                ⚡ 1-Click Adopt
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    // Bind card checkboxes and selection
+    el.discoverDeviceList.querySelectorAll(".device-select-cb").forEach((cb) => {
+      cb.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const ip = cb.dataset.ip;
+        if (cb.checked) {
+          state.selectedDeviceIps.add(ip);
+        } else {
+          state.selectedDeviceIps.delete(ip);
+        }
+        const card = el.discoverDeviceList.querySelector(`.device-card[data-ip="${ip}"]`);
+        if (card) card.classList.toggle("selected", cb.checked);
+        updateBatchAdoptUi();
+      });
+    });
+
+    el.discoverDeviceList.querySelectorAll(".device-card").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        if (e.target.closest("button") || e.target.closest("input") || e.target.closest("a")) return;
+        const ip = card.dataset.ip;
+        const cb = card.querySelector(".device-select-cb");
+        if (cb) {
+          cb.checked = !cb.checked;
+          if (cb.checked) {
+            state.selectedDeviceIps.add(ip);
+          } else {
+            state.selectedDeviceIps.delete(ip);
+          }
+          card.classList.toggle("selected", cb.checked);
+          updateBatchAdoptUi();
+        }
+      });
+    });
+
+    el.discoverDeviceList.querySelectorAll(".btn-adopt-card").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const ip = btn.dataset.ip;
+        const dev = state.discoveredDevices.find((d) => d.ip === ip);
+        if (dev) openAdoptModal(dev);
+      });
+    });
+
+    updateBatchAdoptUi();
+  }
+
+  function updateBatchAdoptUi() {
+    const count = state.selectedDeviceIps.size;
+    if (el.batchCountNum) el.batchCountNum.textContent = count;
+    if (el.btnBatchAdopt) {
+      el.btnBatchAdopt.style.display = count > 0 ? "inline-block" : "none";
+    }
+  }
+
+  function openAdoptModal(dev) {
+    state.selectedAdoptingDevice = dev;
+    state.batchAdopting = false;
+
+    if (el.adoptModalTitle) el.adoptModalTitle.textContent = `Adopt ${dev.brand} ${dev.model || dev.ip}`;
+    if (el.adoptSummary) {
+      el.adoptSummary.innerHTML = `
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span><b>Device:</b> ${escapeHtml(dev.brand)} ${escapeHtml(dev.model || "Intercom Unit")}</span>
+          <span style="color:var(--accent); font-weight:700;">${escapeHtml(dev.ip)}</span>
+        </div>
+        <div style="font-size:0.78rem; color:var(--text-secondary);">
+          Category: <b>${escapeHtml((dev.category || "intercom").replace("_", " ").toUpperCase())}</b> &bull; MAC: ${escapeHtml(dev.mac || "—")}
+        </div>
+      `;
+    }
+
+    const btnSubmit = document.getElementById("btnAdoptSubmit");
+    if (btnSubmit) btnSubmit.textContent = "Adopt & Connect";
+    if (el.adoptUsername) el.adoptUsername.value = "admin";
+    if (el.adoptPassword) el.adoptPassword.value = "";
+    if (el.adoptFeedback) el.adoptFeedback.textContent = "";
+    if (el.adoptModal) el.adoptModal.style.display = "flex";
+  }
+
+  function openBatchAdoptModal() {
+    const selectedList = state.discoveredDevices.filter((d) => state.selectedDeviceIps.has(d.ip));
+    if (!selectedList.length) return;
+
+    state.batchAdopting = true;
+    state.selectedAdoptingDevice = null;
+
+    if (el.adoptModalTitle) {
+      el.adoptModalTitle.textContent = `Batch Adopt (${selectedList.length} Intercom Units)`;
+    }
+    if (el.adoptSummary) {
+      el.adoptSummary.innerHTML = `
+        <div style="margin-bottom:8px; font-weight:700; color:var(--accent);">
+          Adopting ${selectedList.length} Intercom Devices simultaneously:
+        </div>
+        <div style="max-height:120px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; font-size:0.78rem;">
+          ${selectedList
+            .map(
+              (d) => `
+            <div style="display:flex; justify-content:space-between; padding:3px 6px; background:rgba(255,255,255,0.05); border-radius:4px;">
+              <span><b>${escapeHtml(d.model || d.ip)}</b> (${escapeHtml(d.brand)})</span>
+              <span style="color:var(--text-secondary);">${escapeHtml(d.ip)}</span>
+            </div>`
+            )
+            .join("")}
+        </div>
+        <div style="margin-top:8px; font-size:0.75rem; color:var(--text-muted);">
+          Enter the common login credentials. Hardware door stations &amp; touch screens will be automatically registered!
+        </div>
+      `;
+    }
+
+    const btnSubmit = document.getElementById("btnAdoptSubmit");
+    if (btnSubmit) btnSubmit.textContent = `Adopt All ${selectedList.length} Stations`;
+    if (el.adoptUsername) el.adoptUsername.value = "admin";
+    if (el.adoptPassword) el.adoptPassword.value = "";
+    if (el.adoptFeedback) el.adoptFeedback.textContent = "";
+    if (el.adoptModal) el.adoptModal.style.display = "flex";
+  }
+
+  function closeAdoptModal() {
+    if (el.adoptModal) el.adoptModal.style.display = "none";
+    state.selectedAdoptingDevice = null;
+    state.batchAdopting = false;
+  }
+
+  async function handleAdoptSubmit(e) {
+    e.preventDefault();
+    const username = el.adoptUsername.value.trim();
+    const password = el.adoptPassword.value;
+    const btnSubmit = document.getElementById("btnAdoptSubmit");
+
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.textContent = "Connecting...";
+    }
+    el.adoptFeedback.innerHTML = '<span style="color:var(--accent);">Configuring intercom station and establishing links...</span>';
+
+    let payload = {};
+    if (state.batchAdopting) {
+      const selectedList = state.discoveredDevices.filter((d) => state.selectedDeviceIps.has(d.ip));
+      payload = {
+        devices: selectedList.map((d) => ({
+          ip: d.ip,
+          brand: (d.brand || "auto").toLowerCase(),
+          model: d.model || "",
+          category: d.category || "door_station",
+          http_port: d.http_port || 80,
+          rtsp_port: d.rtsp_port || 554,
+          name: `${d.brand} ${d.model || d.ip}`,
+        })),
+        default_username: username,
+        default_password: password,
+      };
+    } else {
+      const dev = state.selectedAdoptingDevice;
+      if (!dev) return;
+      payload = {
+        ip: dev.ip,
+        brand: (dev.brand || "auto").toLowerCase(),
+        model: dev.model || "",
+        category: dev.category || "door_station",
+        http_port: dev.http_port || 80,
+        rtsp_port: dev.rtsp_port || 554,
+        username: username,
+        password: password,
+        name: `${dev.brand} ${dev.model || dev.ip}`,
+      };
+    }
+
+    const res = await safeFetchJson("api/discover/adopt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok && res.data && res.data.ok) {
+      state.selectedDeviceIps.clear();
+      el.adoptFeedback.innerHTML = '<span style="color:var(--success);">✓ Intercom device(s) adopted! Reloading stations...</span>';
+      setTimeout(async () => {
+        closeAdoptModal();
+        await loadConfiguredStations();
+        await checkStatus();
+        switchTab("live");
+      }, 900);
+    } else {
+      el.adoptFeedback.innerHTML = `<span style="color:var(--danger);">${res.error || (res.data && res.data.error) || "Adoption failed"}</span>`;
+    }
+
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.textContent = "Adopt & Connect";
+    }
+  }
+
+  // ------------------------------------------------------------------ Multi-Station Management & Door Switcher
+  function setupManagedStationsUI() {
+    if (el.btnAddManualDoorStation) {
+      el.btnAddManualDoorStation.addEventListener("click", () => openManualStationModal("door_station"));
+    }
+    if (el.btnAddManualIndoorStation) {
+      el.btnAddManualIndoorStation.addEventListener("click", () => openManualStationModal("indoor_station"));
+    }
+    if (el.btnManualStationModalClose) {
+      el.btnManualStationModalClose.addEventListener("click", closeManualStationModal);
+    }
+    if (el.btnManualStationCancel) {
+      el.btnManualStationCancel.addEventListener("click", closeManualStationModal);
+    }
+    if (el.manualStationForm) {
+      el.manualStationForm.addEventListener("submit", handleManualStationSubmit);
+    }
+  }
+
+  async function loadConfiguredStations() {
+    try {
+      const res = await safeFetchJson("api/devices");
+      if (res.ok && res.data) {
+        state.doorStations = Array.isArray(res.data.door_stations) ? res.data.door_stations : [];
+        state.indoorStations = Array.isArray(res.data.indoor_stations) ? res.data.indoor_stations : [];
+
+        if (state.doorStations.length > 0 && !state.activeDoorStationId) {
+          state.activeDoorStationId = state.doorStations[0].id;
+        }
+
+        renderStationSwitcher();
+        renderConfiguredDoorStations();
+        renderConfiguredIndoorStations();
+      }
+    } catch (e) {
+      console.error("Failed to load intercom devices:", e);
+    }
+  }
+
+  function renderStationSwitcher() {
+    if (!el.stationSwitcherBar || !el.stationSwitcherPills) return;
+    const doors = state.doorStations || [];
+
+    if (doors.length <= 1) {
+      el.stationSwitcherBar.style.display = "none";
+      return;
+    }
+
+    el.stationSwitcherBar.style.display = "flex";
+    el.stationSwitcherPills.innerHTML = doors
+      .map((st) => {
+        const isActive = st.id === state.activeDoorStationId;
+        return `
+          <button class="filter-pill ${isActive ? "active" : ""}" data-id="${escapeHtml(st.id)}">
+            <span>🚪 ${escapeHtml(st.name || st.host)}</span>
+            <span class="pill-badge">${escapeHtml(st.host)}</span>
+          </button>
+        `;
+      })
+      .join("");
+
+    el.stationSwitcherPills.querySelectorAll(".filter-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        const sid = pill.dataset.id;
+        switchDoorStation(sid);
+      });
+    });
+  }
+
+  async function switchDoorStation(stationId) {
+    const station = state.doorStations.find((d) => d.id === stationId);
+    if (!station) return;
+
+    state.activeDoorStationId = stationId;
+    renderStationSwitcher();
+
+    // Update active on server
+    safeFetchJson("api/intercom/station/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ station_id: stationId }),
+    }).catch(() => {});
+
+    // Update Live image feed
+    if (el.doorLiveImage) {
+      el.doorLiveImage.src = `api/mjpeg?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+    }
+
+    // Update UI labels
+    if (el.feedDoorName) el.feedDoorName.textContent = (station.name || "DOOR STATION").toUpperCase();
+    if (el.labelDoor1) el.labelDoor1.textContent = station.door_1_name || "Main Gate";
+    if (el.labelDoor2) el.labelDoor2.textContent = station.door_2_name || "Pedestrian Door";
+    if (el.btnQuickUnlock) el.btnQuickUnlock.innerHTML = `🔓 Unlock ${station.door_1_name || "Main Gate"}`;
+    if (el.intercomSubTitle) el.intercomSubTitle.textContent = `${station.name} · ${station.host} · Online`;
+  }
+
+  function renderConfiguredDoorStations() {
+    if (!el.configuredDoorStationsList) return;
+    const list = state.doorStations || [];
+
+    if (!list.length) {
+      el.configuredDoorStationsList.innerHTML = `
+        <div class="empty-hint">
+          No door stations configured yet. Use the <b>SADP Scanner</b> above or click <b>"+ Add Door Station Manually"</b>.
+        </div>`;
+      return;
+    }
+
+    el.configuredDoorStationsList.innerHTML = list
+      .map((d) => {
+        const brandPillClass =
+          d.brand === "hikvision" ? "badge cyber" : d.brand === "dahua" ? "badge warning" : "badge neutral";
+        return `
+          <div class="configured-device-item" data-id="${escapeHtml(d.id)}">
+            <div class="dev-item-info">
+              <div class="dev-item-icon">🚪</div>
+              <div class="dev-item-details">
+                <b>${escapeHtml(d.name || "Door Station")}</b>
+                <span>${escapeHtml(d.host)}:${d.http_port || 80} &bull; Relay 1: ${escapeHtml(d.door_1_name || "Door 1")} &bull; Relay 2: ${escapeHtml(d.door_2_name || "Door 2")}</span>
+              </div>
+            </div>
+            <div class="dev-item-actions">
+              <span class="${brandPillClass}">${escapeHtml((d.brand || "auto").toUpperCase())}</span>
+              <span class="badge ${d.online !== false ? "success" : "danger"}">${d.online !== false ? "● Online" : "○ Offline"}</span>
+              <button class="secondary-btn btn-edit-door-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
+              <button class="secondary-btn btn-delete-door-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    el.configuredDoorStationsList.querySelectorAll(".btn-edit-door-station").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const st = state.doorStations.find((d) => d.id === btn.dataset.id);
+        if (st) openManualStationModal("door_station", st);
+      });
+    });
+
+    el.configuredDoorStationsList.querySelectorAll(".btn-delete-door-station").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleDeleteStation(btn.dataset.id, "door_station");
+      });
+    });
+  }
+
+  function renderConfiguredIndoorStations() {
+    if (!el.configuredIndoorStationsList) return;
+    const list = state.indoorStations || [];
+
+    if (!list.length) {
+      el.configuredIndoorStationsList.innerHTML = `
+        <div class="empty-hint">
+          No indoor displays configured yet. Add physical wall panels (Hikvision DS-KH9510, Android smart screens) or adopt via SADP Scanner.
+        </div>`;
+      return;
+    }
+
+    el.configuredIndoorStationsList.innerHTML = list
+      .map((d) => {
+        const brandPillClass =
+          d.brand === "hikvision" ? "badge cyber" : d.brand === "dahua" ? "badge warning" : "badge neutral";
+        return `
+          <div class="configured-device-item" data-id="${escapeHtml(d.id)}">
+            <div class="dev-item-info">
+              <div class="dev-item-icon">📟</div>
+              <div class="dev-item-details">
+                <b>${escapeHtml(d.name || "Indoor Touch Display")}</b>
+                <span>${escapeHtml(d.host)}:${d.http_port || 80} &bull; Room: <b>${escapeHtml(d.room || "Villa")}</b> &bull; Model: ${escapeHtml(d.model || "Touch Screen")}</span>
+              </div>
+            </div>
+            <div class="dev-item-actions">
+              <span class="${brandPillClass}">${escapeHtml((d.brand || "auto").toUpperCase())}</span>
+              <span class="badge success">● Connected</span>
+              <button class="secondary-btn btn-edit-indoor-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
+              <button class="secondary-btn btn-delete-indoor-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    el.configuredIndoorStationsList.querySelectorAll(".btn-edit-indoor-station").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const st = state.indoorStations.find((d) => d.id === btn.dataset.id);
+        if (st) openManualStationModal("indoor_station", st);
+      });
+    });
+
+    el.configuredIndoorStationsList.querySelectorAll(".btn-delete-indoor-station").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        handleDeleteStation(btn.dataset.id, "indoor_station");
+      });
+    });
+  }
+
+  function openManualStationModal(category = "door_station", station = null) {
+    if (el.manualStationForm) el.manualStationForm.reset();
+    if (el.manualStationFeedback) el.manualStationFeedback.textContent = "";
+
+    const isDoor = category === "door_station";
+    if (el.manualStationCategory) el.manualStationCategory.value = category;
+    if (el.manualStationModalBadge) {
+      el.manualStationModalBadge.textContent = isDoor ? "🚪 Door Station" : "📟 Indoor Display";
+    }
+    if (el.manualStationDoorsRow) el.manualStationDoorsRow.style.display = isDoor ? "grid" : "none";
+    if (el.manualStationRoomRow) el.manualStationRoomRow.style.display = isDoor ? "none" : "block";
+    if (el.manualStationModelRow) el.manualStationModelRow.style.display = isDoor ? "none" : "block";
+
+    if (station) {
+      if (el.manualStationModalTitle)
+        el.manualStationModalTitle.textContent = `Edit Station: ${station.name || station.host}`;
+      if (el.manualStationId) el.manualStationId.value = station.id || "";
+      if (el.manualStationName) el.manualStationName.value = station.name || "";
+      if (el.manualStationHost) el.manualStationHost.value = station.host || "";
+      if (el.manualStationBrand) el.manualStationBrand.value = station.brand || "auto";
+      if (el.manualStationHttpPort) el.manualStationHttpPort.value = station.http_port || 80;
+      if (el.manualStationRtspPort) el.manualStationRtspPort.value = station.rtsp_port || 554;
+      if (el.manualStationUsername) el.manualStationUsername.value = station.username || "admin";
+      if (el.manualStationPassword) el.manualStationPassword.value = station.has_password ? "••••••••" : "";
+
+      if (isDoor) {
+        if (el.manualStationDoor1) el.manualStationDoor1.value = station.door_1_name || "Main Gate";
+        if (el.manualStationDoor2) el.manualStationDoor2.value = station.door_2_name || "Pedestrian Door";
+      } else {
+        if (el.manualStationRoom) el.manualStationRoom.value = station.room || "Living Room";
+        if (el.manualStationModel) el.manualStationModel.value = station.model || "DS-KH9510";
+      }
+    } else {
+      if (el.manualStationModalTitle)
+        el.manualStationModalTitle.textContent = isDoor ? "Add Door Station" : "Add Indoor Touch Screen";
+      if (el.manualStationId) el.manualStationId.value = "";
+      if (el.manualStationHttpPort) el.manualStationHttpPort.value = 80;
+      if (el.manualStationRtspPort) el.manualStationRtspPort.value = 554;
+      if (el.manualStationUsername) el.manualStationUsername.value = "admin";
+      if (isDoor) {
+        if (el.manualStationDoor1) el.manualStationDoor1.value = "Main Gate";
+        if (el.manualStationDoor2) el.manualStationDoor2.value = "Pedestrian Door";
+      } else {
+        if (el.manualStationRoom) el.manualStationRoom.value = "Living Room";
+        if (el.manualStationModel) el.manualStationModel.value = "DS-KH9510";
+      }
+    }
+
+    if (el.manualStationModal) el.manualStationModal.style.display = "flex";
+  }
+
+  function closeManualStationModal() {
+    if (el.manualStationModal) el.manualStationModal.style.display = "none";
+  }
+
+  async function handleManualStationSubmit(e) {
+    e.preventDefault();
+    const cat = el.manualStationCategory.value || "door_station";
+    const payload = {
+      category: cat,
+      id: el.manualStationId.value.trim() || undefined,
+      name: el.manualStationName.value.trim(),
+      host: el.manualStationHost.value.trim(),
+      brand: el.manualStationBrand.value,
+      http_port: parseInt(el.manualStationHttpPort.value, 10) || 80,
+      rtsp_port: parseInt(el.manualStationRtspPort.value, 10) || 554,
+      username: el.manualStationUsername.value.trim() || "admin",
+      password: el.manualStationPassword.value,
+    };
+
+    if (cat === "door_station") {
+      payload.door_1_name = el.manualStationDoor1.value.trim();
+      payload.door_2_name = el.manualStationDoor2.value.trim();
+    } else {
+      payload.room = el.manualStationRoom.value.trim();
+      payload.model = el.manualStationModel.value.trim();
+    }
+
+    if (el.manualStationFeedback) {
+      el.manualStationFeedback.innerHTML = '<span style="color:var(--accent);">Validating and saving station...</span>';
+    }
+
+    const res = await safeFetchJson("api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok && res.data && res.data.ok) {
+      if (el.manualStationFeedback) {
+        el.manualStationFeedback.innerHTML = '<span style="color:var(--success);">✓ Station saved successfully!</span>';
+      }
+      setTimeout(async () => {
+        closeManualStationModal();
+        await loadConfiguredStations();
+        await checkStatus();
+      }, 700);
+    } else {
+      if (el.manualStationFeedback) {
+        el.manualStationFeedback.innerHTML = `<span style="color:var(--danger);">${res.error || "Failed to save station"}</span>`;
+      }
+    }
+  }
+
+  async function handleDeleteStation(stationId, category) {
+    const isDoor = category === "door_station";
+    if (!confirm(`Are you sure you want to remove this ${isDoor ? "door station" : "indoor display"}?`)) return;
+
+    const res = await safeFetchJson("api/devices/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: stationId, category: category }),
+    });
+
+    if (res.ok && res.data && res.data.ok) {
+      await loadConfiguredStations();
+      await checkStatus();
+    } else {
+      alert(`Could not remove station: ${res.error || "Unknown error"}`);
+    }
   }
 
   // ------------------------------------------------------------------ Inter-Display Room Calling & Broadcast System
@@ -1295,33 +2153,47 @@
       const statusClass = d.status === "available" ? "status-available" : d.status === "busy" ? "status-busy" : "status-dnd";
       const statusText = d.status === "available" ? "Available" : d.status === "busy" ? "In Call" : "DND";
 
+      const isHw = Boolean(d.is_hardware || d.device_type === "indoor_panel");
+      const actionButtons = isSelf
+        ? `<button type="button" class="btn-room-page" style="flex:1;" disabled>📍 Local Screen</button>`
+        : isHw
+        ? `<button type="button" class="primary-btn btn-room-call" data-hw-unit="${escapeHtml(d.unit_number || '101')}" data-name="${escapeHtml(d.name)}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            Ring Panel
+          </button>
+          <button type="button" class="btn-room-page" data-name="${escapeHtml(d.name)}" title="Send Quick Page">📢 Page</button>`
+        : `<button type="button" class="btn-room-call" data-id="${d.id}" data-name="${escapeHtml(d.name)}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            Call Room
+          </button>
+          <button type="button" class="btn-room-page" data-name="${escapeHtml(d.name)}" title="Send Quick Page">📢 Page</button>`;
+
       card.innerHTML = `
         <div class="room-card-head">
           <div class="room-avatar-badge">
             <div class="room-icon-box">${avatar}</div>
             <div class="room-title-block">
-              <b>${d.name} ${isSelf ? "<small style='color:var(--accent); font-weight:normal;'>(This Screen)</small>" : ""}</b>
-              <span>${d.device_type || "Wall Display"} &bull; ${d.ip || "LAN"}</span>
+              <b>${escapeHtml(d.name)} ${isSelf ? "<small style='color:var(--accent); font-weight:normal;'>(This Screen)</small>" : ""}</b>
+              <span>${escapeHtml(d.device_type === "indoor_panel" ? (d.model || "Wall Panel") : (d.device_type || "Wall Display"))} &bull; ${escapeHtml(d.ip || "LAN")}</span>
             </div>
           </div>
           <span class="room-status-badge ${statusClass}">${statusText}</span>
         </div>
         <div class="room-card-actions">
-          ${isSelf
-            ? `<button type="button" class="btn-room-page" style="flex:1;" disabled>📍 Local Screen</button>`
-            : `<button type="button" class="btn-room-call" data-id="${d.id}" data-name="${d.name}">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                Call Room
-              </button>
-              <button type="button" class="btn-room-page" data-name="${d.name}" title="Send Quick Page">📢 Page</button>`
-          }
+          ${actionButtons}
         </div>
       `;
 
       if (!isSelf) {
-        card.querySelector(".btn-room-call")?.addEventListener("click", () => {
-          initiateRoomCall(d.id, d.name);
-        });
+        if (isHw) {
+          card.querySelector(".btn-room-call")?.addEventListener("click", () => {
+            dialHardwareStation(d.unit_number || "101");
+          });
+        } else {
+          card.querySelector(".btn-room-call")?.addEventListener("click", () => {
+            initiateRoomCall(d.id, d.name);
+          });
+        }
         card.querySelector(".btn-room-page")?.addEventListener("click", () => {
           sendVillaBroadcast(`Paging ${d.name}: Please respond on intercom.`);
         });

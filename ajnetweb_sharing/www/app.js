@@ -6,6 +6,43 @@
 (function () {
   "use strict";
 
+  /**
+   * Safe fetch helper that guarantees graceful JSON parsing and never crashes on plain-text/HTML errors.
+   */
+  async function safeFetchJson(url, options = {}) {
+    try {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (parseErr) {
+        return {
+          ok: false,
+          status: res.status,
+          error: `HTTP ${res.status}: ${text.slice(0, 150) || "Invalid server response"}`,
+          data: null,
+        };
+      }
+      if (!res.ok) {
+        return {
+          ok: false,
+          status: res.status,
+          error: (data && (data.error || data.message)) || `Server returned HTTP ${res.status}`,
+          data,
+        };
+      }
+      return { ok: true, status: res.status, data };
+    } catch (netErr) {
+      return {
+        ok: false,
+        status: 0,
+        error: `Network error: ${netErr.message}`,
+        data: null,
+      };
+    }
+  }
+
   const state = {
     activeTab: "passes",
     areas: [],
@@ -176,8 +213,8 @@
   // ------------------------------------------------------------------ Metadata
   async function loadMetadata() {
     try {
-      const res = await fetch("api/metadata");
-      const data = await res.json();
+      const res = await safeFetchJson("api/metadata");
+      const data = res.data || {};
       state.areas = data.areas || [];
       state.users = data.users || [];
 
@@ -208,9 +245,9 @@
   // ------------------------------------------------------------------ Guest Passes
   async function loadPasses() {
     try {
-      const res = await fetch("api/passes");
-      const list = await res.json();
-      state.passes = Array.isArray(list) ? list : [];
+      const res = await safeFetchJson("api/passes");
+      const list = Array.isArray(res.data) ? res.data : [];
+      state.passes = list;
 
       const activeCount = state.passes.filter((p) => !p.revoked && !p.expired).length;
       const totalActions = state.passes.reduce((acc, p) => acc + (p.use_count || 0), 0);
@@ -312,7 +349,7 @@
     el.passesList.querySelectorAll(".btn-revoke-pass").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!confirm("Revoke this pass immediately? The guest will lose room access.")) return;
-        await fetch("api/passes/revoke", {
+        await safeFetchJson("api/passes/revoke", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: btn.dataset.id }),
@@ -324,7 +361,7 @@
     el.passesList.querySelectorAll(".btn-delete-pass").forEach((btn) => {
       btn.addEventListener("click", async () => {
         if (!confirm("Permanently delete this pass?")) return;
-        await fetch("api/passes/delete", {
+        await safeFetchJson("api/passes/delete", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: btn.dataset.id }),
@@ -380,19 +417,19 @@
       };
 
       try {
-        const res = await fetch("api/passes/create", {
+        const res = await safeFetchJson("api/passes/create", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = await res.json();
-        if (data.ok) {
+        const data = res.data || {};
+        if (res.ok && data.ok) {
           el.modalCreatePass.style.display = "none";
           el.formCreatePass.reset();
           await loadPasses();
           openViewPassModal(data.pass);
         } else {
-          alert(data.error || "Failed to create pass.");
+          alert(res.error || data.error || "Failed to create pass.");
         }
       } catch (err) {
         alert("Error: " + err.message);
@@ -516,8 +553,8 @@
   // ------------------------------------------------------------------ Visual User Room Matrix
   async function loadMatrix() {
     try {
-      const res = await fetch("api/matrix");
-      const data = await res.json();
+      const res = await safeFetchJson("api/matrix");
+      const data = res.data || {};
       state.matrix = data.users || [];
       const areas = data.areas || state.areas;
 
@@ -576,19 +613,19 @@
 
       el.matrixFeedback.innerHTML = '<span style="color:var(--accent);">Saving matrix permissions...</span>';
       try {
-        const res = await fetch("api/matrix/save", {
+        const res = await safeFetchJson("api/matrix/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ matrix: matrixMap }),
         });
-        const d = await res.json();
-        if (d.ok) {
+        const d = res.data || {};
+        if (res.ok && d.ok) {
           el.matrixFeedback.innerHTML = '<span style="color:var(--success);">✓ Permissions saved successfully!</span>';
           setTimeout(() => {
             el.matrixFeedback.innerHTML = "";
           }, 3000);
         } else {
-          el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${d.error || "Failed"}</span>`;
+          el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${res.error || d.error || "Failed"}</span>`;
         }
       } catch (err) {
         el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
@@ -605,16 +642,16 @@
       el.matrixFeedback.innerHTML =
         '<span style="color:var(--accent);">⚡ Synchronizing Lovelace view visibility rules...</span>';
       try {
-        const res = await fetch("api/matrix/sync_dashboards", {
+        const res = await safeFetchJson("api/matrix/sync_dashboards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         });
-        const d = await res.json();
-        if (d.ok) {
+        const d = res.data || {};
+        if (res.ok && d.ok) {
           el.matrixFeedback.innerHTML = `<span style="color:var(--success);">✓ ${d.message}</span>`;
         } else {
-          el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${d.error || "Sync failed"}</span>`;
+          el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${res.error || d.error || "Sync failed"}</span>`;
         }
       } catch (err) {
         el.matrixFeedback.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
@@ -625,9 +662,9 @@
   // ------------------------------------------------------------------ Audit Log
   async function loadAudit() {
     try {
-      const res = await fetch("api/audit");
-      const list = await res.json();
-      if (!Array.isArray(list) || !list.length) {
+      const res = await safeFetchJson("api/audit");
+      const list = Array.isArray(res.data) ? res.data : [];
+      if (!list.length) {
         el.auditTableBody.innerHTML = `<tr><td colspan="6" class="empty-hint">No audit events recorded yet.</td></tr>`;
         return;
       }

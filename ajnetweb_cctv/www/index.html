@@ -57,6 +57,18 @@
         </svg>
         <span>NVR Playback</span>
       </button>
+      <button class="nav-btn" data-tab="discover">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="2" x2="12" y2="6"></line>
+          <line x1="12" y1="18" x2="12" y2="22"></line>
+          <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+          <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+          <line x1="2" y1="12" x2="6" y2="12"></line>
+          <line x1="18" y1="12" x2="22" y2="12"></line>
+        </svg>
+        <span>SADP Scanner</span>
+      </button>
       <button class="nav-btn" data-tab="settings">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
@@ -108,6 +120,9 @@
   <main class="app-main">
     <!-- VIEW: LIVE GRID WALL -->
     <section id="viewGrid" class="view-panel active">
+      <div class="livewall-filter-bar" id="liveWallFilterBar" style="display:none; margin-bottom: 12px;">
+        <div class="filter-pills" id="liveWallDevicePills"></div>
+      </div>
       <div id="cameraGrid" class="camera-grid cols-2">
         <div class="empty-state">
           <div class="spinner"></div>
@@ -285,11 +300,93 @@
       </div>
     </section>
 
+    <!-- VIEW: SADP & ONVIF DEVICE SCANNER -->
+    <section id="viewDiscover" class="view-panel">
+      <div class="discover-container">
+        <!-- Top Toolbar -->
+        <div class="discover-toolbar">
+          <div class="discover-title-group">
+            <h2>
+              <span class="pulse-radar-dot"></span>
+              SADP &amp; ONVIF Device Scanner
+            </h2>
+            <p class="discover-subtitle">Automated subnet broadcast &amp; multicast discovery for Hikvision cameras, AcuSense NVRs, Villa Door Stations &amp; Dahua streams.</p>
+          </div>
+          <div class="discover-actions">
+            <button id="btnSelectAllDiscover" class="secondary-btn" style="display:none;">
+              <span>Select All</span>
+            </button>
+            <button id="btnBatchAdopt" class="primary-btn batch-adopt-btn pulse-glow" style="display:none;">
+              <span class="pulse-radar-dot" style="margin-right:6px;"></span>
+              <span>Adopt Selected (<span id="batchCountNum">0</span>)</span>
+            </button>
+            <button id="btnRefreshScan" class="primary-btn pulse-glow">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              <span>Scan Network Now</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="discover-filter-bar">
+          <div class="filter-pills" id="discoverFilterPills">
+            <button class="filter-pill active" data-filter="all">All Devices <span class="pill-badge" id="badgeCountAll">0</span></button>
+            <button class="filter-pill" data-filter="nvr">NVRs <span class="pill-badge" id="badgeCountNvr">0</span></button>
+            <button class="filter-pill" data-filter="camera">Cameras <span class="pill-badge" id="badgeCountCam">0</span></button>
+            <button class="filter-pill" data-filter="door_station">Door Stations <span class="pill-badge" id="badgeCountDoor">0</span></button>
+            <button class="filter-pill" data-filter="indoor_station">Indoor Displays <span class="pill-badge" id="badgeCountIndoor">0</span></button>
+          </div>
+          <div class="search-box">
+            <input type="text" id="discoverSearchInput" placeholder="Filter by IP, model, brand, MAC..." />
+          </div>
+        </div>
+
+        <!-- Device Grid / Results -->
+        <div id="discoverDeviceList" class="discover-device-grid">
+          <div class="scanning-placeholder">
+            <div class="radar-scan-anim">
+              <div class="radar-circle circle-1"></div>
+              <div class="radar-circle circle-2"></div>
+              <div class="radar-circle circle-3"></div>
+              <div class="radar-sweep"></div>
+            </div>
+            <p>Ready to discover surveillance hardware. Click <b>"Scan Network Now"</b> above.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- VIEW: SETTINGS & THEMES -->
     <section id="viewSettings" class="view-panel">
       <div class="settings-card">
         <h2>Surveillance Studio Settings</h2>
         <p class="hint">Configure your NVR connection, display preferences, and theme styling.</p>
+
+        <!-- Quick Discovery Banner -->
+        <div class="discover-banner">
+          <div class="banner-info">
+            <div class="banner-title">🔍 Auto-Discover Cameras &amp; NVRs (Hikvision SADP &amp; ONVIF)</div>
+            <div class="banner-desc">Zero manual typing. Scan your local subnet to automatically locate Hikvision NVRs, AcuSense cameras, and Dahua streams with 1-click adoption.</div>
+          </div>
+          <button type="button" id="btnQuickScan" class="primary-btn">
+            <span class="pulse-radar-dot" style="margin-right:6px;"></span> Open SADP Scanner
+          </button>
+        </div>
+
+        <!-- Configured Devices Manager -->
+        <div class="settings-section-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>Managed Devices (NVRs &amp; Standalone Cameras)</span>
+          <button type="button" id="btnAddManualDevice" class="secondary-btn" style="padding:4px 10px; font-size:0.8rem;">
+            + Add Device Manually
+          </button>
+        </div>
+        <div class="configured-devices-container">
+          <div id="configuredDevicesList" class="configured-devices-list">
+            <div class="empty-hint">Loading configured surveillance devices...</div>
+          </div>
+        </div>
 
         <!-- Theme Engine Settings -->
         <div class="settings-section-title">Color Theme &amp; Display Appearance</div>
@@ -384,6 +481,105 @@
       </div>
     </section>
   </main>
+
+  <!-- Device Adoption Modal -->
+  <div id="adoptModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">⚡ 1-Click Adopt</span>
+          <h3 id="adoptModalTitle">Adopt Device to CCTV Studio</h3>
+        </div>
+        <button id="btnAdoptModalClose" class="icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="adopt-device-summary" id="adoptSummary"></div>
+        <form id="adoptForm" class="adopt-form">
+          <div class="form-row">
+            <label for="adoptUsername">Device Username</label>
+            <input type="text" id="adoptUsername" value="admin" required />
+          </div>
+          <div class="form-row">
+            <label for="adoptPassword">Device Password</label>
+            <input type="password" id="adoptPassword" placeholder="Enter device password..." required />
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="btnAdoptCancel" class="secondary-btn">Cancel</button>
+            <button type="submit" id="btnAdoptSubmit" class="primary-btn">Adopt &amp; Connect Stream</button>
+          </div>
+          <div id="adoptFeedback" class="feedback-msg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Device Modal -->
+  <div id="manualDeviceModal" class="modal-backdrop" style="display:none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">📹 Hardware Unit</span>
+          <h3 id="manualDeviceModalTitle">Add Surveillance Device</h3>
+        </div>
+        <button id="btnManualDeviceModalClose" class="icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="manualDeviceForm" class="adopt-form">
+          <input type="hidden" id="manualDevId" />
+          <div class="form-row">
+            <label for="manualDevName">Friendly Device Name *</label>
+            <input type="text" id="manualDevName" placeholder="e.g. Front Yard TiOC 4K" required />
+          </div>
+          <div class="form-row">
+            <label for="manualDevHost">IP Address / Hostname *</label>
+            <input type="text" id="manualDevHost" placeholder="e.g. 192.168.8.25" required />
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="manualDevBrand">Brand</label>
+              <select id="manualDevBrand">
+                <option value="auto">Auto-Detect</option>
+                <option value="hikvision">Hikvision</option>
+                <option value="dahua">Dahua / Amcrest</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label for="manualDevType">Device Type</label>
+              <select id="manualDevType">
+                <option value="camera">Standalone Camera</option>
+                <option value="nvr">Multi-Channel NVR</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="manualDevHttpPort">HTTP API Port</label>
+              <input type="number" id="manualDevHttpPort" value="80" />
+            </div>
+            <div class="form-row">
+              <label for="manualDevRtspPort">RTSP Streaming Port</label>
+              <input type="number" id="manualDevRtspPort" value="554" />
+            </div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-row">
+              <label for="manualDevUsername">Username *</label>
+              <input type="text" id="manualDevUsername" value="admin" required />
+            </div>
+            <div class="form-row">
+              <label for="manualDevPassword">Password</label>
+              <input type="password" id="manualDevPassword" placeholder="••••••••" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="btnManualDeviceCancel" class="secondary-btn">Cancel</button>
+            <button type="submit" class="primary-btn">Save Device &amp; Sync Channels</button>
+          </div>
+          <div id="manualDevFeedback" class="feedback-msg"></div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

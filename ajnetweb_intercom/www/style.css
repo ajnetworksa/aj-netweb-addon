@@ -1797,4 +1797,494 @@ body {
   margin-top: 2px;
 }
 
+/* ==========================================================================
+   SADP & ONVIF DEVICE SCANNER STYLES
+   ========================================================================== */
+.discover-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1350px;
+  margin: 0 auto;
+}
+
+.discover-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(16px);
+}
+
+.discover-title-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.discover-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0 0;
+}
+
+.pulse-radar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  box-shadow: 0 0 10px var(--accent-glow);
+  animation: radarPulse 1.8s infinite;
+}
+
+@keyframes radarPulse {
+  0% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 var(--accent-glow); }
+  70% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 0 8px rgba(0, 229, 255, 0); }
+  100% { transform: scale(0.9); opacity: 0.8; box-shadow: 0 0 0 0 rgba(0, 229, 255, 0); }
+}
+
+.pulse-glow {
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* Discover Filter Bar */
+.discover-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.filter-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-pill {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.filter-pill:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.filter-pill.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pill-badge {
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.filter-pill.active .pill-badge {
+  background: var(--accent);
+  color: #050811;
+  font-weight: 700;
+}
+
+.search-box input {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.84rem;
+  outline: none;
+  min-width: 240px;
+  transition: border-color 0.2s;
+}
+
+.search-box input:focus {
+  border-color: var(--accent);
+}
+
+/* Device Cards Grid */
+.discover-device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 16px;
+}
+
+.device-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.device-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.device-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.device-icon-type {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.device-cat-icon {
+  font-size: 1.5rem;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-title-block b {
+  display: block;
+  font-size: 0.96rem;
+  color: var(--text-primary);
+}
+
+.device-title-block span {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.device-badge-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.device-details-table {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 12px 0 16px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+
+.detail-item span {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.detail-item b {
+  color: var(--text-primary);
+  font-family: ui-monospace, monospace;
+}
+
+.device-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.device-card-actions button, .device-card-actions a {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  font-size: 0.82rem;
+  padding: 8px 10px;
+}
+
+/* Scanning Placeholder & Radar */
+.scanning-placeholder {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.radar-scan-anim {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 229, 255, 0.3);
+}
+
+.radar-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 229, 255, 0.2);
+}
+
+.circle-1 { width: 30px; height: 30px; }
+.circle-2 { width: 60px; height: 60px; }
+.circle-3 { width: 90px; height: 90px; }
+
+.radar-sweep {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(0, 229, 255, 0.4) 0deg, transparent 60deg);
+  animation: radarSweep 2s linear infinite;
+}
+
+@keyframes radarSweep {
+  to { transform: rotate(360deg); }
+}
+
+/* Quick Discovery Banner in Settings */
+.discover-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.1) 0%, rgba(14, 20, 34, 0.6) 100%);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px var(--accent-subtle);
+}
+
+.banner-title {
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+
+.banner-desc {
+  font-size: 0.83rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+}
+
+/* Adoption Modal */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-box {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  animation: modalScale 0.25s ease-out;
+}
+
+@keyframes modalScale {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.modal-badge {
+  font-size: 0.72rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  font-weight: 700;
+  display: block;
+}
+
+.modal-header h3 {
+  margin: 2px 0 0 0;
+  font-size: 1.1rem;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.adopt-device-summary {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Door Station Switcher Bar */
+.station-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(14px);
+  margin-bottom: 14px;
+}
+
+.station-switcher-bar .switcher-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Multi-Device Selection & Batch Adopt */
+.device-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-subtle);
+  background: linear-gradient(180deg, rgba(0, 229, 255, 0.08) 0%, rgba(14, 20, 34, 0.85) 100%);
+}
+
+.device-select-cb-wrap {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.device-select-cb {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.batch-adopt-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, #0088ff 100%);
+  color: #000;
+  font-weight: 700;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+/* Configured Stations List (Settings) */
+.configured-devices-container {
+  margin-bottom: 24px;
+}
+
+.configured-devices-list {
+  display: grid;
+  gap: 10px;
+}
+
+.configured-device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.configured-device-item:hover {
+  border-color: var(--accent);
+  background: rgba(0, 229, 255, 0.03);
+}
+
+.dev-item-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dev-item-icon {
+  font-size: 1.5rem;
+}
+
+.dev-item-details b {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.dev-item-details span {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.dev-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+
 
