@@ -247,45 +247,48 @@ def _connect_door_station(dev: dict):
 def init_all_intercom_devices(data: dict = None):
     """Initialize all Door Station clients and load indoor stations."""
     global _door_stations_list, _indoor_stations_list, _door_clients, _active_client, _client_brand, _active_station_id, _config_cache
+    if data is None:
+        data = load_intercom_devices()
+    doors = data.get("door_stations", [])
+    indoors = data.get("indoor_stations", [])
+    cfg = load_config()
+
+    new_clients = {}
+    primary_client = None
+    primary_brand = None
+    primary_id = None
+
+    for dev in doors:
+        dev_id = dev.get("id") or f"door_{int(time.time()*1000)}"
+        dev["id"] = dev_id
+        if not dev.get("enabled", True):
+            continue
+
+        try:
+            cl, br = _connect_door_station(dev)
+            if cl:
+                new_clients[dev_id] = {
+                    "client": cl,
+                    "brand": br,
+                    "device": dev,
+                }
+                if primary_client is None:
+                    primary_client = cl
+                    primary_brand = br
+                    primary_id = dev_id
+        except Exception as e:
+            log.error("Failed to connect door station %s (%s): %s", dev.get("name"), dev.get("host"), e)
+
     with _state_lock:
-        if data is None:
-            data = load_intercom_devices()
-        _door_stations_list = data.get("door_stations", [])
-        _indoor_stations_list = data.get("indoor_stations", [])
-        _config_cache = load_config()
-
-        new_clients = {}
-        primary_client = None
-        primary_brand = None
-        primary_id = None
-
-        for dev in _door_stations_list:
-            dev_id = dev.get("id") or f"door_{int(time.time()*1000)}"
-            dev["id"] = dev_id
-            if not dev.get("enabled", True):
-                continue
-
-            try:
-                cl, br = _connect_door_station(dev)
-                if cl:
-                    new_clients[dev_id] = {
-                        "client": cl,
-                        "brand": br,
-                        "device": dev,
-                    }
-                    if primary_client is None:
-                        primary_client = cl
-                        primary_brand = br
-                        primary_id = dev_id
-            except Exception as e:
-                log.error("Failed to connect door station %s (%s): %s", dev.get("name"), dev.get("host"), e)
-
+        _door_stations_list = doors
+        _indoor_stations_list = indoors
+        _config_cache = cfg
         _door_clients = new_clients
         _active_client = primary_client
         _client_brand = primary_brand
         if not _active_station_id or _active_station_id not in _door_clients:
             _active_station_id = primary_id
-        log.info("Initialized %d door stations and %d indoor stations.", len(new_clients), len(_indoor_stations_list))
+    log.info("Initialized %d door stations and %d indoor stations.", len(new_clients), len(indoors))
 
     start_event_listener()
 

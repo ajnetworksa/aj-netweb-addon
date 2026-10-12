@@ -9,6 +9,7 @@ import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime
+import time
 
 try:
     import urllib3
@@ -55,58 +56,57 @@ class HikvisionIntercomClient:
         to = timeout or self.timeout
         hdrs = headers or {}
 
-        with self._lock:
-            # Auto-detect protocol if default port 80 might redirect to HTTPS (common on Hikvision Villa stations)
-            if not self._checked_protocol and self.port == 80:
-                self._checked_protocol = True
-                try:
-                    s = self._get_session()
-                    probe = s.request("GET", f"http://{self.host}:80/ISAPI/System/deviceInfo", timeout=2, allow_redirects=False)
-                    if probe.status_code in (301, 302, 307, 308):
-                        loc = probe.headers.get("Location", "")
-                        if "https://" in loc:
-                            log.info("Hikvision door station at %s requires HTTPS; auto-upgraded base_url", self.host)
-                            self.base_url = f"https://{self.host}:443"
-                except Exception:
-                    pass
-
-            sess = self._get_session()
-            url = f"{self.base_url}{path}"
-
+        # Auto-detect protocol if default port 80 might redirect to HTTPS (common on Hikvision Villa stations)
+        if not self._checked_protocol and self.port == 80:
+            self._checked_protocol = True
             try:
+                s = self._get_session()
+                probe = s.request("GET", f"http://{self.host}:80/ISAPI/System/deviceInfo", timeout=2, allow_redirects=False)
+                if probe.status_code in (301, 302, 307, 308):
+                    loc = probe.headers.get("Location", "")
+                    if "https://" in loc:
+                        log.info("Hikvision door station at %s requires HTTPS; auto-upgraded base_url", self.host)
+                        self.base_url = f"https://{self.host}:443"
+            except Exception:
+                pass
+
+        sess = self._get_session()
+        url = f"{self.base_url}{path}"
+
+        try:
+            resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
+
+            # Upgrade if redirected to HTTPS
+            if resp.status_code in (301, 302, 307, 308) and "https://" in resp.headers.get("Location", ""):
+                self.base_url = f"https://{self.host}:443"
+                url = f"{self.base_url}{path}"
                 resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
 
-                # Upgrade if redirected to HTTPS
-                if resp.status_code in (301, 302, 307, 308) and "https://" in resp.headers.get("Location", ""):
+            if resp.status_code == 401:
+                # Try Basic auth without permanently corrupting session auth
+                try:
+                    resp_b = sess.request(method, url, data=data, json=json, headers=hdrs,
+                                          timeout=to, stream=stream,
+                                          auth=HTTPBasicAuth(self.username, self.password))
+                    if resp_b.status_code in (200, 204):
+                        return resp_b
+                except Exception:
+                    pass
+            return resp
+        except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as ce:
+            # If HTTP failed, fallback to HTTPS once
+            if self.base_url.startswith("http://"):
+                try:
                     self.base_url = f"https://{self.host}:443"
                     url = f"{self.base_url}{path}"
-                    resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
-
-                if resp.status_code == 401:
-                    # Try Basic auth without permanently corrupting session auth
-                    try:
-                        resp_b = sess.request(method, url, data=data, json=json, headers=hdrs,
-                                              timeout=to, stream=stream,
-                                              auth=HTTPBasicAuth(self.username, self.password))
-                        if resp_b.status_code in (200, 204):
-                            return resp_b
-                    except Exception:
-                        pass
-                return resp
-            except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as ce:
-                # If HTTP failed, fallback to HTTPS once
-                if self.base_url.startswith("http://"):
-                    try:
-                        self.base_url = f"https://{self.host}:443"
-                        url = f"{self.base_url}{path}"
-                        return sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
-                    except Exception:
-                        pass
-                log.warning("Hikvision intercom request failed (%s %s): %s", method, path, ce)
-                raise
-            except Exception as e:
-                log.warning("Hikvision intercom request failed (%s %s): %s", method, path, e)
-                raise
+                    return sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
+                except Exception:
+                    pass
+            log.warning("Hikvision intercom request failed (%s %s): %s", method, path, ce)
+            raise
+        except Exception as e:
+            log.warning("Hikvision intercom request failed (%s %s): %s", method, path, e)
+            raise
 
     def get_device_info(self) -> dict:
         """Fetch model, serial number, and firmware version."""
