@@ -276,7 +276,11 @@ class HikvisionIntercomClient:
         import urllib.request
         import ssl
 
-        log.info("Connecting to Hikvision alertStream event listener...")
+        if not hasattr(self, "_alert_stream_logged"):
+            log.info("Hikvision alertStream event listener active (monitoring doorbell ring & RFID card punches)")
+            self._alert_stream_logged = True
+        else:
+            log.debug("Hikvision alertStream polling cycle active")
         url = f"{self.base_url}/ISAPI/Event/notification/alertStream"
 
         passman = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -297,7 +301,6 @@ class HikvisionIntercomClient:
                 time.sleep(5)
                 return
 
-            log.info("Hikvision alertStream connected successfully!")
             buf = ""
             while True:
                 line = resp.readline()
