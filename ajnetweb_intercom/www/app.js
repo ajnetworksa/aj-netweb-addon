@@ -742,26 +742,135 @@
     }
   }
 
-  function toggleLiveListen() {
-    state.isListening = !state.isListening;
-    if (el.btnLiveListen) {
-      el.btnLiveListen.classList.toggle("active", state.isListening);
+  // ------------------------------------------------------------------ Built-in WebRTC Audio & Two-Way Talk (go2rtc Bridge)
+  let webrtcAudioPeer = null;
+  let audioOutputEl = null;
+
+  async function startWebRtcAudio(enableMicrophone = false) {
+    stopWebRtcAudio();
+
+    if (!audioOutputEl) {
+      audioOutputEl = document.createElement("audio");
+      audioOutputEl.autoplay = true;
+      audioOutputEl.playsInline = true;
+      document.body.appendChild(audioOutputEl);
     }
-    if (el.liveListenText) {
-      el.liveListenText.textContent = state.isListening ? "Listening Active" : "Listen to Audio";
+
+    let iceServers = [
+      { urls: ["stun:stun.l.google.com:19302", "stun:192.168.8.214:3478"] }
+    ];
+    try {
+      const iceRes = await fetch("api/webrtc/ice");
+      if (iceRes.ok) {
+        const iceData = await iceRes.json();
+        if (iceData && iceData.iceServers) iceServers = iceData.iceServers;
+      }
+    } catch (_) {}
+
+    const pc = new RTCPeerConnection({ iceServers });
+    webrtcAudioPeer = pc;
+
+    // Receive audio from the door station
+    pc.addTransceiver("audio", { direction: enableMicrophone ? "sendrecv" : "recvonly" });
+
+    pc.ontrack = (ev) => {
+      if (ev.track.kind === "audio" && audioOutputEl) {
+        audioOutputEl.srcObject = new MediaStream([ev.track]);
+        audioOutputEl.play().catch((err) => console.warn("Audio autoplay blocked by browser policy:", err));
+      }
+    };
+
+    if (enableMicrophone) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Microphone access is not supported by your browser or requires HTTPS.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      state.talkMediaStream = stream;
+      const micTrack = stream.getAudioTracks()[0];
+      if (micTrack) {
+        pc.addTransceiver(micTrack, { direction: "sendonly" });
+      }
     }
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    // Allow ICE candidates to populate (trickle ICE or batch)
+    await new Promise((resolve) => {
+      if (pc.iceGatheringState === "complete") {
+        resolve();
+      } else {
+        const checkState = () => {
+          if (pc.iceGatheringState === "complete") {
+            pc.removeEventListener("icegatheringstatechange", checkState);
+            resolve();
+          }
+        };
+        pc.addEventListener("icegatheringstatechange", checkState);
+        setTimeout(resolve, 800);
+      }
+    });
+
+    const activeStation = state.doorStations.find((d) => d.id === state.activeDoorStationId);
+    const srcParam = activeStation && activeStation.stream_name ? activeStation.stream_name : "doorbell_live";
+
+    const res = await fetch(`api/webrtc?src=${encodeURIComponent(srcParam)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/sdp" },
+      body: pc.localDescription.sdp,
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`WebRTC negotiation error (${res.status}): ${errText}`);
+    }
+
+    const answerSdp = await res.text();
+    await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
+  }
+
+  function stopWebRtcAudio() {
+    if (state.talkMediaStream) {
+      state.talkMediaStream.getTracks().forEach((t) => t.stop());
+      state.talkMediaStream = null;
+    }
+    if (webrtcAudioPeer) {
+      try { webrtcAudioPeer.close(); } catch (_) {}
+      webrtcAudioPeer = null;
+    }
+    if (audioOutputEl) {
+      audioOutputEl.srcObject = null;
+    }
+  }
+
+  async function toggleLiveListen() {
     if (state.isListening) {
-      addActivityItem("audio", "Audio monitoring activated on door station.");
+      stopWebRtcAudio();
+      state.isListening = false;
+      if (el.btnLiveListen) el.btnLiveListen.classList.remove("active");
+      if (el.liveListenText) el.liveListenText.textContent = "Listen to Audio";
+      addActivityItem("audio", "Audio monitoring stopped.");
+    } else {
+      try {
+        if (el.liveListenText) el.liveListenText.textContent = "Connecting Audio...";
+        await startWebRtcAudio(false);
+        state.isListening = true;
+        if (el.btnLiveListen) el.btnLiveListen.classList.add("active");
+        if (el.liveListenText) el.liveListenText.textContent = "Listening Active (Mute)";
+        addActivityItem("audio", "Audio monitoring connected: Streaming outdoor station microphone.");
+      } catch (err) {
+        console.error("Live listen failed:", err);
+        state.isListening = false;
+        if (el.btnLiveListen) el.btnLiveListen.classList.remove("active");
+        if (el.liveListenText) el.liveListenText.textContent = "Listen to Audio";
+        alert(`Could not start audio stream: ${err.message}`);
+      }
     }
   }
 
   async function toggleLiveTalk() {
     if (state.isTalking) {
-      // Stop talking
-      if (state.talkMediaStream) {
-        state.talkMediaStream.getTracks().forEach((t) => t.stop());
-        state.talkMediaStream = null;
-      }
+      stopWebRtcAudio();
       state.isTalking = false;
       if (el.btnLiveTalk) {
         el.btnLiveTalk.classList.remove("pulsing");
@@ -771,14 +880,9 @@
       if (el.liveTalkText) el.liveTalkText.textContent = "Talk to Door";
       addActivityItem("audio", "Two-Way Audio broadcast ended.");
     } else {
-      // Start talking
       try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          alert("Microphone access is not supported by your browser or is blocked due to HTTP. Please ensure HTTPS or Home Assistant Companion App.");
-          return;
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        state.talkMediaStream = stream;
+        if (el.liveTalkText) el.liveTalkText.textContent = "Connecting Mic...";
+        await startWebRtcAudio(true);
         state.isTalking = true;
         if (el.btnLiveTalk) {
           el.btnLiveTalk.classList.add("pulsing");
@@ -786,10 +890,17 @@
           el.btnLiveTalk.classList.add("danger");
         }
         if (el.liveTalkText) el.liveTalkText.textContent = "Talking... (Click to Stop)";
-        addActivityItem("audio", "Microphone active: Transmitting 2-way audio to Door Station speaker.");
+        addActivityItem("audio", "Microphone active: Streaming voice backchannel to door station speaker.");
       } catch (err) {
         console.warn("Could not capture microphone:", err);
-        alert(`Could not access microphone: ${err.message}. Please allow microphone permission in your browser.`);
+        state.isTalking = false;
+        if (el.btnLiveTalk) {
+          el.btnLiveTalk.classList.remove("pulsing");
+          el.btnLiveTalk.classList.remove("danger");
+          el.btnLiveTalk.classList.add("primary");
+        }
+        if (el.liveTalkText) el.liveTalkText.textContent = "Talk to Door";
+        alert(`Could not start two-way talk: ${err.message}. Please check microphone permission.`);
       }
     }
   }

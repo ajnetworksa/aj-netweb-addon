@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.4.4
+- **Native Two-Way WebRTC Audio & Microphone Backchannel**:
+  - Integrated zero-latency WebRTC live audio monitoring and bidirectional microphone backchannel directly into the addon UI.
+  - "Listen to Audio": connects directly to local `go2rtc` engine via RTCPeerConnection, streaming outdoor door station microphone to browser/phone speakers.
+  - "Talk to Door": captures browser microphone, packages Opus audio track, and bridges into Hikvision RTSP backchannel (`#backchannel=1`), broadcasting user voice out of the outdoor station speaker.
+  - Built-in WebRTC proxy endpoint `/api/webrtc` in `server.py` routing directly to local `go2rtc` instance (`127.0.0.1:1984`) for seamless traversal across Ingress and local networks.
+
 ## 1.4.3
 - **Calling-Style Mobile Push Notifications**:
   - Doorbell rings deliver continuous alarm stream audio (`alarm_stream: True`, `importance: "high"`, `priority: "high"`) waking Android and iOS screens with incoming call ringback.

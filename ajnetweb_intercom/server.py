@@ -868,6 +868,13 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 </svg>"""
         return svg.encode("utf-8")
 
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
+
     def do_HEAD(self):
         return self.do_GET()
 
@@ -875,6 +882,15 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
+
+        # ---------------------------------------------------------------- WebRTC Proxy & ICE
+        if path == "/api/webrtc/ice":
+            ice_servers = [
+                {"urls": ["stun:stun.l.google.com:19302"]},
+                {"urls": ["stun:192.168.8.214:3478"]}
+            ]
+            self._send_json({"ok": True, "iceServers": ice_servers})
+            return
 
         # ---------------------------------------------------------------- Device Discovery (SADP & ONVIF)
         if path in ("/api/discover", "/api/discover/scan"):
@@ -1164,10 +1180,33 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
+        query = urllib.parse.parse_qs(parsed.query)
 
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+
+        # ---------------------------------------------------------------- WebRTC Proxy (go2rtc bridge)
+        if path == "/api/webrtc":
+            st_id = query.get("src", ["doorbell_live"])[0]
+            go2rtc_url = f"http://127.0.0.1:1984/api/webrtc?src={st_id}"
+            try:
+                sdp_bytes = body.encode("utf-8")
+                req = urllib.request.Request(go2rtc_url, data=sdp_bytes)
+                req.add_header("Content-Type", "application/sdp")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    ans = resp.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/sdp")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(ans)
+            except Exception as e:
+                log.error("go2rtc WebRTC bridge error: %s", e)
+                self._send_json({"ok": False, "error": f"go2rtc WebRTC bridge error: {e}"}, status=500)
+            return
+
         try:
             payload = json.loads(body)
         except ValueError:
