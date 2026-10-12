@@ -91,6 +91,8 @@
     cardEnrollCountdown: null,
     cardEnrollSecondsLeft: 60,
     lastDetectedCard: null,
+    // UI Mode (View / Kiosk Mode vs Editor Mode)
+    isEditorMode: localStorage.getItem("ajn_intercom_mode") === "edit",
   };
   localStorage.setItem("ajn_display_id", state.selfId);
 
@@ -99,6 +101,7 @@
     intercomSubTitle: document.getElementById("intercomSubTitle"),
     navBtns: document.querySelectorAll(".nav-btn"),
     viewPanels: document.querySelectorAll(".view-panel"),
+    btnModeToggle: document.getElementById("btnModeToggle"),
     quickThemeSelect: document.getElementById("quickThemeSelect"),
     headerColorPicker: document.getElementById("headerColorPicker"),
     colorPickerWrapper: document.getElementById("colorPickerWrapper"),
@@ -373,6 +376,7 @@
   async function init() {
     applyTheme(state.theme, state.customColor, state.oledMode);
     setupNavigation();
+    applyUiMode(state.isEditorMode);
     setupDoorControls();
     setupDiscoveryUI();
     setupManagedStationsUI();
@@ -448,11 +452,41 @@
     state.clockTimer = setInterval(update, 1000);
   }
 
+  // ------------------------------------------------------------------ View vs Editor Mode Engine
+  function applyUiMode(isEdit) {
+    state.isEditorMode = isEdit;
+    localStorage.setItem("ajn_intercom_mode", isEdit ? "edit" : "view");
+    if (isEdit) {
+      document.body.classList.remove("mode-view");
+      document.body.classList.add("mode-edit");
+      if (el.btnModeToggle) {
+        el.btnModeToggle.innerHTML = `<span class="mode-icon">✏️</span><span class="mode-text">Editor Mode</span>`;
+        el.btnModeToggle.title = "Currently in Editor Mode. Click to lock into View Mode (Kiosk/Operator)";
+      }
+    } else {
+      document.body.classList.remove("mode-edit");
+      document.body.classList.add("mode-view");
+      if (el.btnModeToggle) {
+        el.btnModeToggle.innerHTML = `<span class="mode-icon">🔒</span><span class="mode-text">View Mode</span>`;
+        el.btnModeToggle.title = "Currently in View Mode. Click to enable Editor Mode (Admin)";
+      }
+      if (["credentials", "discover", "settings"].includes(state.activeTab)) {
+        switchTab("live");
+      }
+    }
+  }
+
   // ------------------------------------------------------------------ Navigation
   function setupNavigation() {
     el.navBtns.forEach((btn) => {
       btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
+
+    if (el.btnModeToggle) {
+      el.btnModeToggle.addEventListener("click", () => {
+        applyUiMode(!state.isEditorMode);
+      });
+    }
 
     el.quickThemeSelect.addEventListener("change", (e) => {
       applyTheme(e.target.value, state.customColor, state.oledMode);
@@ -477,6 +511,9 @@
   }
 
   function switchTab(tab) {
+    if (!state.isEditorMode && ["credentials", "discover", "settings"].includes(tab)) {
+      tab = "live";
+    }
     state.activeTab = tab;
     el.navBtns.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     const targetId = tab === "room-intercom" ? "viewRoomIntercom" : `view${capitalize(tab)}`;
@@ -515,7 +552,9 @@
         el.intercomBrandBadge.textContent = "Not Configured";
         el.intercomBrandBadge.className = "badge warning";
         el.intercomSubTitle.textContent = "Please configure Door Station in Settings or SADP Scanner";
-        switchTab("settings");
+        if (state.isEditorMode) {
+          switchTab("settings");
+        }
         return;
       }
 
@@ -2086,8 +2125,8 @@
             <div class="dev-item-actions">
               <span class="${brandPillClass}">${escapeHtml((d.brand || "auto").toUpperCase())}</span>
               <span class="badge ${d.online !== false ? "success" : "danger"}">${d.online !== false ? "● Online" : "○ Offline"}</span>
-              <button class="secondary-btn btn-edit-door-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
-              <button class="secondary-btn btn-delete-door-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
+              <button class="secondary-btn btn-edit-door-station admin-only" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
+              <button class="secondary-btn btn-delete-door-station admin-only" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
             </div>
           </div>
         `;
@@ -2136,8 +2175,8 @@
             <div class="dev-item-actions">
               <span class="${brandPillClass}">${escapeHtml((d.brand || "auto").toUpperCase())}</span>
               <span class="badge success">● Connected</span>
-              <button class="secondary-btn btn-edit-indoor-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
-              <button class="secondary-btn btn-delete-indoor-station" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
+              <button class="secondary-btn btn-edit-indoor-station admin-only" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem;">Edit</button>
+              <button class="secondary-btn btn-delete-indoor-station admin-only" data-id="${escapeHtml(d.id)}" style="padding:4px 8px; font-size:0.75rem; color:var(--danger);">Delete</button>
             </div>
           </div>
         `;

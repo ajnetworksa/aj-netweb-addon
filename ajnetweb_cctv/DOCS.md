@@ -15,18 +15,45 @@
 
 3. **Open the Web UI**:
    - Click **Open Web UI** or access **CCTV Studio** from the Home Assistant sidebar.
-   - You will see all your cameras connected to the NVR appear on the live grid wall.
+   - You will see all camera channels connected to the NVR appear on the live grid wall.
+
+---
+
+## Channel Detection & Device Hierarchy
+
+The add-on accurately identifies the physical channel capacity of your hardware:
+- **4-Channel NVRs (e.g., DS-7604NXI-K1/4P, NVR4104HS)**: Exactly 4 channels (IDs 1, 2, 3, 4).
+- **8-Channel NVRs (e.g., DS-7608NXI, NVR4108HS)**: Exactly 8 channels (IDs 1 through 8).
+- **16-Channel NVRs (e.g., DS-7616NXI, NVR4216HS)**: Exactly 16 channels.
+- **Standalone IP Cameras & Video Doorbells (e.g., DH-IPC-HDW1639T, DS-KV8113)**: Exactly 1 channel.
+- **Indoor Touch Displays (e.g., DS-KH9510)**: Identified as display units (0 CCTV channels) so they do not pollute your camera matrix with dummy channels.
+
+---
+
+## Live Monitoring Wall
+
+- **Multi-Layout Grid**: Toggle instantly between **1×1 Single View**, **2×2 Quad View**, **3×3 Matrix**, and **All Cameras View**.
+- **Adaptive Stream Modes**:
+  - **⚡ Fast Live Snapshot**: Double-buffered, ultra-low latency snapshot feed that works flawlessly through Home Assistant Ingress without dropping connections.
+  - **Continuous MJPEG**: Full-frame smooth motion streaming.
+- **Direct RTSP URL Export**: 1-click button on every tile to copy the authenticated RTSP stream URL for Home Assistant Lovelace or go2rtc integration.
+
+---
 
 ## PTZ Controls
+
 - Click on any camera with PTZ support or navigate to the **PTZ Control** tab.
 - Use the virtual 8-direction D-pad to pan and tilt.
 - Adjust the speed slider to control movement velocity.
 - Use the **Zoom In (+)** and **Zoom Out (-)** buttons for optical magnification.
 - Select **Go To** to jump to saved presets 1 through 16, or select **Save Position** to store your camera's current angle.
 
-## Playback & Recordings
+---
+
+## NVR Playback & Recording Timeline
+
 - Navigate to the **NVR Playback** tab.
 - Choose a camera channel and pick a date.
-- Click **Search Recordings** to pull the timeline directly from your NVR storage.
+- Click **Search Recordings** to pull the timeline directly from your NVR hard drive via ISAPI/CGI.
 - The 24-hour bar shows green blocks for continuous recording and red blocks for motion/event detection.
 - Click anywhere on the timeline or select a clip from the list to begin video playback.

@@ -1,33 +1,58 @@
 # AJ Netweb Dashboard Suite
 
-Professional, automated room-aware Lovelace dashboard generator for Home Assistant with 5 curated aesthetics. Built natively with modern Sections architecture and bundled with the self-contained `ajnetweb-card-suite.js` (zero HACS dependencies).
+Professional, automated room-aware Lovelace dashboard generator for Home Assistant featuring Apple HomeKit Frosted Glass (iOS 18) and 5 curated aesthetics. Built natively with modern Sections architecture, dual **📱 Mobile Mode** and **📟 Tab Mode (Wall Panel)**, zero-HACS dependencies, and instant WebSocket deployment.
 
 ---
 
-## The Dashboard Challenge & Solution
+## Dual Experience: Mobile Mode vs. Tablet Wall Panel Mode
 
-Setting up dashboards in Home Assistant is traditionally time-consuming and fragile:
-- Every residence has different rooms, lights, thermostats, shades, and cameras.
-- Third-party HACS plugins (Bubble Card, Mushroom Card, etc.) frequently break on monthly Home Assistant core updates, leaving customers with broken wall tablets.
+The generated dashboard includes two purpose-built, responsive primary experiences that share the same luxury Apple Frosted Glass design:
 
-**AJ Netweb Dashboard Suite solves this completely**:
-1. **Automated Room & Device Discovery**: Automatically queries the Home Assistant Area Registry, Device Registry, and Entity Registry. Detects which device belongs to which room and classifies them into Lights, ACs, Curtains, Media, Locks, and Cameras.
-2. **5 Curated Aesthetics**:
-   - **Cyber Luxury Glassmorphism**: Translucent frosted cards, neon cyan/violet glowing borders, obsidian base.
-   - **Minimalist Scandinavian**: Clean typography, warm paper tones, generous breathing room, serene atmosphere.
-   - **Modern Bento Grid (iOS)**: Apple Home inspired 2x2 rounded bento tiles with dynamic color tinting.
-   - **Pure OLED Stealth**: True pitch black `#000000` background, battery-saving, zero burn-in on wall tablets.
-   - **Boutique Hotel Hub**: Hospitality concierge layout with prominent greeting, quick scenes, and suite selector.
-3. **Native Sections + Self-Contained Card Suite**: Uses Home Assistant's official modern Sections view layout and Tile cards with features. Custom hero components are bundled in `ajnetweb-card-suite.js` managed directly in this repository — zero external HACS developer dependencies.
-4. **1-Click Instant Deployment**: Generates and writes the dashboard directly to Home Assistant storage and registers it in the sidebar. Ready in 5 seconds.
+### 📱 1. Mobile Mode (`path: "home"`)
+- **Designed For**: iPhone & Android Home Assistant Companion App.
+- **Layout Architecture**: 2-column compact Sections flow optimized for vertical swiping.
+- **Glance Header**: Live status pills displaying active lights count, smoke/safety alarms, air conditioning status, security cameras, video doorbell status, and server latency.
+- **Room Sections**: Clean 1-tap toggle tiles, brightness sliders, climate thermostat dials, and window blind open/close sliders.
+
+### 📟 2. Tab Mode / Wall Panel Console (`path: "tablet"`)
+- **Designed For**: Wall-mounted touch screens (Hikvision `DS-KH9510`, Android smart kiosks, iPads, Galaxy Tabs).
+- **Layout Architecture**: 4-column ultra-wide horizontal matrix with large touch targets (min 48px) for effortless wall interaction.
+- **Master Command Bar**:
+  - `⚡ Quick Gate Unlock`: Instant 1-tap trigger for electric gate / door strikes.
+  - `💡 Master All Lights Off`: Turns off all villa lights upon leaving or bedtime.
+  - `Villa Console Banner`: Live time, date, and security status.
+- **Surveillance & Intercom Matrix**: Live CCTV camera feeds and doorbell snapshots side-by-side with immediate gate unlock buttons.
+- **Room Grid**: High-contrast touch tiles with embedded sliders for every room.
 
 ---
 
-## How to Use
+## Zero-Restart Dynamic WebSocket Deployment (No More 404s!)
+
+Previously, modifying Home Assistant Lovelace storage files on disk required restarting Home Assistant Core for the web server router to recognize the new URL route. 
+
+**AJ Netweb Dashboard Suite v1.3.1 eliminates this entirely**:
+- Interacts with Home Assistant Core via authenticated **WebSocket APIs** (`lovelace/dashboards/create`, `lovelace/dashboards/update`, and `lovelace/config/save`).
+- Dynamically registers the `/{url_path}` route directly into Home Assistant's running `aiohttp` web server router in memory.
+- Clicking **🚀 Open Dashboard** immediately navigates to your live dashboard with **HTTP 200 OK** in less than 2 seconds — **zero core restarts required!**
+
+---
+
+## Auto-Device Discovery & Classification
+
+The engine dynamically inspects Home Assistant's Area, Device, and Entity Registries and automatically populates:
+- **💡 Lighting**: Tiles with brightness sliders and color temperature dials.
+- **❄️ Climate / HVAC**: Native thermostat cards with temperature targets, fan modes, and HVAC presets (Cool, Heat, Eco).
+- **🪟 Curtains & Shades**: Vertical/horizontal slider controls with open, close, and stop.
+- **🔒 Locks & Gates**: Secure release tiles with momentary strike actions.
+- **📹 CCTV & Cameras**: Live snapshot and real-time streaming tiles for all NVR channels and door stations.
+- **🎵 Media Players**: Audio playback controls and volume sliders.
+- **🛡️ Sensors & Safety**: Smoke detectors, motion sensors, temperature/humidity sensors, and tank level watchdogs.
+
+---
+
+## How to Deploy in 3 Clicks
 
 1. Open **Dashboard Suite** from the Home Assistant sidebar.
-2. Review the **Discovered Rooms** and entity count breakdown (Lights, ACs, Shades, Cameras).
-3. Select your desired **Aesthetic Theme** (Cyber Luxury, Minimalist Scandinavian, Modern Bento, OLED Stealth, or Boutique Hotel).
-4. Customize the **Title** and **URL Path** (e.g., `ajnetweb`).
-5. Click **🚀 Deploy Dashboard to Home Assistant**.
-6. Click the instant link to view and pin your new dashboard!
+2. Select your desired theme (e.g. **Apple Frosted Glass**).
+3. Review your rooms and click **🚀 Deploy Dashboard to Home Assistant**.
+4. Click **🚀 Open Dashboard** to launch your new mobile and tablet wall panel interface!

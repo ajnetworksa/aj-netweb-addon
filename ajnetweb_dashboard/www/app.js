@@ -239,10 +239,14 @@
           el.deployFeedback.className = "deploy-feedback show success";
           el.deployFeedback.innerHTML = `
             <div style="font-weight:700; margin-bottom:6px;">✓ Dashboard deployed successfully!</div>
-            <div style="font-size:0.85rem; margin-bottom:12px;">The dashboard has been written directly to Home Assistant storage and registered in your sidebar.</div>
-            <a href="/${escapeHtml(d.url_path)}" target="_blank" class="primary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
-              🚀 Open Dashboard in Home Assistant (/${escapeHtml(d.url_path)})
-            </a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+              <a href="/${escapeHtml(d.url_path)}" target="_top" class="primary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
+                🚀 Open Dashboard (/${escapeHtml(d.url_path)})
+              </a>
+              <a href="/${escapeHtml(d.url_path)}" target="_blank" class="secondary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
+                ↗ Open in New Tab
+              </a>
+            </div>
           `;
         } else {
           el.deployFeedback.className = "deploy-feedback show error";

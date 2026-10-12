@@ -178,12 +178,26 @@ class HikvisionClient:
         except Exception as e:
             log.debug("Video inputs channels query failed: %s", e)
 
-        # Fallback: if NVR returned empty channel list, provide default 4 or 8 channels
+        # Fallback: determine actual hardware channel count from model string
         if not channels:
-            for cid in range(1, 9):
+            info = self.get_device_info()
+            model = (info.get("model") or "").upper()
+            if "DS-KH" in model:
+                # Indoor touch stations have no CCTV channels
+                return []
+            elif "7604" in model or "7104" in model or "7704" in model:
+                max_ch = 4
+            elif "7608" in model or "7108" in model or "7708" in model:
+                max_ch = 8
+            elif "7616" in model or "7716" in model:
+                max_ch = 16
+            else:
+                max_ch = 1  # Default to 1 channel for standalone cameras / doorbells
+
+            for cid in range(1, max_ch + 1):
                 channels.append({
                     "id": cid,
-                    "name": f"Camera {cid}",
+                    "name": f"Camera {cid}" if max_ch > 1 else (info.get("device_name") or "Camera 1"),
                     "online": True,
                     "ptz": True,
                     "brand": "hikvision",

@@ -229,6 +229,46 @@ body {
 
 .icon-btn:hover { color: var(--accent); background: var(--bg-hover); }
 
+/* ------------------------------------------------------------------ View vs Editor Mode Controls */
+.mode-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.mode-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+body.mode-view .mode-toggle-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.mode-edit .mode-toggle-btn {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+/* View Mode Constraints: Hide all admin/creation/deletion/provisioning controls */
+body.mode-view .admin-only {
+  display: none !important;
+}
+
 /* ------------------------------------------------------------------ Incoming Call Banner */
 .call-banner {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(185, 28, 28, 0.95));

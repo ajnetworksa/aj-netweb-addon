@@ -633,14 +633,139 @@ Frosted Glass:
             home_badges.append({"type": "entity", "entity": smoke_ent, "icon": "mdi:fire", "show_name": False, "show_state": True})
 
         views.append({
-            "title": "Home",
+            "title": "Mobile",
             "path": "home",
-            "icon": "mdi:home",
+            "icon": "mdi:cellphone",
             "type": "sections",
-            "max_columns": 3,
+            "max_columns": 2,
             "theme": "Frosted Glass",
             "badges": home_badges,
             "sections": home_sections,
+        })
+
+        # ------------------------------------------------------------- 1B. TAB / TABLET & WALL PANEL VIEW
+        # Optimized for Android Wall Panels (DS-KH9510), iPads, and tablets (4-column wide grid)
+        tablet_sections = []
+
+        # SECTION 1: Wall Panel Master Controls Bar
+        panel_master_cards = [
+            {
+                "type": "custom:ajnetweb-room-card",
+                "title": title or "Villa Wall Console",
+                "subtitle": f"{len(areas)} Active Zones • Surveillance Armed",
+                "badge_text": "Touch Panel Ready",
+                "preset": "bento",
+            }
+        ]
+
+        if lock_ent or doorbell_ent:
+            panel_master_cards.append({
+                "type": "tile",
+                "entity": lock_ent or doorbell_ent,
+                "name": "⚡ Quick Gate Unlock",
+                "icon": "mdi:door-open",
+                "color": "green",
+                "vertical": False,
+                "grid_options": {"columns": 6, "rows": 1},
+                "tap_action": {"action": "call-service", "service": "lock.unlock" if lock_ent else "homeassistant.toggle", "target": {"entity_id": lock_ent or doorbell_ent}},
+            })
+
+        if light_ent:
+            panel_master_cards.append({
+                "type": "tile",
+                "entity": light_ent,
+                "name": "💡 All Lights Off",
+                "icon": "mdi:lightbulb-group-off",
+                "color": "amber",
+                "vertical": False,
+                "grid_options": {"columns": 6, "rows": 1},
+                "tap_action": {"action": "call-service", "service": "light.turn_off", "target": {"entity_id": "all"}},
+            })
+
+        tablet_sections.append({
+            "type": "grid",
+            "cards": panel_master_cards,
+        })
+
+        # SECTION 2: Security & Camera Matrix on Wall Panel
+        if all_cameras:
+            cctv_matrix_cards = [
+                {
+                    "type": "heading",
+                    "heading": "Live Surveillance Matrix",
+                    "icon": "mdi:cctv",
+                    "heading_style": "subtitle",
+                }
+            ]
+            for cam in all_cameras[:4]:
+                cctv_matrix_cards.append({
+                    "type": "picture-entity",
+                    "entity": cam["entity_id"],
+                    "name": cam["name"],
+                    "camera_view": "live",
+                    "show_state": True,
+                    "grid_options": {"columns": 6, "rows": 3},
+                })
+            tablet_sections.append({
+                "type": "grid",
+                "cards": cctv_matrix_cards,
+            })
+
+        # SECTION 3+: Tablet Room Touch Grid
+        for a in areas:
+            if a.get("total_devices", 0) == 0:
+                continue
+            tab_room_cards = [
+                {
+                    "type": "heading",
+                    "heading": a["name"],
+                    "icon": a["icon"],
+                    "heading_style": "subtitle",
+                }
+            ]
+            for lt in a.get("lights", [])[:4]:
+                tab_room_cards.append({
+                    "type": "tile",
+                    "entity": lt["entity_id"],
+                    "name": lt["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                    "features": [{"type": "light-brightness"}],
+                })
+            for cl in a.get("climates", [])[:1]:
+                tab_room_cards.append({
+                    "type": "tile",
+                    "entity": cl["entity_id"],
+                    "name": cl["name"],
+                    "color": "light-blue",
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                    "features": [
+                        {"type": "climate-hvac-modes", "style": "icons", "hvac_modes": ["off", "cool", "heat"]},
+                    ],
+                })
+            for cv in a.get("covers", [])[:1]:
+                tab_room_cards.append({
+                    "type": "tile",
+                    "entity": cv["entity_id"],
+                    "name": cv["name"],
+                    "vertical": False,
+                    "grid_options": {"columns": 6, "rows": 1},
+                    "features": [{"type": "cover-open-close"}],
+                })
+            tablet_sections.append({
+                "type": "grid",
+                "cards": tab_room_cards,
+            })
+
+        views.append({
+            "title": "Tablet & Wall Panel",
+            "path": "tablet",
+            "icon": "mdi:tablet-dashboard",
+            "type": "sections",
+            "max_columns": 4,
+            "theme": "Frosted Glass",
+            "sections": tablet_sections,
         })
 
         # ------------------------------------------------------------- 2. CAMERAS VIEW
@@ -1336,6 +1461,39 @@ Frosted Glass:
         storage_slug = clean_url.replace("-", "_")
 
         dashboard_cfg = self.generate_dashboard(theme_key, title, active_areas, url_path=url_path)
+
+        # Register directly in Home Assistant running memory via WebSocket API for 0-restart instant routing
+        dash_icon = "mdi:apple" if "apple" in theme_key else "mdi:view-dashboard-variant"
+        try:
+            existing_dashboards = self._call_ws("lovelace/dashboards/list") or []
+            existing = next((d for d in existing_dashboards if d.get("url_path") == url_path), None)
+            if not existing:
+                create_res = self._call_ws("lovelace/dashboards/create", {
+                    "url_path": url_path,
+                    "title": title,
+                    "icon": dash_icon,
+                    "require_admin": False,
+                    "show_in_sidebar": True,
+                    "mode": "storage",
+                })
+                log.info("WebSocket lovelace/dashboards/create result: %s", create_res)
+            else:
+                update_res = self._call_ws("lovelace/dashboards/update", {
+                    "dashboard_id": existing.get("id"),
+                    "title": title,
+                    "icon": dash_icon,
+                    "require_admin": False,
+                    "show_in_sidebar": True,
+                })
+                log.info("WebSocket lovelace/dashboards/update result: %s", update_res)
+
+            save_res = self._call_ws("lovelace/config/save", {
+                "url_path": url_path,
+                "config": dashboard_cfg,
+            })
+            log.info("WebSocket lovelace/config/save result: %s", save_res)
+        except Exception as ws_err:
+            log.warning("WebSocket Lovelace dynamic registration error: %s (falling back to disk)", ws_err)
 
         # Write Lovelace configuration directly to .storage/lovelace.{storage_slug}
         storage_file = os.path.join(STORAGE_DIR, f"lovelace.{storage_slug}")
