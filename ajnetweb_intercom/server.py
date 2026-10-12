@@ -64,6 +64,21 @@ _pruner_thread = None
 _last_ring_time = 0
 _connected_displays = {}  # display_id -> dict(id, name, device_type, status, last_seen, ip)
 _active_intercom_calls = {}  # call_id -> dict(call_id, from_id, from_name, to_id, to_name, call_type, state, start_time)
+_card_enroll_active = False
+
+
+def _auto_stop_card_enroll(client):
+    global _card_enroll_active
+    time.sleep(60)
+    with _state_lock:
+        if _card_enroll_active:
+            _card_enroll_active = False
+            try:
+                if hasattr(client, "set_issue_cards_mode"):
+                    client.set_issue_cards_mode(False)
+            except Exception:
+                pass
+            broadcast_sse({"event": "card_enroll_stopped"})
 
 
 def get_active_displays() -> list:
@@ -730,6 +745,10 @@ def on_door_event(event_info: dict):
     elif ev == "door_unlocked":
         record_visitor_event("door_unlock", event_info.get("details", "Door opened"))
         notify_homeassistant_event("ajnetweb_door_unlocked", event_info)
+    elif ev == "card_swiped":
+        c_no = event_info.get("card_no", "Unknown")
+        record_visitor_event("card_swipe", f"RFID Card swiped on door reader: {c_no}")
+        notify_homeassistant_event("ajnetweb_card_swiped", event_info)
 
     # Broadcast to all live Ingress web views
     broadcast_sse(event_info)
@@ -1072,6 +1091,19 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                 "brand": brand,
                 "connected": connected,
             })
+            return
+
+        if path == "/api/credentials/card/enroll/status":
+            with _state_lock:
+                client = _active_client
+                active = _card_enroll_active
+            isapi_active = False
+            if client and hasattr(client, "get_issue_cards_mode"):
+                try:
+                    isapi_active = client.get_issue_cards_mode()
+                except Exception:
+                    pass
+            self._send_json({"ok": True, "active": active or isapi_active})
             return
 
         if path == "/api/intercom/displays":
@@ -1419,7 +1451,81 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
             ok = False
             if client and brand == "hikvision" and hasattr(client, "call_signal"):
-                ok = client.call_signal("dial")
+                ok = client.call_signal("request")
+
+            # Broadcast incoming call to all wall displays & tablets
+            broadcast_sse({
+                "event": "incoming_call",
+                "call_id": f"hw_call_{int(time.time()*1000)}",
+                "from_id": "door_station",
+                "from_name": "Outdoor Door Station",
+                "to_id": target,
+                "to_name": f"Station {target}",
+                "call_type": "audio",
+            })
+            self._send_json({
+                "ok": True,
+                "target": target,
+                "hardware_dial": ok,
+                "message": f"Calling indoor station {target}...",
+            })
+            return
+
+        # ---------------------------------------------------------------- Hardware Card & Biometric Enrollment
+        if path == "/api/credentials/card/enroll/start":
+            global _card_enroll_active
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+            if not client:
+                self._send_json({"ok": False, "error": "Door Station not connected"}, status=503)
+                return
+
+            ok = False
+            if brand == "hikvision" and hasattr(client, "set_issue_cards_mode"):
+                ok = client.set_issue_cards_mode(True)
+            else:
+                ok = True
+
+            with _state_lock:
+                _card_enroll_active = True
+
+            threading.Thread(target=_auto_stop_card_enroll, args=(client,), daemon=True).start()
+            broadcast_sse({"event": "card_enroll_started", "duration_sec": 60})
+            self._send_json({
+                "ok": True,
+                "hardware_activated": ok,
+                "duration_sec": 60,
+                "message": "Outdoor station card reader activated in ENROLLMENT MODE! Please punch/swipe card on outdoor station now.",
+            })
+            return
+
+        if path == "/api/credentials/card/enroll/stop":
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+                _card_enroll_active = False
+
+            if client and brand == "hikvision" and hasattr(client, "set_issue_cards_mode"):
+                client.set_issue_cards_mode(False)
+
+            broadcast_sse({"event": "card_enroll_stopped"})
+            self._send_json({"ok": True, "message": "Card enrollment mode stopped."})
+            return
+
+        if path == "/api/credentials/biometric/enroll":
+            bio_type = payload.get("type", "face")  # face | fingerprint
+            with _state_lock:
+                client = _active_client
+                brand = _client_brand
+            self._send_json({
+                "ok": True,
+                "type": bio_type,
+                "supported": False if brand == "hikvision" and not hasattr(client, "capture_face") else True,
+                "message": f"Biometric {bio_type} enrollment requested. For villa door stations (DS-KV8113), please use the outdoor RFID Card Punch button or PIN keypad.",
+            })
+            return
+
         if path == "/api/intercom/station/active":
             st_id = payload.get("station_id", "").strip()
             global _active_station_id

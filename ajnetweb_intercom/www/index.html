@@ -166,6 +166,9 @@
               <span id="feedDoorName">DOOR STATION LIVE</span>
             </div>
             <div class="header-badges">
+              <button type="button" id="btnToggleStreamMode" class="btn-micro" title="Toggle between ultra-reliable Fast Snapshot Live and Continuous MJPEG">⚡ Fast Live</button>
+              <button type="button" id="btnRefreshFeed" class="btn-micro" title="Reconnect Feed">↻ Refresh</button>
+              <button type="button" id="btnCopyRtsp" class="btn-micro" title="Copy RTSP Stream URL">📋 RTSP</button>
               <span id="doorLockBadge" class="badge success">Locked</span>
               <span id="callStatusBadge" class="badge neutral">Standby</span>
             </div>
@@ -173,9 +176,30 @@
           <div class="feed-viewport">
             <div class="feed-osd">
               <span id="osdTitle">ENTRANCE INTERCOM</span>
+              <span id="osdModeBadge" class="badge cyber" style="font-size:0.65rem; padding:2px 6px;">⚡ LIVE</span>
               <span id="osdClock">--:--:--</span>
             </div>
-            <img id="doorLiveImage" src="api/mjpeg" alt="Door Station Live Feed">
+            <img id="doorLiveImage" src="api/snapshot" alt="Door Station Live Feed">
+          </div>
+
+          <!-- Two-Way Audio & Live Intercom Bar -->
+          <div class="audio-intercom-bar">
+            <button type="button" id="btnLiveListen" class="audio-action-btn" title="Toggle listening to door station audio">
+              <span class="audio-icon">🔊</span>
+              <span id="liveListenText">Listen to Audio</span>
+            </button>
+            <button type="button" id="btnLiveTalk" class="audio-action-btn primary pulse-glow" title="Hold or Click to Speak through Door Station Speaker (2-Way Audio)">
+              <span class="audio-icon">🎙️</span>
+              <span id="liveTalkText">Talk to Door</span>
+            </button>
+            <button type="button" id="btnCallIndoorTop" class="audio-action-btn secondary" title="Ring indoor touch monitor">
+              <span class="audio-icon">📞</span>
+              <span>Ring Indoor</span>
+            </button>
+            <button type="button" id="btnPunchCardTop" class="audio-action-btn warning" title="Swipe / Punch RFID card on outdoor station reader">
+              <span class="audio-icon">🎴</span>
+              <span>Punch Card</span>
+            </button>
           </div>
         </div>
 
@@ -303,8 +327,9 @@
                 <label for="passCardNo">
                   Card No / Scannable QR Token
                   <button type="button" id="btnRandomCard" class="btn-micro">🎲 Randomize</button>
+                  <button type="button" id="btnPunchCardForForm" class="btn-micro" title="Swipe / Punch RFID card on outdoor station to learn number">🎴 Punch on Outdoor Reader</button>
                 </label>
-                <input type="text" id="passCardNo" placeholder="8-digit QR token" maxlength="12" />
+                <input type="text" id="passCardNo" placeholder="8-digit QR token or swiped card number" maxlength="16" />
               </div>
             </div>
 
@@ -315,6 +340,40 @@
               <span id="passFeedback" class="feedback-msg-inline"></span>
             </div>
           </form>
+        </div>
+
+        <!-- Outdoor Reader Hardware Enrollment Card -->
+        <div class="pass-issuer-card hardware-enroll-card" style="margin-top: 24px;">
+          <div class="issuer-header">
+            <div class="issuer-badge">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span>Outdoor Reader Hardware Learning Mode</span>
+            </div>
+            <h2>Punch / Swipe Physical RFID Card on Door Station</h2>
+            <p class="hint">
+              For key fobs, keycards, and tags without printed card numbers: activate the outdoor reader directly so you can swipe your card on the outdoor door station to enroll automatically.
+            </p>
+          </div>
+          <div class="enroll-action-buttons">
+            <button type="button" id="btnStartCardEnroll" class="primary-btn pulse-glow enroll-main-btn" style="width: 100%; padding: 14px; font-size: 1rem; margin-bottom: 12px;">
+              🎴 Activate Outdoor Reader (Punch Card to Enroll)
+            </button>
+            <div class="bio-btn-row" style="display: flex; gap: 10px; margin-bottom: 14px;">
+              <button type="button" id="btnEnrollFace" class="secondary-btn" style="flex: 1;">
+                👤 Enroll Face (MinMoe)
+              </button>
+              <button type="button" id="btnEnrollFingerprint" class="secondary-btn" style="flex: 1;">
+                👆 Enroll Fingerprint (MinMoe)
+              </button>
+            </div>
+          </div>
+          <div class="hardware-status-hint" style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-dim);">
+            <span class="pulse-dot green"></span>
+            <span id="hardwareReaderStatus">Outdoor RFID Reader Ready &bull; DS-KV8113 Mifare 13.56MHz Active</span>
+          </div>
         </div>
 
         <!-- Active Passes List -->
@@ -922,6 +981,35 @@
           </div>
           <div id="manualStationFeedback" class="feedback-msg"></div>
         </form>
+      </div>
+  <!-- Outdoor Card Punch & Biometric Enrollment Modal -->
+  <div id="cardEnrollModal" class="modal-overlay" style="display:none;">
+    <div class="modal-card enroll-modal-content" style="max-width: 480px; text-align: center;">
+      <div class="modal-header">
+        <div class="modal-badge">
+          <span>🎴 Outdoor Hardware Enrollment Active</span>
+        </div>
+        <button type="button" class="btn-modal-close" id="btnCardEnrollClose">&times;</button>
+      </div>
+      <div class="enroll-body" style="padding: 24px 16px;">
+        <div class="enroll-radar-ring" style="width: 80px; height: 80px; margin: 0 auto 16px; border-radius: 50%; background: rgba(56, 189, 248, 0.1); border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 2.2rem; animation: pulseGlow 1.5s infinite;">
+          🎴
+        </div>
+        <h3 id="enrollStatusTitle" style="margin-bottom: 8px;">Reader Activated &bull; Please Swipe Card!</h3>
+        <p id="enrollStatusDesc" style="color: var(--text-dim); font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px;">
+          Walk to your outdoor door station (DS-KV8113) and punch/swipe your physical RFID card, key fob, or NFC badge on the card reader now.
+        </p>
+        <div class="countdown-bar-container" style="background: rgba(255,255,255,0.06); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 20px;">
+          <div id="enrollCountdownBar" class="countdown-bar" style="background: var(--accent); width: 100%; height: 100%; transition: width 1s linear;"></div>
+        </div>
+        <div class="enroll-detected-box" id="enrollDetectedBox" style="display:none; background: rgba(34, 197, 94, 0.1); border: 1px solid var(--success); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          <span style="display: block; font-size: 0.85rem; color: var(--success); font-weight: 600;">✓ Card Detected on Outdoor Reader!</span>
+          <span id="detectedCardNo" style="display: block; font-size: 1.4rem; font-weight: 700; color: #fff; margin: 8px 0; letter-spacing: 2px;">--</span>
+          <button type="button" id="btnUseDetectedCard" class="primary-btn" style="padding: 8px 16px; font-size: 0.85rem;">Use This Card in Guest Pass</button>
+        </div>
+      </div>
+      <div class="modal-actions" style="justify-content: center;">
+        <button type="button" id="btnStopEnroll" class="secondary-btn" style="width: 100%;">Stop / Finish Enrollment</button>
       </div>
     </div>
   </div>

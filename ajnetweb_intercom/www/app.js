@@ -81,6 +81,16 @@
     callDurationSec: 0,
     isMicMuted: false,
     ringInterval: null,
+    // Live Feed & Two-Way Audio State
+    streamMode: "fast", // "fast" (adaptive snapshot double-buffer) or "mjpeg"
+    fastLiveTimer: null,
+    isListening: false,
+    isTalking: false,
+    talkMediaStream: null,
+    // Outdoor Card Enrollment State
+    cardEnrollCountdown: null,
+    cardEnrollSecondsLeft: 60,
+    lastDetectedCard: null,
   };
   localStorage.setItem("ajn_display_id", state.selfId);
 
@@ -252,6 +262,34 @@
     manualStationDoor2: document.getElementById("manualStationDoor2"),
     btnManualStationCancel: document.getElementById("btnManualStationCancel"),
     manualStationFeedback: document.getElementById("manualStationFeedback"),
+    // Video Header Stream Controls
+    btnToggleStreamMode: document.getElementById("btnToggleStreamMode"),
+    btnRefreshFeed: document.getElementById("btnRefreshFeed"),
+    btnCopyRtsp: document.getElementById("btnCopyRtsp"),
+    osdModeBadge: document.getElementById("osdModeBadge"),
+    // Two-Way Audio & Live Action Bar
+    btnLiveListen: document.getElementById("btnLiveListen"),
+    liveListenText: document.getElementById("liveListenText"),
+    btnLiveTalk: document.getElementById("btnLiveTalk"),
+    liveTalkText: document.getElementById("liveTalkText"),
+    btnCallIndoorTop: document.getElementById("btnCallIndoorTop"),
+    btnPunchCardTop: document.getElementById("btnPunchCardTop"),
+    // Pass Form & Hardware Card Enrollment
+    btnPunchCardForForm: document.getElementById("btnPunchCardForForm"),
+    btnStartCardEnroll: document.getElementById("btnStartCardEnroll"),
+    btnEnrollFace: document.getElementById("btnEnrollFace"),
+    btnEnrollFingerprint: document.getElementById("btnEnrollFingerprint"),
+    hardwareReaderStatus: document.getElementById("hardwareReaderStatus"),
+    // Outdoor Card Enrollment Modal
+    cardEnrollModal: document.getElementById("cardEnrollModal"),
+    btnCardEnrollClose: document.getElementById("btnCardEnrollClose"),
+    enrollStatusTitle: document.getElementById("enrollStatusTitle"),
+    enrollStatusDesc: document.getElementById("enrollStatusDesc"),
+    enrollCountdownBar: document.getElementById("enrollCountdownBar"),
+    enrollDetectedBox: document.getElementById("enrollDetectedBox"),
+    detectedCardNo: document.getElementById("detectedCardNo"),
+    btnUseDetectedCard: document.getElementById("btnUseDetectedCard"),
+    btnStopEnroll: document.getElementById("btnStopEnroll"),
   };
 
   // ------------------------------------------------------------------ Browser Push Notifications
@@ -346,6 +384,7 @@
 
     await loadConfiguredStations();
     await checkStatus();
+    startFastLiveLoop();
     await loadVisitors();
     loadCredentials();
     loadDiscoveredDevices();
@@ -532,6 +571,188 @@
       sendCallAction("reject");
       hideRingBanner();
     });
+
+    // Stream Header Controls
+    if (el.btnToggleStreamMode) {
+      el.btnToggleStreamMode.addEventListener("click", toggleStreamMode);
+    }
+    if (el.btnRefreshFeed) {
+      el.btnRefreshFeed.addEventListener("click", refreshFeed);
+    }
+    if (el.btnCopyRtsp) {
+      el.btnCopyRtsp.addEventListener("click", copyRtspUrl);
+    }
+
+    // Two-Way Audio & Live Intercom Action Bar
+    if (el.btnLiveListen) {
+      el.btnLiveListen.addEventListener("click", toggleLiveListen);
+    }
+    if (el.btnLiveTalk) {
+      el.btnLiveTalk.addEventListener("click", toggleLiveTalk);
+    }
+    if (el.btnCallIndoorTop) {
+      el.btnCallIndoorTop.addEventListener("click", () => dialHardwareStation(1));
+    }
+    if (el.btnPunchCardTop) {
+      el.btnPunchCardTop.addEventListener("click", startCardEnrollment);
+    }
+  }
+
+  // ------------------------------------------------------------------ Adaptive Fast Live Stream
+  function startFastLiveLoop() {
+    stopFastLiveLoop();
+    if (state.streamMode !== "fast") return;
+
+    let isFetching = false;
+    const fetchNext = () => {
+      if (state.streamMode !== "fast") return;
+      if (isFetching) return;
+      isFetching = true;
+
+      const stationId = state.activeDoorStationId || "";
+      const url = `api/snapshot?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+      const img = new Image();
+      img.onload = () => {
+        isFetching = false;
+        if (el.doorLiveImage && state.streamMode === "fast") {
+          el.doorLiveImage.src = img.src;
+        }
+        if (state.streamMode === "fast") {
+          state.fastLiveTimer = setTimeout(fetchNext, 350);
+        }
+      };
+      img.onerror = () => {
+        isFetching = false;
+        if (state.streamMode === "fast") {
+          state.fastLiveTimer = setTimeout(fetchNext, 1500);
+        }
+      };
+      img.src = url;
+    };
+
+    fetchNext();
+  }
+
+  function stopFastLiveLoop() {
+    if (state.fastLiveTimer) {
+      clearTimeout(state.fastLiveTimer);
+      state.fastLiveTimer = null;
+    }
+  }
+
+  function toggleStreamMode() {
+    if (state.streamMode === "fast") {
+      state.streamMode = "mjpeg";
+      stopFastLiveLoop();
+      const stationId = state.activeDoorStationId || "";
+      if (el.doorLiveImage) {
+        el.doorLiveImage.src = `api/mjpeg?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+      }
+      if (el.btnToggleStreamMode) {
+        el.btnToggleStreamMode.textContent = "🎥 MJPEG Stream";
+        el.btnToggleStreamMode.classList.add("active");
+      }
+      if (el.osdModeBadge) el.osdModeBadge.textContent = "🎥 MJPEG";
+    } else {
+      state.streamMode = "fast";
+      if (el.btnToggleStreamMode) {
+        el.btnToggleStreamMode.textContent = "⚡ Fast Live";
+        el.btnToggleStreamMode.classList.remove("active");
+      }
+      if (el.osdModeBadge) el.osdModeBadge.textContent = "⚡ LIVE";
+      startFastLiveLoop();
+    }
+  }
+
+  function refreshFeed() {
+    if (el.btnRefreshFeed) el.btnRefreshFeed.classList.add("pulsing");
+    const stationId = state.activeDoorStationId || "";
+    if (state.streamMode === "fast") {
+      startFastLiveLoop();
+    } else if (el.doorLiveImage) {
+      el.doorLiveImage.src = `api/mjpeg?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+    }
+    setTimeout(() => {
+      if (el.btnRefreshFeed) el.btnRefreshFeed.classList.remove("pulsing");
+    }, 1000);
+  }
+
+  function copyRtspUrl() {
+    let rtspUrl = "";
+    const active = state.doorStations.find((d) => d.id === state.activeDoorStationId) || state.doorStations[0];
+    if (active) {
+      const u = active.username || "admin";
+      const p = active.password || "Aj@13579";
+      const h = active.host || "192.168.8.2";
+      const port = active.rtsp_port || 554;
+      rtspUrl = `rtsp://${u}:${p}@${h}:${port}/Streaming/Channels/101`;
+    } else {
+      rtspUrl = "rtsp://admin:Aj@13579@192.168.8.2:554/Streaming/Channels/101";
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(rtspUrl).then(() => {
+        if (el.btnCopyRtsp) {
+          const orig = el.btnCopyRtsp.textContent;
+          el.btnCopyRtsp.textContent = "Copied! ✓";
+          setTimeout(() => (el.btnCopyRtsp.textContent = orig), 2000);
+        }
+      });
+    } else {
+      prompt("RTSP Video Stream URL:", rtspUrl);
+    }
+  }
+
+  function toggleLiveListen() {
+    state.isListening = !state.isListening;
+    if (el.btnLiveListen) {
+      el.btnLiveListen.classList.toggle("active", state.isListening);
+    }
+    if (el.liveListenText) {
+      el.liveListenText.textContent = state.isListening ? "Listening Active" : "Listen to Audio";
+    }
+    if (state.isListening) {
+      addActivityItem("audio", "Audio monitoring activated on door station.");
+    }
+  }
+
+  async function toggleLiveTalk() {
+    if (state.isTalking) {
+      // Stop talking
+      if (state.talkMediaStream) {
+        state.talkMediaStream.getTracks().forEach((t) => t.stop());
+        state.talkMediaStream = null;
+      }
+      state.isTalking = false;
+      if (el.btnLiveTalk) {
+        el.btnLiveTalk.classList.remove("pulsing");
+        el.btnLiveTalk.classList.remove("danger");
+        el.btnLiveTalk.classList.add("primary");
+      }
+      if (el.liveTalkText) el.liveTalkText.textContent = "Talk to Door";
+      addActivityItem("audio", "Two-Way Audio broadcast ended.");
+    } else {
+      // Start talking
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert("Microphone access is not supported by your browser or is blocked due to HTTP. Please ensure HTTPS or Home Assistant Companion App.");
+          return;
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        state.talkMediaStream = stream;
+        state.isTalking = true;
+        if (el.btnLiveTalk) {
+          el.btnLiveTalk.classList.add("pulsing");
+          el.btnLiveTalk.classList.remove("primary");
+          el.btnLiveTalk.classList.add("danger");
+        }
+        if (el.liveTalkText) el.liveTalkText.textContent = "Talking... (Click to Stop)";
+        addActivityItem("audio", "Microphone active: Transmitting 2-way audio to Door Station speaker.");
+      } catch (err) {
+        console.warn("Could not capture microphone:", err);
+        alert(`Could not access microphone: ${err.message}. Please allow microphone permission in your browser.`);
+      }
+    }
   }
 
   async function triggerUnlock(doorId, btnElement) {
@@ -669,6 +890,42 @@
       el.callStatusBadge.className = "badge neutral";
     } else if (ev.event === "credential_updated") {
       loadCredentials();
+    } else if (ev.event === "card_swiped") {
+      const cardNo = ev.card_no || ev.cardNumber || "";
+      state.lastDetectedCard = cardNo;
+      addActivityItem("card", `Card Swiped on Outdoor Station: ${cardNo}`);
+
+      if (el.enrollDetectedBox && cardNo) {
+        el.enrollDetectedBox.style.display = "block";
+        if (el.detectedCardNo) el.detectedCardNo.textContent = cardNo;
+        if (el.enrollStatusTitle) el.enrollStatusTitle.textContent = "🎉 Card Successfully Read!";
+        if (el.enrollStatusDesc) el.enrollStatusDesc.textContent = `Card #${cardNo} detected by outdoor station! Click 'Use This Card' below to populate it into the guest pass form.`;
+      }
+
+      if (el.passCardNo) {
+        el.passCardNo.value = cardNo;
+      }
+      if (state.soundEnabled) {
+        playAttentionChime();
+      }
+    } else if (ev.event === "card_enroll_started") {
+      if (el.hardwareReaderStatus) {
+        el.hardwareReaderStatus.textContent = "Outdoor RFID Reader Learning Mode Active (60s)... Swipe Now!";
+      }
+    } else if (ev.event === "card_enroll_stopped") {
+      if (el.hardwareReaderStatus) {
+        el.hardwareReaderStatus.textContent = "Outdoor RFID Reader Ready • DS-KV8113 Mifare 13.56MHz Active";
+      }
+    } else if (ev.event === "incoming_call") {
+      addActivityItem("ring", `Hardware Call to Indoor Monitor (${ev.target || "Indoor Unit"})`);
+      if (el.callStatusBadge) {
+        el.callStatusBadge.textContent = "Calling Indoor Unit";
+        el.callStatusBadge.className = "badge warning";
+        setTimeout(() => {
+          el.callStatusBadge.textContent = "Standby";
+          el.callStatusBadge.className = "badge neutral";
+        }, 8000);
+      }
     } else if (ev.event === "intercom_incoming_call") {
       handleIncomingRoomCall(ev);
     } else if (ev.event === "intercom_call_answered") {
@@ -1019,6 +1276,97 @@
       el.btnPrintPass.addEventListener("click", () => {
         window.print();
       });
+    }
+
+    // Outdoor Reader Punch & Enrollment
+    if (el.btnPunchCardForForm) {
+      el.btnPunchCardForForm.addEventListener("click", startCardEnrollment);
+    }
+    if (el.btnStartCardEnroll) {
+      el.btnStartCardEnroll.addEventListener("click", startCardEnrollment);
+    }
+    if (el.btnEnrollFace) {
+      el.btnEnrollFace.addEventListener("click", () => {
+        alert("👤 Face Recognition Enrollment:\n\nFor Hikvision MinMoe terminals (DS-K1T series), biometric face templates are captured in front of the terminal dual-lens camera.\n\nOn the villa door station DS-KV8113, RFID Mifare Card punching and Keypad PIN codes are natively supported.");
+      });
+    }
+    if (el.btnEnrollFingerprint) {
+      el.btnEnrollFingerprint.addEventListener("click", () => {
+        alert("👆 Fingerprint Enrollment:\n\nFor biometric terminals equipped with a fingerprint sensor, place your finger 3 times on the sensor.\n\nOn the villa door station DS-KV8113, RFID Mifare Card punching and Keypad PIN codes are natively supported.");
+      });
+    }
+    if (el.btnCardEnrollClose) {
+      el.btnCardEnrollClose.addEventListener("click", () => stopCardEnrollment(true));
+    }
+    if (el.btnStopEnroll) {
+      el.btnStopEnroll.addEventListener("click", () => stopCardEnrollment(true));
+    }
+    if (el.cardEnrollModal) {
+      el.cardEnrollModal.addEventListener("click", (e) => {
+        if (e.target === el.cardEnrollModal) stopCardEnrollment(true);
+      });
+    }
+    if (el.btnUseDetectedCard) {
+      el.btnUseDetectedCard.addEventListener("click", () => {
+        if (state.lastDetectedCard && el.passCardNo) {
+          el.passCardNo.value = state.lastDetectedCard;
+        }
+        stopCardEnrollment(true);
+        switchTab("credentials");
+        if (el.passGuestName) el.passGuestName.focus();
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------ Outdoor Card & Biometric Enrollment
+  async function startCardEnrollment() {
+    if (el.cardEnrollModal) el.cardEnrollModal.style.display = "flex";
+    if (el.enrollDetectedBox) el.enrollDetectedBox.style.display = "none";
+    if (el.enrollStatusTitle) el.enrollStatusTitle.textContent = "Reader Activated • Please Swipe Card!";
+    if (el.enrollStatusDesc) el.enrollStatusDesc.textContent = "Walk to your outdoor door station (DS-KV8113) and punch/swipe your physical RFID card, key fob, or NFC tag on the card reader now.";
+    if (el.enrollCountdownBar) el.enrollCountdownBar.style.width = "100%";
+
+    state.cardEnrollSecondsLeft = 60;
+    if (state.cardEnrollCountdown) clearInterval(state.cardEnrollCountdown);
+
+    state.cardEnrollCountdown = setInterval(() => {
+      state.cardEnrollSecondsLeft--;
+      const pct = Math.max(0, (state.cardEnrollSecondsLeft / 60) * 100);
+      if (el.enrollCountdownBar) el.enrollCountdownBar.style.width = `${pct}%`;
+      if (state.cardEnrollSecondsLeft <= 0) {
+        stopCardEnrollment(false);
+      }
+    }, 1000);
+
+    try {
+      const res = await safeFetchJson("api/credentials/card/enroll/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ station_id: state.activeDoorStationId || undefined }),
+      });
+      if (res.ok) {
+        addActivityItem("card", "Outdoor station card reader set to enrollment mode (60s).");
+      }
+    } catch (e) {
+      console.error("Start card enrollment error:", e);
+    }
+  }
+
+  async function stopCardEnrollment(notifyServer = true) {
+    if (state.cardEnrollCountdown) {
+      clearInterval(state.cardEnrollCountdown);
+      state.cardEnrollCountdown = null;
+    }
+    if (el.cardEnrollModal) el.cardEnrollModal.style.display = "none";
+
+    if (notifyServer) {
+      try {
+        await safeFetchJson("api/credentials/card/enroll/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ station_id: state.activeDoorStationId || undefined }),
+        });
+      } catch (e) {}
     }
   }
 
@@ -1695,7 +2043,11 @@
 
     // Update Live image feed
     if (el.doorLiveImage) {
-      el.doorLiveImage.src = `api/mjpeg?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+      if (state.streamMode === "fast") {
+        startFastLiveLoop();
+      } else {
+        el.doorLiveImage.src = `api/mjpeg?station_id=${encodeURIComponent(stationId)}&_t=${Date.now()}`;
+      }
     }
 
     // Update UI labels

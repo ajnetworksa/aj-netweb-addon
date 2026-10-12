@@ -182,17 +182,62 @@ class HikvisionIntercomClient:
 
     def call_signal(self, cmd_type: str = "hangUp") -> bool:
         """
-        Interact with incoming call:
-        cmd_type: 'answer' | 'reject' | 'hangUp'
+        Interact with call signal:
+        cmd_type: 'answer' | 'reject' | 'hangUp' | 'request' | 'cancel'
         """
+        if cmd_type == "dial":
+            cmd_type = "request"
         payload = {"CallSignal": {"cmdType": cmd_type}}
         try:
             resp = self._request("PUT", "/ISAPI/VideoIntercom/callSignal?format=json",
                                   json=payload, timeout=4)
-            return resp.status_code in (200, 204)
+            if resp.status_code in (200, 204):
+                return True
         except Exception as e:
             log.error("Hikvision call signal failed (%s): %s", cmd_type, e)
-            return False
+
+        # Fallback XML attempt
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<CallSignal version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<cmdType>{cmd_type}</cmdType>
+</CallSignal>"""
+        try:
+            resp = self._request("PUT", "/ISAPI/VideoIntercom/callSignal",
+                                  data=xml, headers={"Content-Type": "application/xml"}, timeout=4)
+            return resp.status_code in (200, 204)
+        except Exception:
+            pass
+        return False
+
+    def set_issue_cards_mode(self, enabled: bool = True) -> bool:
+        """
+        Put door station into / out of RFID Card Learning / Issuing mode.
+        When enabled, physical reader on outdoor station beeps and waits for card punch.
+        """
+        val = "true" if enabled else "false"
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<IssueCards version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<enabled>{val}</enabled>
+</IssueCards>"""
+        try:
+            resp = self._request("PUT", "/ISAPI/VideoIntercom/issueCards",
+                                  data=xml, headers={"Content-Type": "application/xml"}, timeout=5)
+            if resp.status_code in (200, 204):
+                log.info("Hikvision outdoor card issuing mode set to %s.", val)
+                return True
+        except Exception as e:
+            log.error("Failed to set issueCards mode to %s: %s", val, e)
+        return False
+
+    def get_issue_cards_mode(self) -> bool:
+        """Query if door station is currently in card issuing / learning mode."""
+        try:
+            resp = self._request("GET", "/ISAPI/VideoIntercom/issueCards", timeout=3)
+            if resp.status_code == 200 and "<enabled>true</enabled>" in resp.text:
+                return True
+        except Exception:
+            pass
+        return False
 
     def get_snapshot(self) -> bytes | None:
         """Fetch real-time camera snapshot from door station."""
@@ -247,10 +292,12 @@ class HikvisionIntercomClient:
                     m_type = re.search(r"<eventType>(.*?)</eventType>", buf)
                     m_state = re.search(r"<eventState>(.*?)</eventState>", buf)
                     m_sub = re.search(r"<subEventType>(.*?)</subEventType>", buf)
+                    m_card = re.search(r"<(?:cardNo|cardNumber)>(.*?)</(?:cardNo|cardNumber)>", buf)
 
                     ev_type = m_type.group(1) if m_type else "unknown"
                     ev_state = m_state.group(1) if m_state else "active"
                     sub_type = m_sub.group(1) if m_sub else ""
+                    card_num = m_card.group(1).strip() if m_card else None
 
                     # Map event
                     event_name = None
@@ -260,15 +307,20 @@ class HikvisionIntercomClient:
                         event_name = "door_unlocked"
                     elif "tamper" in ev_type.lower():
                         event_name = "tamper"
+                    elif card_num:
+                        event_name = "card_swiped"
 
                     if event_name:
-                        event_callback({
+                        payload = {
                             "event": event_name,
                             "type": ev_type,
                             "state": ev_state,
                             "sub_type": sub_type,
                             "timestamp": datetime.utcnow().isoformat() + "Z",
-                        })
+                        }
+                        if card_num:
+                            payload["card_no"] = card_num
+                        event_callback(payload)
                     buf = ""
         except Exception as e:
             log.warning("Hikvision alertStream disconnected: %s. Reconnecting in 5s...", e)

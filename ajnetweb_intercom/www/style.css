@@ -2286,5 +2286,107 @@ body {
   align-items: center;
 }
 
+/* ==============================================================================
+   2-Way Audio Intercom Bar & Live Feed Toolbar
+   ============================================================================== */
+.audio-intercom-bar {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.7);
+  border-top: 1px solid var(--border-color);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.audio-action-btn {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.audio-action-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.audio-action-btn.primary {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(2, 132, 199, 0.4));
+  border-color: var(--accent);
+  color: #38bdf8;
+}
+
+.audio-action-btn.primary:hover {
+  background: var(--accent);
+  color: #070a12;
+}
+
+.audio-action-btn.primary.active {
+  background: #ef4444;
+  border-color: #f87171;
+  color: #fff;
+  animation: pulseGlow 1s infinite alternate;
+}
+
+.audio-action-btn.secondary {
+  background: rgba(168, 85, 247, 0.15);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.audio-action-btn.secondary:hover {
+  background: #a855f7;
+  color: #fff;
+}
+
+.audio-action-btn.warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.audio-action-btn.warning:hover {
+  background: #f59e0b;
+  color: #070a12;
+}
+
+.audio-icon {
+  font-size: 1.1rem;
+}
+
+/* Hardware Enrollment Card */
+.hardware-enroll-card {
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.03), rgba(15, 23, 42, 0.6)) !important;
+}
+
+.hardware-enroll-card:hover {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+}
+
+.enroll-radar-ring {
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.3);
+}
+
+@keyframes pulseGlow {
+  0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5); }
+  70% { transform: scale(1.04); box-shadow: 0 0 0 16px rgba(56, 189, 248, 0); }
+  100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+
 
 
