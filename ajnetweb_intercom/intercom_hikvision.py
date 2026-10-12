@@ -5,9 +5,16 @@ Supports Remote Door Release, Call Status Monitoring, Event Long-Polling & Snaps
 
 import logging
 import re
+import threading
 import urllib.parse
 import xml.etree.ElementTree as ET
 from datetime import datetime
+
+try:
+    import urllib3
+    urllib3.disable_warnings()
+except Exception:
+    pass
 
 try:
     import requests
@@ -27,30 +34,79 @@ class HikvisionIntercomClient:
         self.username = username.strip()
         self.password = password
         self.timeout = timeout
-        self.base_url = f"http://{self.host}:{self.port}"
+        proto = "https" if self.port in (443, 8443) else "http"
+        self.base_url = f"{proto}://{self.host}:{self.port}"
         self._session = None
+        self._lock = threading.Lock()
+        self._checked_protocol = False
+        self._working_snapshot_path = None
 
     def _get_session(self):
         if self._session is None:
             self._session = requests.Session()
+            self._session.verify = False
             self._session.auth = HTTPDigestAuth(self.username, self.password)
+            adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
+            self._session.mount("http://", adapter)
+            self._session.mount("https://", adapter)
         return self._session
 
     def _request(self, method: str, path: str, data=None, json=None, headers=None, timeout=None, stream=False):
-        url = f"{self.base_url}{path}"
-        sess = self._get_session()
         to = timeout or self.timeout
         hdrs = headers or {}
 
-        try:
-            resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
-            if resp.status_code == 401 and isinstance(sess.auth, HTTPDigestAuth):
-                sess.auth = HTTPBasicAuth(self.username, self.password)
+        with self._lock:
+            # Auto-detect protocol if default port 80 might redirect to HTTPS (common on Hikvision Villa stations)
+            if not self._checked_protocol and self.port == 80:
+                self._checked_protocol = True
+                try:
+                    s = self._get_session()
+                    probe = s.request("GET", f"http://{self.host}:80/ISAPI/System/deviceInfo", timeout=2, allow_redirects=False)
+                    if probe.status_code in (301, 302, 307, 308):
+                        loc = probe.headers.get("Location", "")
+                        if "https://" in loc:
+                            log.info("Hikvision door station at %s requires HTTPS; auto-upgraded base_url", self.host)
+                            self.base_url = f"https://{self.host}:443"
+                except Exception:
+                    pass
+
+            sess = self._get_session()
+            url = f"{self.base_url}{path}"
+
+            try:
                 resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
-            return resp
-        except Exception as e:
-            log.warning("Hikvision intercom request failed (%s %s): %s", method, path, e)
-            raise
+
+                # Upgrade if redirected to HTTPS
+                if resp.status_code in (301, 302, 307, 308) and "https://" in resp.headers.get("Location", ""):
+                    self.base_url = f"https://{self.host}:443"
+                    url = f"{self.base_url}{path}"
+                    resp = sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
+
+                if resp.status_code == 401:
+                    # Try Basic auth without permanently corrupting session auth
+                    try:
+                        resp_b = sess.request(method, url, data=data, json=json, headers=hdrs,
+                                              timeout=to, stream=stream,
+                                              auth=HTTPBasicAuth(self.username, self.password))
+                        if resp_b.status_code in (200, 204):
+                            return resp_b
+                    except Exception:
+                        pass
+                return resp
+            except (requests.exceptions.SSLError, requests.exceptions.ConnectionError) as ce:
+                # If HTTP failed, fallback to HTTPS once
+                if self.base_url.startswith("http://"):
+                    try:
+                        self.base_url = f"https://{self.host}:443"
+                        url = f"{self.base_url}{path}"
+                        return sess.request(method, url, data=data, json=json, headers=hdrs, timeout=to, stream=stream)
+                    except Exception:
+                        pass
+                log.warning("Hikvision intercom request failed (%s %s): %s", method, path, ce)
+                raise
+            except Exception as e:
+                log.warning("Hikvision intercom request failed (%s %s): %s", method, path, e)
+                raise
 
     def get_device_info(self) -> dict:
         """Fetch model, serial number, and firmware version."""
@@ -136,15 +192,21 @@ class HikvisionIntercomClient:
 
     def get_snapshot(self) -> bytes | None:
         """Fetch real-time camera snapshot from door station."""
-        paths = [
+        candidate_paths = [
             "/ISAPI/Streaming/channels/101/picture",
             "/ISAPI/System/Video/inputs/channels/1/picture",
             "/ISAPI/Streaming/channels/1/picture",
         ]
+        if self._working_snapshot_path:
+            paths = [self._working_snapshot_path] + [p for p in candidate_paths if p != self._working_snapshot_path]
+        else:
+            paths = candidate_paths
+
         for path in paths:
             try:
                 resp = self._request("GET", path, timeout=4)
                 if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
+                    self._working_snapshot_path = path
                     return resp.content
             except Exception:
                 continue

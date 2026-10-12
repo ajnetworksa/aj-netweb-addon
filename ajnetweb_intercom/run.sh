@@ -22,7 +22,7 @@ export HA_NOTIFY="$(bashio::config 'ha_notify_on_ring' 'true')"
 export PUSH_NOTIFY_MODE="$(bashio::config 'push_notify_mode' 'all_mobile_devices')"
 export CRITICAL_PUSH_SOUND="$(bashio::config 'critical_push_sound' 'true')"
 export LOG_LEVEL="$(bashio::config 'log_level' 'info')"
-export INGRESS_PORT="8097"
+export INGRESS_PORT="8091"
 
 bashio::log.info "Target Door Station: ${INTERCOM_HOST:-'(Not configured yet - open Web UI to connect)'}"
 bashio::log.info "Brand: ${INTERCOM_BRAND}, Door 1: ${DOOR_1_NAME}, Door 2: ${DOOR_2_NAME}"

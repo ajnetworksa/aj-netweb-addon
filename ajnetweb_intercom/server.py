@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import socket
 from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
@@ -27,7 +28,6 @@ except ImportError:
 from intercom_dahua import DahuaIntercomClient
 from intercom_hikvision import HikvisionIntercomClient
 
-
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("intercom.server")
 
@@ -38,7 +38,7 @@ HISTORY_FILE = "/data/intercom/visitor_history.json"
 CREDENTIALS_FILE = "/data/intercom/credentials.json"
 HA_WWW_DIR = "/config/www/ajnetweb_intercom"
 WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
-PORT = int(os.environ.get("INGRESS_PORT", 8097))
+PORT = int(os.environ.get("INGRESS_PORT", 8091))
 
 os.makedirs(VISITORS_DIR, exist_ok=True)
 try:
@@ -100,6 +100,15 @@ def get_active_displays() -> list:
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            try:
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except OSError:
+                pass
+        super().server_bind()
 
 
 def load_config() -> dict:
@@ -1600,11 +1609,27 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    log.info("Starting AJ Netweb Intercom & Door Station Server on port %s...", PORT)
+    log.info("Starting AJ Netweb Intercom & Door Station Server on configured port %s...", PORT)
     init_client()
     start_ha_action_listener()
     start_credential_pruner()
-    server = ThreadedHTTPServer(("0.0.0.0", PORT), IntercomRequestHandler)
+
+    candidate_ports = [PORT, 8092, 8093, 8094, 8087]
+    server = None
+    for p in candidate_ports:
+        try:
+            server = ThreadedHTTPServer(("0.0.0.0", p), IntercomRequestHandler)
+            log.info("Intercom HTTP Server listening successfully on port %s", p)
+            break
+        except OSError as e:
+            if e.errno == 98 or "in use" in str(e).lower():
+                log.warning("Port %s is currently in use, trying next candidate port...", p)
+                continue
+            raise
+
+    if not server:
+        raise OSError(f"Could not bind Intercom HTTP Server on any candidate port ({candidate_ports})")
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:

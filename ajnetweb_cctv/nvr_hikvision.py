@@ -18,6 +18,9 @@ except ImportError:
 log = logging.getLogger("cctv.hikvision")
 
 
+from threading import Lock
+import time
+
 class HikvisionClient:
     def __init__(self, host: str, port: int = 80, rtsp_port: int = 554,
                  username: str = "admin", password: str = "", timeout: int = 8):
@@ -27,32 +30,45 @@ class HikvisionClient:
         self.username = username.strip()
         self.password = password
         self.timeout = timeout
-        self.base_url = f"http://{self.host}:{self.port}"
+        proto = "https" if self.port in (443, 8443) else "http"
+        self.base_url = f"{proto}://{self.host}:{self.port}"
         self._session = None
+        self._lock = Lock()
+        self._working_paths = {}
+        self._offline_channels = {}
 
     def _get_session(self):
         if self._session is None:
             self._session = requests.Session()
-            # Most Hikvision devices require HTTP Digest auth
+            self._session.verify = False
             self._session.auth = HTTPDigestAuth(self.username, self.password)
+            adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
+            self._session.mount("http://", adapter)
+            self._session.mount("https://", adapter)
         return self._session
 
     def _request(self, method: str, path: str, data=None, headers=None, timeout=None):
         url = f"{self.base_url}{path}"
-        sess = self._get_session()
         to = timeout or self.timeout
         hdrs = headers or {}
 
-        try:
-            resp = sess.request(method, url, data=data, headers=hdrs, timeout=to)
-            # If 401 with Digest, try Basic auth fallback
-            if resp.status_code == 401 and isinstance(sess.auth, HTTPDigestAuth):
-                sess.auth = HTTPBasicAuth(self.username, self.password)
+        with self._lock:
+            sess = self._get_session()
+            try:
                 resp = sess.request(method, url, data=data, headers=hdrs, timeout=to)
-            return resp
-        except Exception as e:
-            log.warning("Hikvision request failed (%s %s): %s", method, path, e)
-            raise
+                if resp.status_code == 401:
+                    # Test Basic auth without permanently mutating session auth
+                    try:
+                        resp_b = sess.request(method, url, data=data, headers=hdrs, timeout=to,
+                                              auth=HTTPBasicAuth(self.username, self.password))
+                        if resp_b.status_code == 200:
+                            return resp_b
+                    except Exception:
+                        pass
+                return resp
+            except Exception as e:
+                log.debug("Hikvision request failed (%s %s): %s", method, path, e)
+                raise
 
     def test_connection(self) -> dict:
         """Verify credentials and connectivity by requesting device info."""
@@ -120,6 +136,8 @@ class HikvisionClient:
                                 "brand": "hikvision",
                                 "stream_main": self.get_rtsp_url(cid, "main"),
                                 "stream_sub": self.get_rtsp_url(cid, "sub"),
+                                "rtsp_main": self.get_rtsp_url(cid, "main"),
+                                "rtsp_sub": self.get_rtsp_url(cid, "sub"),
                             })
                         except ValueError:
                             pass
@@ -151,6 +169,8 @@ class HikvisionClient:
                                     "brand": "hikvision",
                                     "stream_main": self.get_rtsp_url(cid, "main"),
                                     "stream_sub": self.get_rtsp_url(cid, "sub"),
+                                    "rtsp_main": self.get_rtsp_url(cid, "main"),
+                                    "rtsp_sub": self.get_rtsp_url(cid, "sub"),
                                 })
                         except ValueError:
                             pass
@@ -168,6 +188,8 @@ class HikvisionClient:
                     "brand": "hikvision",
                     "stream_main": self.get_rtsp_url(cid, "main"),
                     "stream_sub": self.get_rtsp_url(cid, "sub"),
+                    "rtsp_main": self.get_rtsp_url(cid, "main"),
+                    "rtsp_sub": self.get_rtsp_url(cid, "sub"),
                 })
 
         channels.sort(key=lambda x: x["id"])
@@ -176,20 +198,37 @@ class HikvisionClient:
     def get_snapshot(self, channel_id: int) -> bytes | None:
         """
         Fetch JPEG snapshot from NVR for the given channel.
-        Tries primary snapshot path first, then proxy fallback.
+        Uses cached working path for speed, and backs off offline channels.
         """
-        paths = [
+        now = time.time()
+        if channel_id in self._offline_channels:
+            if now < self._offline_channels[channel_id]:
+                return None
+            else:
+                del self._offline_channels[channel_id]
+
+        known_path = self._working_paths.get(channel_id)
+        candidates = [known_path] if known_path else []
+        candidates += [
             f"/ISAPI/Streaming/channels/{channel_id}01/picture",
             f"/ISAPI/ContentMgmt/StreamingProxy/channels/{channel_id}01/picture",
             f"/ISAPI/Streaming/channels/{channel_id}/picture",
+            f"/ISAPI/Streaming/channels/{channel_id}02/picture",
         ]
-        for path in paths:
+
+        for path in candidates:
+            if not path:
+                continue
             try:
-                resp = self._request("GET", path, timeout=4)
+                resp = self._request("GET", path, timeout=3)
                 if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
+                    self._working_paths[channel_id] = path
                     return resp.content
             except Exception:
                 continue
+
+        # If all paths failed, mark offline for 4 seconds to prevent stalling active streams
+        self._offline_channels[channel_id] = now + 4.0
         return None
 
     def ptz_continuous(self, channel_id: int, pan: int = 0, tilt: int = 0, zoom: int = 0) -> bool:

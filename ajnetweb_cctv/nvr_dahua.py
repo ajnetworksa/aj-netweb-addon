@@ -17,6 +17,9 @@ except ImportError:
 log = logging.getLogger("cctv.dahua")
 
 
+from threading import Lock
+import time
+
 class DahuaClient:
     def __init__(self, host: str, port: int = 80, rtsp_port: int = 554,
                  username: str = "admin", password: str = "", timeout: int = 8):
@@ -26,31 +29,43 @@ class DahuaClient:
         self.username = username.strip()
         self.password = password
         self.timeout = timeout
-        self.base_url = f"http://{self.host}:{self.port}"
+        proto = "https" if self.port in (443, 8443) else "http"
+        self.base_url = f"{proto}://{self.host}:{self.port}"
         self._session = None
+        self._lock = Lock()
+        self._offline_channels = {}
 
     def _get_session(self):
         if self._session is None:
             self._session = requests.Session()
+            self._session.verify = False
             # Dahua standard is HTTP Digest authentication
             self._session.auth = HTTPDigestAuth(self.username, self.password)
+            adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
+            self._session.mount("http://", adapter)
+            self._session.mount("https://", adapter)
         return self._session
 
     def _request(self, method: str, path: str, params=None, data=None, timeout=None):
         url = f"{self.base_url}{path}"
-        sess = self._get_session()
         to = timeout or self.timeout
 
-        try:
-            resp = sess.request(method, url, params=params, data=data, timeout=to)
-            # If 401 with Digest, try Basic auth fallback
-            if resp.status_code == 401 and isinstance(sess.auth, HTTPDigestAuth):
-                sess.auth = HTTPBasicAuth(self.username, self.password)
+        with self._lock:
+            sess = self._get_session()
+            try:
                 resp = sess.request(method, url, params=params, data=data, timeout=to)
-            return resp
-        except Exception as e:
-            log.warning("Dahua request failed (%s %s): %s", method, path, e)
-            raise
+                if resp.status_code == 401:
+                    try:
+                        resp_b = sess.request(method, url, params=params, data=data, timeout=to,
+                                              auth=HTTPBasicAuth(self.username, self.password))
+                        if resp_b.status_code == 200:
+                            return resp_b
+                    except Exception:
+                        pass
+                return resp
+            except Exception as e:
+                log.debug("Dahua request failed (%s %s): %s", method, path, e)
+                raise
 
     def test_connection(self) -> dict:
         """Verify credentials and connectivity by requesting device info."""
@@ -112,6 +127,8 @@ class DahuaClient:
                         "brand": "dahua",
                         "stream_main": self.get_rtsp_url(cid, "main"),
                         "stream_sub": self.get_rtsp_url(cid, "sub"),
+                        "rtsp_main": self.get_rtsp_url(cid, "main"),
+                        "rtsp_sub": self.get_rtsp_url(cid, "sub"),
                     })
         except Exception as e:
             log.debug("Dahua ChannelTitle query failed: %s", e)
@@ -128,6 +145,8 @@ class DahuaClient:
                     "brand": "dahua",
                     "stream_main": self.get_rtsp_url(cid, "main"),
                     "stream_sub": self.get_rtsp_url(cid, "sub"),
+                    "rtsp_main": self.get_rtsp_url(cid, "main"),
+                    "rtsp_sub": self.get_rtsp_url(cid, "sub"),
                 })
 
         channels.sort(key=lambda x: x["id"])
@@ -138,14 +157,23 @@ class DahuaClient:
         Fetch JPEG snapshot from Dahua NVR for the given channel.
         channel_id: 1-indexed
         """
+        now = time.time()
+        if channel_id in self._offline_channels:
+            if now < self._offline_channels[channel_id]:
+                return None
+            else:
+                del self._offline_channels[channel_id]
+
         # Dahua snapshot CGI accepts 1-based or 0-based channel
         for ch in [channel_id, channel_id - 1]:
             try:
-                resp = self._request("GET", "/cgi-bin/snapshot.cgi", params={"channel": ch}, timeout=4)
+                resp = self._request("GET", "/cgi-bin/snapshot.cgi", params={"channel": ch}, timeout=3)
                 if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
                     return resp.content
             except Exception:
                 continue
+
+        self._offline_channels[channel_id] = now + 4.0
         return None
 
     def ptz_start(self, channel_id: int, code: str, speed: int = 5) -> bool:

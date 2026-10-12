@@ -8,6 +8,14 @@ import re
 import urllib.parse
 from datetime import datetime
 
+import threading
+
+try:
+    import urllib3
+    urllib3.disable_warnings()
+except Exception:
+    pass
+
 try:
     import requests
     from requests.auth import HTTPBasicAuth, HTTPDigestAuth
@@ -26,29 +34,41 @@ class DahuaIntercomClient:
         self.username = username.strip()
         self.password = password
         self.timeout = timeout
-        self.base_url = f"http://{self.host}:{self.port}"
+        proto = "https" if self.port in (443, 8443) else "http"
+        self.base_url = f"{proto}://{self.host}:{self.port}"
         self._session = None
+        self._lock = threading.Lock()
 
     def _get_session(self):
         if self._session is None:
             self._session = requests.Session()
+            self._session.verify = False
             self._session.auth = HTTPDigestAuth(self.username, self.password)
+            adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
+            self._session.mount("http://", adapter)
+            self._session.mount("https://", adapter)
         return self._session
 
     def _request(self, method: str, path: str, params=None, data=None, timeout=None, stream=False):
         url = f"{self.base_url}{path}"
-        sess = self._get_session()
         to = timeout or self.timeout
 
-        try:
-            resp = sess.request(method, url, params=params, data=data, timeout=to, stream=stream)
-            if resp.status_code == 401 and isinstance(sess.auth, HTTPDigestAuth):
-                sess.auth = HTTPBasicAuth(self.username, self.password)
+        with self._lock:
+            sess = self._get_session()
+            try:
                 resp = sess.request(method, url, params=params, data=data, timeout=to, stream=stream)
-            return resp
-        except Exception as e:
-            log.warning("Dahua VTO request failed (%s %s): %s", method, path, e)
-            raise
+                if resp.status_code == 401:
+                    try:
+                        resp_b = sess.request(method, url, params=params, data=data, timeout=to, stream=stream,
+                                              auth=HTTPBasicAuth(self.username, self.password))
+                        if resp_b.status_code in (200, 204):
+                            return resp_b
+                    except Exception:
+                        pass
+                return resp
+            except Exception as e:
+                log.warning("Dahua VTO request failed (%s %s): %s", method, path, e)
+                raise
 
     def get_device_info(self) -> dict:
         """Fetch model and serial number."""

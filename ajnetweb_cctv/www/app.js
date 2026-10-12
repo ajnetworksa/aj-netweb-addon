@@ -14,7 +14,7 @@
     channels: [],
     activeTab: "grid",
     gridCols: 2,
-    streamMode: "mjpeg", // mjpeg | snapshot_fast | snapshot_slow
+    streamMode: localStorage.getItem("ajn_cctv_stream_mode") || "mjpeg", // mjpeg | snapshot_fast | snapshot_slow
     ptzChannel: 1,
     ptzSpeed: 5,
     presetMode: "goto", // goto | set
@@ -278,14 +278,20 @@
       });
     });
 
-    el.streamModeSelect.addEventListener("change", (e) => {
-      state.streamMode = e.target.value;
-      if (state.activeTab === "grid") {
-        renderGrid();
-      } else if (state.activeTab === "ptz") {
-        updatePtzLiveFeed();
-      }
-    });
+    if (el.streamModeSelect) {
+      el.streamModeSelect.value = state.streamMode;
+      el.streamModeSelect.addEventListener("change", (e) => {
+        state.streamMode = e.target.value;
+        try {
+          localStorage.setItem("ajn_cctv_stream_mode", state.streamMode);
+        } catch (_) {}
+        if (state.activeTab === "grid") {
+          renderGrid();
+        } else if (state.activeTab === "ptz") {
+          updatePtzLiveFeed();
+        }
+      });
+    }
 
     el.quickThemeSelect.addEventListener("change", (e) => {
       const t = e.target.value;
@@ -508,6 +514,18 @@
   }
 
   function bindGridEvents() {
+    el.cameraGrid.querySelectorAll(".tile-image").forEach((img) => {
+      img.onerror = () => {
+        const tile = img.closest(".camera-tile");
+        const cid = tile ? tile.dataset.id : null;
+        if (cid) {
+          setTimeout(() => {
+            img.src = `api/snapshot/${cid}?_t=${Date.now()}`;
+          }, 1500);
+        }
+      };
+    });
+
     el.cameraGrid.querySelectorAll(".btn-snap").forEach((b) => {
       b.addEventListener("click", (e) => {
         e.stopPropagation();

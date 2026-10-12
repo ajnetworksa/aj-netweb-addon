@@ -45,10 +45,62 @@ _client_brand = None
 _config_cache = {}
 
 
+import base64
+import socket
+
+# Valid 3.2KB JPEG byte frame (dark slate background with camera icon)
+FALLBACK_JPEG_B64 = (
+    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//"
+    "2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0//wAARCAC0AUADASIAAhEBAxEB/8QA"
+    "HwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkK"
+    "FhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXG"
+    "x8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECA"
+    "xEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEh"
+    "YaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDz6iiitiAoo"
+    "ooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKAC"
+    "iiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAoooo"
+    "AKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACii"
+    "igAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigDQttF1G7t1nt7ffG+cNvUZw"
+    "cdzUv8Awjurf8+n/kRP8aNQ/wCQBpP/AG2/9CFZVaNRWlv6+4wi6ktU1u+nn6mr/wAI7q3/AD6f+RE/xo/4R3Vv+fT/AMiJ/jWVRSvDs/v/AOAVap3X3f8A"
+    "BNX/AIR3Vv8An0/8iJ/jR/wjurf8+n/kRP8AGsqii8Oz+/8A4AWqd193/BLt5pV9YxCW6g8tC20Hep5/A+1Uq1f+ZU/7fv8A2nWVRNJbDpybT5gora0/w3"
+    "e3eHnH2aP1cfMev8P+OOtZl7CtvfXECElY5GQE9cA4ocJJXaCNWEpOMWQUUUVBoFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQ"
+    "AUUUUAFFFFABRRRQBq6h/yANJ/7bf8AoQrKrV1D/kAaT/22/wDQhWVVz3+S/IypfD83+bNe3hh0ywiv7uBZ5rjIghkB2gY++Rjntgehz9D/hJNSaRjI8Ukb"
+    "ZzE0Y2kHt64/GjWozJZabdx/NCbZYcgHhlzkH9fyNZFVKTi7RIhCNRc01d/kat/aw3FkNVso/LjaQpLCMkRN6g46Hj6E4+mVWvaxmDwzfTS/KtzJHHFwfmKn"
+    "J/Dr+RrIqZ9H3LpPddmdHpGmtqmgGBZRGFuy7MRnjYBwPqRXQafo9lp+Ggi3SD/lo/Ld/y644qh4N/5BMv/Xc/+grW9XdRhHlUrank4mrPnlC+gV5xqv8AyF"
+    "rz/ru/8A6Ea9Hrzi/srmbVrwxQSSL578qpI6mlivssvL2lzXZXoq1/Zd9/z6y/8AfNH9l33/AD6y/wDfNcV0eopLurFWirX9l33/AD6y/wDfNH9l33/PrL/3"
+    "zRdApLurFWirX9l33/PrL/3zR/Zd9/z6y/8AfNF0Cku6sVaKtf2Xff8APrL/AN80f2Xff8+sv/fNF0Cku6sVaKtf2Xff8+sv/fNH9l33/PrL/wB80XQKS7qx"
+    "Voq1/Zd9/wA+sv8A3zR/Zd9/z6y/980XQKS7qxVoq1/Zd9/z6y/980f2Xff8+sv/AHzRdApLurFWirX9l33/AD6y/wDfNH9l33/PrL/3zRdApLurFWirX9l3"
+    "3/PrL/3zR/Zd9/z6y/8AfNF0Cku6sVaKtf2Xff8APrL/AN80f2Xff8+sv/fNF0Cku6sVaKtf2Xff8APrL/AN80f2Xff8+sv/fNF0Cku6sVaKtf2Xff8+sv/A"
+    "3zR/Zd9/z6y/980XQKS7qxVoq1/Zd9/z6y/980f2Xff8+sv/AHzRdApLurFWirX9l33/AD6y/wDfNH9l33/PrL/3zRdApLurFWirX9l33/PrL/3zR/Zd9/z6"
+    "y/8AfNF0Cku6sVaKtf2Xff8APrL/AN80f2Xff8+sv/fNF0Cku6sVaKtf2Xff8APrL/AN80f2Xff8+sv/fNF0Cku6sVaKtf2Xff8+sv/fNH9l33/PrL/wB80"
+    "XQKS7qx0f8AYv8AyANN/wDAf/61H9i/9QDTP/Af/wCtWf8Ab57bTLCJFR1+zg/Mv+01V/7bvP7kX/fP/wBesXGbehlCVS2jX3f8A1f7F/6gGmf+A//ANaj"
+    "+xf+oBpn/gP/APWrK/tu8/uRf98//Xo/tu8/uRf98//AFqXLPsPnrd193/BNX+xf+oBpn/gP/8AWo/sX/qAaZ/4D/8A1qyv7bvP7kX/AHz/APXo/tu8/uRf"
+    "98//AFqOWfYPet3X3f8ABNX+xf8AqAaZ/wCA/wD9aj+xf+oBpn/gP/8AWpK8/wD7bvP7kX/fP/16P7bvP7kX/fP/ANajln2D2tbuvuf+Y67ie2upIXhjiZ"
+    "DgxqMBe/FM8x/L8ve2zO7bnjPr9aqXFzLdTtPMQZGxk4x2qOk1fc0i2kru7LHmP5flysU74zxn19qPMk8vyvMby87tueM+uKr0UWHf0+4seZJ5fleY3l53"
+    "bc8Z9cUeZJ5fleY3l53bc8Z9cffVeiixF/T7ix5j+X5fmN5ed23PGfXFJJLJK26WRpGxjLEk4qCiiw7k3mSeX5XmN5ed23PGfXFDTSuu15XZc5wWJGaioos"
+    "K47zH8vy97bM7tueM+v1pfMfy/L8xvLzu254z64qOiiwXJPNk2KnmNsU5AzwD7Uea/mGTzG8w/xbjnpjrUdFFguO8x/L8ve2zO7bnjPr9aPMk8vyvMby87t"
+    "ueM+uKbRRYLjvMfyzHvbyyd23PGfXH4Ub38vy97bM7tueM+uKZRRYdx3mSeX5XmN5ed23PGfXFBkkKhTI21TkDPAPtTaKLBck82TzPM8xvM/vbueOOtHmyb"
+    "GTzG2MckZ4J9TTKKLBcd5kmzy97bM7tueM+uPrR5kmzyvMby87tueM+uKbRRYLjvMfyzHvbyyd23PGfXFFNoosF2O8yTy/K8xvLzu254z64pfMk8vyvMby8"
+    "7tueM+uKZRRYV7jvMk2eX5jbM5254z64/CjzH8vy97bM7tueM+v1ptFFgux3mSeX5XmN5ed23PGfXFBkkKhTI21TkDPAPtTaKLBcd5kmzy97bM7tueM+uPr"
+    "R5kmzyvMby87tueM+uKbRRYLscskkbbo5GVsYypIOKZRRRYLsk8yTy/K8xvLzu254z64/CgSybVTzG2qcgZ4B9qZRRYdxxkkZQrSMVByATwD60eZJs8ve2z"
+    "O7bnjPrj602iiwXY7zJPL8rzG8vO7bnjPrixRRRYLs//2Q=="
+)
+FALLBACK_JPEG = base64.b64decode(FALLBACK_JPEG_B64)
+
+
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Multi-threaded HTTP server allowing parallel low-latency MJPEG camera streams."""
     daemon_threads = True
     allow_reuse_address = True
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            try:
+                self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+            except OSError:
+                pass
+        super().server_bind()
 
 
 def load_config() -> dict:
@@ -245,8 +297,8 @@ def init_all_devices(devs: list = None):
                         "channel_name": ch.get("name", f"Camera {orig_cid}"),
                         "online": ch.get("online", True),
                         "ptz_support": ch.get("ptz_support", False),
-                        "rtsp_main": ch.get("rtsp_main", ""),
-                        "rtsp_sub": ch.get("rtsp_sub", ""),
+                        "rtsp_main": ch.get("rtsp_main") or ch.get("stream_main") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}01",
+                        "rtsp_sub": ch.get("rtsp_sub") or ch.get("stream_sub") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}02",
                     }
 
                     new_channel_map[str(g_cid)] = mapping
@@ -326,16 +378,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def _placeholder_jpeg(self, label: str = "Camera") -> bytes:
-        """Fallback SVG to return if camera snapshot is not available."""
-        svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
-  <rect width="640" height="360" fill="#080c14" />
-  <circle cx="320" cy="160" r="50" fill="#111827" stroke="#1f2937" stroke-width="4"/>
-  <circle cx="320" cy="160" r="24" fill="#0284c7" opacity="0.3"/>
-  <circle cx="320" cy="160" r="10" fill="#38bdf8"/>
-  <text x="320" y="240" font-family="-apple-system, sans-serif" font-size="18" fill="#94a3b8" text-anchor="middle" font-weight="600">{label}</text>
-  <text x="320" y="265" font-family="-apple-system, sans-serif" font-size="12" fill="#475569" text-anchor="middle">Awaiting NVR stream...</text>
-</svg>"""
-        return svg.encode("utf-8")
+        """Return valid JPEG binary frame so multipart MJPEG decoder never receives malformed text."""
+        return FALLBACK_JPEG
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
@@ -456,9 +500,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                     log.debug("Snapshot fetch failed (%s): %s", cid_raw, e)
 
             # Fallback placeholder
-            label = info.get("channel_name", f"Camera {cid_raw}") if info else f"Camera {cid_raw}"
-            ph = self._placeholder_jpeg(label)
-            self._send_image(ph, "image/svg+xml", filename=filename)
+            ph = self._placeholder_jpeg()
+            self._send_image(ph, "image/jpeg", filename=filename)
             return
 
         if path.startswith("/api/mjpeg/"):

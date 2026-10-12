@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb CCTV & NVR Studio",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "slug": "ajnetweb_cctv",
   "description": "Professional Hikvision & Dahua CCTV Camera Viewer with Instant SADP & ONVIF Device Discovery, Multi-channel Grid, Full PTZ Controller, and NVR Playback Timeline for Home Assistant.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
