@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 1.3.2
+- **Overhauled Dual-Mode Architecture (📱 Mobile Mode & 📟 Wall Console)**:
+  - **Zero Entity Clutter**: Automatically prunes unconfigured firmware noise, raw IEEE hex switches (`0xa4c1...`), internal configuration options, backlight modes, motor reversals, and calibration flags.
+  - **Auto Device Support**: Strictly populates only real controllable devices present in the residence. Door relays mapped directly to access control / gate strikes.
+  - **📱 Mobile Mode (`path: "home"`)**: Optimized 2-column stream for smartphones with glance weather/residence bar, 1-tap gate unlock strip (Main Gate, Pedestrian Gate, Garage Door), live doorbell preview, living room AC thermostat, and real lighting sliders.
+  - **📟 Wall Console Mode (`path: "tablet"`)**: Wide 4-column console for wall touch panels & tablets (Hikvision DS-KH9510, Android kiosks, iPads) with 4-channel live surveillance quad matrix, master command buttons, and room hubs.
+  - **Apple Frosted Glass Styling**: Seamless frosted glass blur, 18px rounded tiles, glowing borders, and high touch target reachability.
+  - **Resolved 404 Routing on Deploy**: Fixed client routing and added direct launch buttons for Mobile Mode, Wall Console, and Main URL.
+
 ## 1.1.0
 - **GCC Luxury Villa Super-Features (Turnkey Blueprints Suite)**:
   - Bundled 3 production-grade Home Assistant automation blueprints installed directly into `/config/blueprints/automation/ajnetweb/`:

@@ -238,13 +238,17 @@
           const d = res.data;
           el.deployFeedback.className = "deploy-feedback show success";
           el.deployFeedback.innerHTML = `
-            <div style="font-weight:700; margin-bottom:6px;">✓ Dashboard deployed successfully!</div>
+            <div style="font-weight:700; margin-bottom:6px; font-size:1.05rem;">✓ Dashboard Deployed &amp; Ready in Home Assistant!</div>
+            <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:10px;">Select your preferred viewing mode:</div>
             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
-              <a href="/${escapeHtml(d.url_path)}" target="_top" class="primary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
-                🚀 Open Dashboard (/${escapeHtml(d.url_path)})
+              <a href="/${escapeHtml(d.url_path)}/home" target="_top" class="primary-btn" style="display:inline-block; text-decoration:none; padding:10px 18px; border-radius:12px; font-weight:600;">
+                📱 Open Mobile Mode
               </a>
-              <a href="/${escapeHtml(d.url_path)}" target="_blank" class="secondary-btn" style="display:inline-block; text-decoration:none; padding:8px 16px;">
-                ↗ Open in New Tab
+              <a href="/${escapeHtml(d.url_path)}/tablet" target="_top" class="primary-btn" style="display:inline-block; text-decoration:none; padding:10px 18px; border-radius:12px; font-weight:600; background:linear-gradient(135deg, #4f46e5, #7c3aed);">
+                📟 Open Wall Console (Tab Mode)
+              </a>
+              <a href="/${escapeHtml(d.url_path)}" target="_top" class="secondary-btn" style="display:inline-block; text-decoration:none; padding:10px 18px; border-radius:12px;">
+                🚀 Open Dashboard (/${escapeHtml(d.url_path)})
               </a>
             </div>
           `;

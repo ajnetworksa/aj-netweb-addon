@@ -447,8 +447,8 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
     is_critical = _config_cache.get("critical_push_sound", True)
 
     payload_data = {
-        "title": f"🔔 Doorbell Ringing - {door_name}",
-        "message": f"Visitor at {door_name} is calling... Tap to open or view.",
+        "title": f"📞 Visitor Calling - {door_name}",
+        "message": f"Visitor is calling at {door_name}. Tap to answer or open door.",
         "data": {
             "image": local_image_url,
             "attachment": {
@@ -456,20 +456,28 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
                 "content-type": "jpeg",
                 "hide-thumbnail": False,
             },
-            "clickAction": "/ajnetweb_intercom",
-            "url": "/ajnetweb_intercom",
+            "clickAction": "/67bcea52_ajnetweb_intercom",
+            "url": "/67bcea52_ajnetweb_intercom",
             "ttl": 0,
             "priority": "high",
+            "importance": "high",
+            "channel": "Doorbell Call",
+            "alarm_stream": True,
+            "notification_icon": "mdi:phone-incoming",
+            "vibrationPattern": "100, 1000, 200, 1000, 200, 1000",
+            "ledColor": "red",
+            "color": "#10b981",
+            "tag": "ajnetweb_doorbell",
+            "persistent": True,
+            "sticky": True,
             "push": {
                 "sound": {
-                    "name": "default",
+                    "name": "doorbell_chime.wav",
                     "critical": 1 if is_critical else 0,
                     "volume": 1.0,
                 },
                 "interruption-level": "critical" if is_critical else "time-sensitive",
             },
-            "channel": "Doorbell",
-            "importance": "high",
             "actions": [
                 {
                     "action": "AJNETWEB_UNLOCK_1",
@@ -483,8 +491,13 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
                 },
                 {
                     "action": "URI",
-                    "title": "📹 View Live Camera",
-                    "uri": "/ajnetweb_intercom",
+                    "title": "📹 Answer / Live View",
+                    "uri": "/67bcea52_ajnetweb_intercom",
+                },
+                {
+                    "action": "URI",
+                    "title": "📱 Open Dashboard",
+                    "uri": "/ajnetweb",
                 },
             ],
         },
@@ -705,10 +718,35 @@ def on_door_event(event_info: dict):
         _last_ring_time = now
 
         # Grab and persist snapshot if enabled
-        if _config_cache.get("auto_snapshot_on_ring", True) and _active_client:
-            try:
-                snap = _active_client.get_snapshot()
-                if snap:
+        if _config_cache.get("auto_snapshot_on_ring", True):
+            snap = None
+            if _active_client:
+                try:
+                    snap = _active_client.get_snapshot()
+                except Exception as e:
+                    log.warning("Active client snapshot failed: %s", e)
+
+            # Fallback to Home Assistant camera proxy (e.g. camera.192_168_8_2)
+            sup_token = os.environ.get("SUPERVISOR_TOKEN")
+            if not snap and sup_token:
+                import urllib.request
+                for cam_id in ["camera.192_168_8_2", "camera.doorbell", "camera.bullet_cam"]:
+                    try:
+                        req = urllib.request.Request(
+                            f"http://supervisor/core/api/camera_proxy/{cam_id}",
+                            headers={"Authorization": f"Bearer {sup_token}"}
+                        )
+                        with urllib.request.urlopen(req, timeout=4) as r:
+                            data = r.read()
+                            if data and len(data) > 1000:
+                                snap = data
+                                log.info("Captured snapshot from Home Assistant entity %s (%d bytes)", cam_id, len(data))
+                                break
+                    except Exception:
+                        continue
+
+            if snap:
+                try:
                     fn = f"ring_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
                     fp = os.path.join(VISITORS_DIR, fn)
                     with open(fp, "wb") as f:
@@ -716,18 +754,21 @@ def on_door_event(event_info: dict):
                     snapshot_filename = fn
                     event_info["snapshot_url"] = f"api/visitors/image/{fn}"
 
-                    # Mirror snapshot to HA /config/www/ajnetweb_intercom so Companion App loads image
-                    try:
-                        if os.path.exists("/config/www"):
-                            os.makedirs(HA_WWW_DIR, exist_ok=True)
-                            with open(os.path.join(HA_WWW_DIR, "latest_ring.jpg"), "wb") as f:
+                    # Mirror snapshot to both /config/www and /homeassistant/www so Companion App loads image
+                    for base_www in ["/config/www", "/homeassistant/www"]:
+                        try:
+                            target_dir = os.path.join(base_www, "ajnetweb_intercom")
+                            os.makedirs(target_dir, exist_ok=True)
+                            with open(os.path.join(target_dir, "latest_ring.jpg"), "wb") as f:
                                 f.write(snap)
-                            with open(os.path.join(HA_WWW_DIR, fn), "wb") as f:
+                            with open(os.path.join(target_dir, fn), "wb") as f:
                                 f.write(snap)
-                    except Exception as err:
-                        log.debug("Could not mirror snapshot to HA www: %s", err)
-            except Exception as e:
-                log.error("Failed to capture visitor snapshot: %s", e)
+                            os.chmod(os.path.join(target_dir, "latest_ring.jpg"), 0o644)
+                            os.chmod(os.path.join(target_dir, fn), 0o644)
+                        except Exception as err:
+                            log.debug("Could not mirror snapshot to %s: %s", base_www, err)
+                except Exception as e:
+                    log.error("Failed to persist visitor snapshot: %s", e)
 
         record_visitor_event("doorbell_ring", "Doorbell button pressed", snapshot_filename)
         notify_homeassistant_event("ajnetweb_doorbell_ring", event_info)

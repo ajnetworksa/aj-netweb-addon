@@ -1,6 +1,16 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
-## 1.2.0
+## 1.4.3
+- **Calling-Style Mobile Push Notifications**:
+  - Doorbell rings deliver continuous alarm stream audio (`alarm_stream: True`, `importance: "high"`, `priority: "high"`) waking Android and iOS screens with incoming call ringback.
+  - Custom vibration pattern, persistent/sticky banner, red LED notification alert, and iOS critical chime (`doorbell_chime.wav`).
+  - Corrected Ingress external link deep-action: tapping "Answer / Live View" now points directly to valid ingress path `/67bcea52_ajnetweb_intercom` and adds "Open Dashboard" shortcut (`/ajnetweb`).
+  - High-reliability visitor snapshot engine: falls back to Home Assistant camera proxy (`/core/api/camera_proxy/camera.192_168_8_2`) if camera ISAPI client is busy, mirroring to both `/config/www` and `/homeassistant/www` with `0o644` permissions.
+- **Kiosk View Mode vs Administrator Editor Mode**:
+  - Operator/View mode hides credential provisioning, hardware learning, and device editing to prevent accidental alterations on wall tablets.
+  - Dedicated "Outdoor Reader Hardware Learning Mode" moved cleanly into Credentials & Passes tab away from live view stream.
+
+## 1.4.2
 - **Room-to-Room Inter-Display Calling & Villa Broadcast System**:
   - **Direct Room-to-Room Calling (1-to-1)**: Call from one wall display/tablet to another (e.g. Master Bedroom to Kitchen or Majlis to Living Room) with full-screen calling dialog, telephone warble chime, and two-way audio.
   - **Villa All-Call Public Address (PA Broadcast)**: Broadcast audio chimes and voice announcements to all connected wall displays simultaneously ("Dinner is ready", "Guests in Majlis", "School bus has arrived") with automated Text-to-Speech playback.
