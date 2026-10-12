@@ -271,22 +271,40 @@ class HikvisionIntercomClient:
         """
         Persistent background listener for /ISAPI/Event/notification/alertStream.
         Invokes event_callback(event_type, details) when rings or door releases occur.
+        Uses a dedicated urllib digest opener to prevent nonce desynchronization across concurrent threads.
         """
+        import urllib.request
+        import ssl
+
         log.info("Connecting to Hikvision alertStream event listener...")
+        url = f"{self.base_url}/ISAPI/Event/notification/alertStream"
+
+        passman = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        passman.add_password(None, url, self.username, self.password)
+        authhandler = urllib.request.HTTPDigestAuthHandler(passman)
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        https_handler = urllib.request.HTTPSHandler(context=ctx)
+
+        opener = urllib.request.build_opener(authhandler, https_handler)
+
         try:
-            resp = self._request("GET", "/ISAPI/Event/notification/alertStream", stream=True, timeout=90)
-            if resp.status_code != 200:
-                log.warning("alertStream returned HTTP %s", resp.status_code)
+            resp = opener.open(url, timeout=90)
+            if resp.getcode() != 200:
+                log.warning("alertStream returned HTTP %s", resp.getcode())
                 time.sleep(5)
                 return
 
+            log.info("Hikvision alertStream connected successfully!")
             buf = ""
-            for chunk in resp.iter_lines():
-                if not chunk:
-                    continue
-                if isinstance(chunk, bytes):
-                    chunk = chunk.decode("utf-8", errors="replace")
-                buf += chunk + "\n"
+            while True:
+                line = resp.readline()
+                if not line:
+                    break
+                line_str = line.decode("utf-8", errors="replace")
+                buf += line_str
                 if "</EventNotificationAlert>" in buf:
                     # Parse event block
                     m_type = re.search(r"<eventType>(.*?)</eventType>", buf)
