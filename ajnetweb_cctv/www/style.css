@@ -354,17 +354,21 @@ body {
   background: var(--bg-hover);
 }
 
-.tile-feed {
+.tile-feed,
+.tile-viewport {
   position: relative;
   width: 100%;
-  padding-top: 56.25%; /* 16:9 widescreen */
+  padding-top: 56.25%; /* 16:9 widescreen aspect ratio */
   background: #000;
   cursor: crosshair;
   overflow: hidden;
   user-select: none;
+  min-height: 180px;
 }
 
-.tile-feed img {
+.tile-feed img,
+.tile-viewport img,
+.tile-image {
   position: absolute;
   top: 0;
   left: 0;
@@ -373,10 +377,12 @@ body {
   object-fit: cover;
   transition: transform 0.08s ease-out;
   transform-origin: center center;
+  display: block;
 }
 
 /* OSD Overlay inside Feed */
-.feed-osd {
+.feed-osd,
+.tile-osd {
   position: absolute;
   top: 8px;
   left: 10px;
@@ -387,8 +393,26 @@ body {
   pointer-events: none;
   z-index: 5;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.tile-name-group,
+.tile-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.pulse-dot,
+.rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 6px var(--danger);
+  animation: pulse-rec 1.8s infinite;
 }
 
 .feed-osd-bottom {

@@ -467,10 +467,8 @@
     el.cameraGrid.className = `camera-grid cols-${state.gridCols}`;
     el.cameraGrid.innerHTML = displayChannels
       .map((c) => {
-        const streamSrc =
-          state.streamMode === "mjpeg"
-            ? `api/mjpeg/${c.id}`
-            : `api/snapshot/${c.id}?_t=${Date.now()}`;
+        // Always seed with an immediate snapshot so the tile displays video immediately without delay
+        const initialSrc = `api/snapshot/${c.id}?_t=${Date.now()}`;
         return `
         <div class="camera-tile" data-id="${c.id}" id="camTile_${c.id}">
           <div class="tile-header">
@@ -502,7 +500,7 @@
               <span>CH ${c.id}</span>
               <span class="live-clock">--:--:--</span>
             </div>
-            <img class="tile-image" src="${streamSrc}" alt="${escapeHtml(c.name)}" loading="lazy">
+            <img class="tile-image" src="${initialSrc}" alt="${escapeHtml(c.name)}">
           </div>
         </div>
       `;
@@ -511,6 +509,19 @@
 
     bindGridEvents();
     setupRefreshTimer();
+
+    // If stream mode is mjpeg, transition image sources after initial snapshot renders
+    if (state.streamMode === "mjpeg") {
+      setTimeout(() => {
+        el.cameraGrid.querySelectorAll(".camera-tile").forEach((tile) => {
+          const cid = tile.dataset.id;
+          const img = tile.querySelector(".tile-image");
+          if (img && cid) {
+            img.src = `api/mjpeg/${cid}`;
+          }
+        });
+      }, 400);
+    }
   }
 
   function bindGridEvents() {
@@ -521,7 +532,7 @@
         if (cid) {
           setTimeout(() => {
             img.src = `api/snapshot/${cid}?_t=${Date.now()}`;
-          }, 1500);
+          }, 1000);
         }
       };
     });
@@ -580,14 +591,18 @@
       state.refreshTimer = null;
     }
     if (state.streamMode.startsWith("snapshot_")) {
-      const interval = state.streamMode === "snapshot_fast" ? 1000 : 3000;
+      const interval = state.streamMode === "snapshot_fast" ? 1200 : 3000;
       state.refreshTimer = setInterval(() => {
         if (state.activeTab === "grid") {
           el.cameraGrid.querySelectorAll(".camera-tile").forEach((tile) => {
             const cid = tile.dataset.id;
             const img = tile.querySelector(".tile-image");
-            if (img) {
-              img.src = `api/snapshot/${cid}?_t=${Date.now()}`;
+            if (img && cid) {
+              const next = new Image();
+              next.onload = () => {
+                img.src = next.src;
+              };
+              next.src = `api/snapshot/${cid}?_t=${Date.now()}`;
             }
           });
         }
@@ -666,10 +681,11 @@
       el.ptzOsdTitle.textContent = `CH ${state.ptzChannel} · ${(curChannel?.name || "CAMERA").toUpperCase()}`;
     }
 
+    el.ptzLiveImage.src = `api/snapshot/${state.ptzChannel}?_t=${Date.now()}`;
     if (state.streamMode === "mjpeg") {
-      el.ptzLiveImage.src = `api/mjpeg/${state.ptzChannel}`;
-    } else {
-      el.ptzLiveImage.src = `api/snapshot/${state.ptzChannel}?_t=${Date.now()}`;
+      setTimeout(() => {
+        el.ptzLiveImage.src = `api/mjpeg/${state.ptzChannel}`;
+      }, 300);
     }
   }
 

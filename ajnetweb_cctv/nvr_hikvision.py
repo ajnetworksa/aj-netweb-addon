@@ -38,37 +38,37 @@ class HikvisionClient:
         self._offline_channels = {}
 
     def _get_session(self):
-        if self._session is None:
-            self._session = requests.Session()
-            self._session.verify = False
-            self._session.auth = HTTPDigestAuth(self.username, self.password)
-            adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
-            self._session.mount("http://", adapter)
-            self._session.mount("https://", adapter)
-        return self._session
+        with self._lock:
+            if self._session is None:
+                self._session = requests.Session()
+                self._session.verify = False
+                self._session.auth = HTTPDigestAuth(self.username, self.password)
+                adapter = requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16)
+                self._session.mount("http://", adapter)
+                self._session.mount("https://", adapter)
+            return self._session
 
     def _request(self, method: str, path: str, data=None, headers=None, timeout=None):
         url = f"{self.base_url}{path}"
         to = timeout or self.timeout
         hdrs = headers or {}
 
-        with self._lock:
-            sess = self._get_session()
-            try:
-                resp = sess.request(method, url, data=data, headers=hdrs, timeout=to)
-                if resp.status_code == 401:
-                    # Test Basic auth without permanently mutating session auth
-                    try:
-                        resp_b = sess.request(method, url, data=data, headers=hdrs, timeout=to,
-                                              auth=HTTPBasicAuth(self.username, self.password))
-                        if resp_b.status_code == 200:
-                            return resp_b
-                    except Exception:
-                        pass
-                return resp
-            except Exception as e:
-                log.debug("Hikvision request failed (%s %s): %s", method, path, e)
-                raise
+        sess = self._get_session()
+        try:
+            resp = sess.request(method, url, data=data, headers=hdrs, timeout=to)
+            if resp.status_code == 401:
+                # Test Basic auth without permanently mutating session auth
+                try:
+                    resp_b = sess.request(method, url, data=data, headers=hdrs, timeout=to,
+                                          auth=HTTPBasicAuth(self.username, self.password))
+                    if resp_b.status_code == 200:
+                        return resp_b
+                except Exception:
+                    pass
+            return resp
+        except Exception as e:
+            log.debug("Hikvision request failed (%s %s): %s", method, path, e)
+            raise
 
     def test_connection(self) -> dict:
         """Verify credentials and connectivity by requesting device info."""
@@ -208,8 +208,17 @@ class HikvisionClient:
                 del self._offline_channels[channel_id]
 
         known_path = self._working_paths.get(channel_id)
-        candidates = [known_path] if known_path else []
-        candidates += [
+        if known_path:
+            try:
+                resp = self._request("GET", known_path, timeout=2.5)
+                if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
+                    return resp.content
+            except Exception:
+                pass
+            # If known path failed once, clear it and fall through to re-probe
+            self._working_paths.pop(channel_id, None)
+
+        candidates = [
             f"/ISAPI/Streaming/channels/{channel_id}01/picture",
             f"/ISAPI/ContentMgmt/StreamingProxy/channels/{channel_id}01/picture",
             f"/ISAPI/Streaming/channels/{channel_id}/picture",
@@ -217,18 +226,16 @@ class HikvisionClient:
         ]
 
         for path in candidates:
-            if not path:
-                continue
             try:
-                resp = self._request("GET", path, timeout=3)
+                resp = self._request("GET", path, timeout=1.5)
                 if resp.status_code == 200 and resp.content and resp.content.startswith(b"\xff\xd8"):
                     self._working_paths[channel_id] = path
                     return resp.content
             except Exception:
                 continue
 
-        # If all paths failed, mark offline for 4 seconds to prevent stalling active streams
-        self._offline_channels[channel_id] = now + 4.0
+        # If all paths failed, mark offline for 8 seconds to prevent stalling active streams
+        self._offline_channels[channel_id] = now + 8.0
         return None
 
     def ptz_continuous(self, channel_id: int, pan: int = 0, tilt: int = 0, zoom: int = 0) -> bool:

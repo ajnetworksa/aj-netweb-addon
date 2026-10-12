@@ -935,7 +935,10 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Cache-Control", "no-cache, private")
+            self.send_header("Cache-Control", "no-cache, private, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
+            self.send_header("X-Accel-Buffering", "no")
             self.end_headers()
 
             ph = self._placeholder_jpeg()
@@ -945,9 +948,11 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                     if not img:
                         img = ph
                     self.wfile.write(b"--frame\r\n")
-                    self.wfile.write(b"Content-Type: image/jpeg\r\n\r\n")
+                    self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                    self.wfile.write(f"Content-Length: {len(img)}\r\n\r\n".encode("ascii"))
                     self.wfile.write(img)
                     self.wfile.write(b"\r\n")
+                    self.wfile.flush()
                     time.sleep(0.35)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
