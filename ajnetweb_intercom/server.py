@@ -752,7 +752,7 @@ def event_monitor_worker():
                 time.sleep(5)
         except Exception as e:
             log.warning("Event stream worker error: %s. Reconnecting in 5s...", e)
-            time.sleep(5)
+        time.sleep(3)
 
 
 def start_event_listener():

@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Intercom & Door Station Studio",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "slug": "ajnetweb_intercom",
   "description": "Professional Video Intercom & Access Control Terminal Studio for Hikvision & Dahua with Instant SADP & ONVIF Device Discovery. Room-to-Room Inter-Display Calling, Villa All-Call PA Broadcast, direct ISAPI QR code & PIN provisioning, and dynamic mobile push.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",

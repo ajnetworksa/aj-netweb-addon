@@ -228,12 +228,15 @@ class HikvisionIntercomClient:
             resp = self._request("GET", "/ISAPI/Event/notification/alertStream", stream=True, timeout=90)
             if resp.status_code != 200:
                 log.warning("alertStream returned HTTP %s", resp.status_code)
+                time.sleep(5)
                 return
 
             buf = ""
-            for chunk in resp.iter_lines(decode_unicode=True):
+            for chunk in resp.iter_lines():
                 if not chunk:
                     continue
+                if isinstance(chunk, bytes):
+                    chunk = chunk.decode("utf-8", errors="replace")
                 buf += chunk + "\n"
                 if "</EventNotificationAlert>" in buf:
                     # Parse event block
@@ -264,7 +267,8 @@ class HikvisionIntercomClient:
                         })
                     buf = ""
         except Exception as e:
-            log.warning("Hikvision alertStream disconnected: %s", e)
+            log.warning("Hikvision alertStream disconnected: %s. Reconnecting in 5s...", e)
+            time.sleep(5)
 
     # ---------------------------------------------------------------- Access Control & Guest QR / PIN Credentials
     # Supported terminals: DS-K1T502, DS-K1T671, DS-K1T673, DS-K1T321, DS-K1T342, and all MinMoe series
