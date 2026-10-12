@@ -53,25 +53,27 @@ class DahuaIntercomClient:
         url = f"{self.base_url}{path}"
         to = timeout or self.timeout
 
-        with self._lock:
-            sess = self._get_session()
-            try:
-                resp = sess.request(method, url, params=params, data=data, timeout=to, stream=stream)
-                if resp.status_code == 401:
-                    try:
-                        resp_b = sess.request(method, url, params=params, data=data, timeout=to, stream=stream,
-                                              auth=HTTPBasicAuth(self.username, self.password))
-                        if resp_b.status_code in (200, 204):
-                            return resp_b
-                    except Exception:
-                        pass
-                return resp
-            except Exception as e:
-                log.warning("Dahua VTO request failed (%s %s): %s", method, path, e)
-                raise
+        sess = self._get_session()
+        try:
+            resp = sess.request(method, url, params=params, data=data, timeout=to, stream=stream)
+            if resp.status_code == 401:
+                try:
+                    resp_b = sess.request(method, url, params=params, data=data, timeout=to, stream=stream,
+                                          auth=HTTPBasicAuth(self.username, self.password))
+                    if resp_b.status_code in (200, 204):
+                        return resp_b
+                except Exception:
+                    pass
+            return resp
+        except Exception as e:
+            log.warning("Dahua VTO request failed (%s %s): %s", method, path, e)
+            raise
 
     def get_device_info(self) -> dict:
         """Fetch model and serial number."""
+        if hasattr(self, "_cached_device_info") and self._cached_device_info:
+            return self._cached_device_info
+
         res = {
             "brand": "Dahua",
             "model": "VTO Door Station",
@@ -80,7 +82,7 @@ class DahuaIntercomClient:
             "device_name": "Dahua Video Doorbell",
         }
         try:
-            resp = self._request("GET", "/cgi-bin/magicBox.cgi", params={"action": "getSystemInfo"})
+            resp = self._request("GET", "/cgi-bin/magicBox.cgi", params={"action": "getSystemInfo"}, timeout=3)
             if resp.status_code == 200:
                 for line in resp.text.splitlines():
                     if "=" in line:
@@ -94,9 +96,10 @@ class DahuaIntercomClient:
                         elif k == "version":
                             res["firmware"] = v
 
-            resp_dev = self._request("GET", "/cgi-bin/magicBox.cgi", params={"action": "getDeviceType"})
+            resp_dev = self._request("GET", "/cgi-bin/magicBox.cgi", params={"action": "getDeviceType"}, timeout=3)
             if resp_dev.status_code == 200 and "=" in resp_dev.text:
                 res["device_name"] = resp_dev.text.split("=", 1)[1].strip() or res["device_name"]
+            self._cached_device_info = res
         except Exception as e:
             log.error("Failed to query Dahua VTO device info: %s", e)
         return res
@@ -104,7 +107,7 @@ class DahuaIntercomClient:
     def get_call_status(self) -> dict:
         """Query current call state."""
         try:
-            resp = self._request("GET", "/cgi-bin/intercom.cgi", params={"action": "callStatus"}, timeout=3)
+            resp = self._request("GET", "/cgi-bin/intercom.cgi", params={"action": "callStatus"}, timeout=2)
             if resp.status_code == 200:
                 # Returns e.g. status=Calling or status=Idle
                 st = "idle"

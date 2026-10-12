@@ -15,7 +15,7 @@ import socket
 from datetime import datetime, timezone
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
-from threading import Lock
+from threading import RLock
 
 try:
     from device_discovery import scan_network
@@ -47,7 +47,7 @@ try:
 except Exception as _e:
     pass
 
-_state_lock = Lock()
+_state_lock = RLock()
 _active_client = None
 _client_brand = None
 _config_cache = {}
@@ -830,8 +830,9 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                 doors = list(_door_stations_list)
                 indoors = list(_indoor_stations_list)
                 act_id = _active_station_id
-                client, brand, active_dev = resolve_door_station(act_id)
                 cfg = dict(_config_cache)
+
+            client, brand, active_dev = resolve_door_station(act_id)
 
             configured = bool(doors or indoors or client)
             if not configured:

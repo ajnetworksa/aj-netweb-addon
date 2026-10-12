@@ -110,6 +110,9 @@ class HikvisionIntercomClient:
 
     def get_device_info(self) -> dict:
         """Fetch model, serial number, and firmware version."""
+        if hasattr(self, "_cached_device_info") and self._cached_device_info:
+            return self._cached_device_info
+
         res = {
             "brand": "Hikvision",
             "model": "Unknown Intercom",
@@ -118,7 +121,7 @@ class HikvisionIntercomClient:
             "device_name": "Hikvision Door Station",
         }
         try:
-            resp = self._request("GET", "/ISAPI/System/deviceInfo")
+            resp = self._request("GET", "/ISAPI/System/deviceInfo", timeout=3)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.text)
                 for elem in root.iter():
@@ -128,6 +131,7 @@ class HikvisionIntercomClient:
                 res["serial"] = root.findtext("serialNumber") or res["serial"]
                 res["firmware"] = root.findtext("firmwareVersion") or res["firmware"]
                 res["device_name"] = root.findtext("deviceName") or res["device_name"]
+                self._cached_device_info = res
         except Exception as e:
             log.error("Failed to query Hikvision device info: %s", e)
         return res
@@ -137,7 +141,7 @@ class HikvisionIntercomClient:
         Check current call status (idle, ring, onCall).
         """
         try:
-            resp = self._request("GET", "/ISAPI/VideoIntercom/callStatus?format=json", timeout=3)
+            resp = self._request("GET", "/ISAPI/VideoIntercom/callStatus?format=json", timeout=2)
             if resp.status_code == 200:
                 data = resp.json()
                 status = (data.get("CallStatus") or {}).get("status", "idle")
@@ -147,7 +151,7 @@ class HikvisionIntercomClient:
 
         # XML fallback
         try:
-            resp = self._request("GET", "/ISAPI/VideoIntercom/callStatus", timeout=3)
+            resp = self._request("GET", "/ISAPI/VideoIntercom/callStatus", timeout=2)
             if resp.status_code == 200 and "<status>" in resp.text:
                 m = re.search(r"<status>(.*?)</status>", resp.text)
                 if m:
