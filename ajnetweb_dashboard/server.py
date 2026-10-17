@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-AJ Netweb Dashboard Suite - Ingress Web Server & API Bridge
+AJ Netweb Dashboard Suite - Ingress web server & API.
 """
 
 import json
 import logging
 import os
-import sys
 import urllib.parse
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
-from dashboard_engine import DashboardEngine
+from dashboard_engine import ADDON_VERSION, DashboardEngine
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("dashboard.server")
 
-WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
+WWW_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8099))
-SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+# Only the Supervisor ingress proxy may talk to us (the port is not published).
+ALLOWED_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
 
-engine = DashboardEngine(supervisor_token=SUPERVISOR_TOKEN)
+engine = DashboardEngine(supervisor_token=os.environ.get("SUPERVISOR_TOKEN", ""))
 
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
@@ -32,110 +32,129 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WWW_DIR, **kwargs)
 
-    def _normalize_path(self) -> str:
-        raw_path = urllib.parse.urlparse(self.path).path
-        if "/api/" in raw_path:
-            return raw_path[raw_path.rfind("/api/"):]
-        return raw_path
+    def log_message(self, fmt, *args):
+        log.debug("%s - %s", self.client_address[0], fmt % args)
 
-    def _send_json(self, data: dict, status: int = 200):
-        body = json.dumps(data).encode("utf-8")
+    def _allowed(self) -> bool:
+        if os.environ.get("DASHBOARD_DEV") == "1" or self.client_address[0] in ALLOWED_CLIENTS:
+            return True
+        self._send_json({"ok": False, "error": "Forbidden"}, 403)
+        return False
+
+    def _path(self) -> str:
+        raw = urllib.parse.urlparse(self.path).path
+        return raw[raw.rfind("/api/"):] if "/api/" in raw else raw
+
+    def _query(self):
+        return {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).items()}
+
+    def _send_json(self, data, status: int = 200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
+    def end_headers(self):
+        if not self.path.startswith("/api/") and "/api/" not in self.path:
+            self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+    def _guard(self, fn, *args):
+        try:
+            return fn(*args)
+        except Exception as e:  # never let a request kill the thread silently
+            log.exception("Request failed")
+            self._send_json({"ok": False, "error": str(e)}, 500)
+
+    # ------------------------------------------------------------------ GET
     def do_GET(self):
-        path = self._normalize_path()
-        parsed = urllib.parse.urlparse(self.path)
-        query = urllib.parse.parse_qs(parsed.query)
-
-        if path == "/api/status":
-            self._send_json({
-                "ready": True,
-                "version": "1.0.0",
-                "supervisor_connected": bool(SUPERVISOR_TOKEN),
-            })
+        if not self._allowed():
             return
-
-        if path == "/api/discovery":
-            try:
-                layout = engine.discover_house_layout()
-                self._send_json({"ok": True, "layout": layout})
-            except Exception as e:
-                log.error("Discovery error: %s", e)
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+        path = self._path()
+        routes = {
+            "/api/status": lambda: {"ready": True, "version": ADDON_VERSION,
+                                    "supervisor_connected": engine.client.connected},
+            "/api/health": engine.health,
+            "/api/project": lambda: {"ok": True, "project": engine.load_project()},
+            "/api/themes": lambda: {"ok": True, "themes": engine.themes()},
+            "/api/blueprints": lambda: {"ok": True, "blueprints": engine.list_blueprints()},
+            "/api/backups": lambda: {"ok": True, "backups": engine.list_backups()},
+            "/api/discovery": self._discovery,
+            "/api/preview": lambda: {"ok": True, "config": engine.generate()},
+        }
+        if path in routes:
+            self._guard(lambda: self._send_json(routes[path]()))
             return
-
-        if path == "/api/preview":
-            theme_key = query.get("theme", ["apple_frosted_glass"])[0]
-            title = query.get("title", ["Apple Smart Home"])[0]
-            url_path = query.get("url", ["ajnetweb"])[0]
-            try:
-                layout = engine.discover_house_layout()
-                preview_cfg = engine.generate_dashboard(theme_key, title, layout["areas"], url_path=url_path)
-                self._send_json({"ok": True, "theme": theme_key, "config": preview_cfg})
-            except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+        if path.startswith("/api/"):
+            self._send_json({"ok": False, "error": f"Endpoint '{path}' not found"}, 404)
             return
-
-        if path == "/api/blueprints":
-            blueprints = engine.list_blueprints()
-            self._send_json({"ok": True, "blueprints": blueprints})
-            return
-
         super().do_GET()
 
+    def do_HEAD(self):
+        if self._allowed():
+            super().do_HEAD()
+
+    def _discovery(self):
+        project = engine.load_project()
+        model = engine.discover_raw()
+        excluded = set(project.get("excluded_entities") or [])
+        for area in model["areas"]:
+            for value in area.values():
+                if isinstance(value, list):
+                    for e in value:
+                        if isinstance(e, dict) and "entity_id" in e:
+                            e["excluded"] = e["entity_id"] in excluded
+        return {"ok": not model.get("errors"), "layout": model, "error": "; ".join(model.get("errors") or [])}
+
+    # ------------------------------------------------------------------ POST
     def do_POST(self):
-        path = self._normalize_path()
-        length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+        if not self._allowed():
+            return
+        path = self._path()
+        length = int(self.headers.get("Content-Length") or 0)
         try:
-            payload = json.loads(body)
+            payload = json.loads(self.rfile.read(length).decode("utf-8") or "{}") if length else {}
         except ValueError:
-            payload = {}
-
-        if path == "/api/blueprints/install":
-            res = engine.install_bundled_blueprints()
-            self._send_json(res, status=200 if res.get("ok") else 500)
+            self._send_json({"ok": False, "error": "Invalid JSON"}, 400)
             return
 
-        if path == "/api/deploy":
-            theme = payload.get("theme", "apple_frosted_glass")
-            dashboard_url = payload.get("dashboard_url", "ajnetweb")
-            title = payload.get("title", "AJ Netweb Smart Home")
-            selected_areas = payload.get("selected_areas")
+        def respond(res):
+            self._send_json(res, 200 if res.get("ok") else 500)
 
-            res = engine.deploy_to_homeassistant(
-                theme_key=theme,
-                dashboard_url=dashboard_url,
-                title=title,
-                selected_areas=selected_areas,
-            )
-            self._send_json(res, status=200 if res.get("ok") else 500)
-            return
-
-        if path == "/api/install_resources":
-            ok = engine.install_bundled_resources()
-            self._send_json({"ok": ok, "message": "Resources installed to /config/www/ajnetweb/"})
-            return
-
-        self._send_json({"ok": False, "error": f"Endpoint '{path}' not found"}, status=404)
+        if path == "/api/project":
+            self._guard(lambda: self._send_json({"ok": True, "project": engine.save_project(payload)}))
+        elif path == "/api/deploy":
+            self._guard(lambda: respond(engine.deploy(payload.get("project"))))
+        elif path == "/api/preview":
+            self._guard(lambda: self._send_json({"ok": True, "config": engine.generate(
+                engine.save_project(payload["project"]) if payload.get("project") else None)}))
+        elif path == "/api/blueprints/install":
+            self._guard(lambda: respond(engine.install_bundled_blueprints()))
+        elif path == "/api/install_resources":
+            self._guard(lambda: respond(engine.install_card_suite()))
+        elif path == "/api/themes/install":
+            self._guard(lambda: respond(engine.install_themes()))
+        elif path == "/api/backups/restore":
+            self._guard(lambda: respond(engine.restore_backup(payload.get("file"))))
+        else:
+            self._send_json({"ok": False, "error": f"Endpoint '{path}' not found"}, 404)
 
 
 def main():
-    log.info("Starting AJ Netweb Dashboard Suite Server on Ingress port %s...", PORT)
-    # Auto-copy resources on startup
-    engine.install_bundled_resources()
-
+    log.info("AJ Netweb Dashboard Suite %s listening on ingress port %s", ADDON_VERSION, PORT)
+    log.info("Home Assistant config folder: %s", engine.config_dir)
+    # Keep the card suite file current after add-on updates so existing dashboards get fixes
+    if os.environ.get("AUTO_REGISTER_RESOURCES", "true") != "false":
+        res = engine.install_card_suite()
+        if not res.get("ok"):
+            log.warning("Card suite not registered: %s", res.get("error"))
     server = ThreadedHTTPServer(("0.0.0.0", PORT), DashboardRequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        log.info("Shutting down Dashboard server...")
         server.server_close()
 
 

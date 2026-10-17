@@ -1,5 +1,35 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 2.0.0
+Complete rebuild of the generator and studio.
+
+**Fixes**
+- Files were written to `/config`, which this add-on does not mount (`homeassistant_config` mounts at
+  `/homeassistant`). The card suite, themes and blueprints never reached Home Assistant. Both paths
+  are now detected.
+- The default URL `ajnetweb` was rejected by Home Assistant (dashboard URLs must contain a hyphen),
+  which caused the 404s. URLs are now normalised (`ajnetweb` -> `ajnetweb-home`).
+- Removed direct writes to `.storage/lovelace*` files, which HA overwrites and which could create
+  duplicate dashboard entries.
+- The theme selection had no effect (every option produced the same layout). Each theme is now a
+  real HA theme applied to every view.
+- Removed hardcoded entities (`weather.home`, intercom panel slug, fixed "Living Room" names).
+- The Frosted Glass theme depended on card-mod (HACS). It now uses native variables only.
+
+**New**
+- One responsive layout for phone, tablet and wall panel (Sections view), plus a Wall Panel view.
+- Room cards with live indicators and one-tap lights toggle, grouped by Floor; a sub-page per room.
+- Lights, Climate, Security, Cameras, Media and admin-only Installer views.
+- Installer project: hide rooms/devices, favourites, support details, language (English/Arabic).
+- Noise filtering uses HA's `entity_category` / hidden / disabled flags.
+- Card suite registered through the resources API with a versioned URL; v1 cards kept for compatibility.
+- Automatic backups before every deploy, with restore.
+- Health checks: HA version, config mount, themes include, resource registration.
+- Ingress server only accepts requests from the Supervisor proxy.
+
+**Upgrade note:** the dashboard now lives at `/ajnetweb-home` by default. An old `/ajnetweb`
+dashboard (if one exists) is left untouched; delete it in Settings → Dashboards once you've switched.
+
 ## 1.3.2
 - **Overhauled Dual-Mode Architecture (📱 Mobile Mode & 📟 Wall Console)**:
   - **Zero Entity Clutter**: Automatically prunes unconfigured firmware noise, raw IEEE hex switches (`0xa4c1...`), internal configuration options, backlight modes, motor reversals, and calibration flags.
