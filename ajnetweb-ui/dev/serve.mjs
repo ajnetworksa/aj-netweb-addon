@@ -7,7 +7,7 @@ import { writeFileSync } from "node:fs";
 const themesPy = new URL("../../ajnetweb_dashboard/themes.py", import.meta.url).pathname;
 try {
   const json = execFileSync("python3", ["-c",
-    `import json,sys,importlib.util as u;s=u.spec_from_file_location('t',sys.argv[1]);m=u.module_from_spec(s);s.loader.exec_module(m);print(json.dumps({k:v['modes'] for k,v in m.THEMES.items()}))`,
+    `import json,sys,importlib.util as u;s=u.spec_from_file_location('t',sys.argv[1]);m=u.module_from_spec(s);s.loader.exec_module(m);print(json.dumps({k:dict(v['modes'],__name=v['name']) for k,v in m.THEMES.items()}))`,
     themesPy]).toString();
   writeFileSync(new URL("./themes.json", import.meta.url), json);
 } catch (e) {
@@ -16,7 +16,8 @@ try {
 
 const ctx = await context({
   entryPoints: ["dev/preview.js"], bundle: true, format: "esm", outfile: "dev/preview.bundle.js",
-  define: { __VERSION__: '"preview"' }, sourcemap: true, logLevel: "info",
+  define: { __VERSION__: '"preview"', __AJN_PUBKEY__: JSON.stringify(process.env.AJN_PUBKEY || ""),
+            __AJN_ENFORCED__: JSON.stringify(!!process.env.AJN_PUBKEY) }, sourcemap: true, logLevel: "info",
 });
 await ctx.watch();
 const { port } = await ctx.serve({ servedir: "dev", port: 5173 });

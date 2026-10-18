@@ -35,6 +35,7 @@
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
+      <button class="tab" data-tab="licence" role="tab">Licence</button>
     </nav>
 
     <main>
@@ -61,6 +62,17 @@
         </div>
       </section>
 
+      <!-- LICENCE -->
+      <section class="panel" id="tab-licence">
+        <div class="card">
+          <h2>Licence</h2>
+          <p class="desc">When <b>AJ Netweb Remote Access</b> is activated on this Home Assistant, every AJ Netweb add-on
+            and the dashboard are licensed automatically. Sites without Remote Access: send the Install ID to AJ Netweb,
+            paste the licence key you receive and press Activate.</p>
+          <iframe id="licFrame" title="Licence" style="width:100%;height:760px;border:0;border-radius:14px" loading="lazy"></iframe>
+        </div>
+      </section>
+
       <!-- DESIGN -->
       <section class="panel" id="tab-design">
         <div class="card">
@@ -82,12 +94,33 @@
                 <option value="navigate">Opens the room page</option></select>
             </label>
             <label>Header image URL (optional)<input id="fHeaderImage" type="text" placeholder="/local/villa.jpg"></label>
+            <label>Colour gradient (default for everyone)
+              <select id="fPalette"><option value="">Theme colour</option>
+                <option value="ocean">Ocean</option><option value="aurora">Aurora</option><option value="sunset">Sunset</option>
+                <option value="desert">Desert gold</option><option value="emerald">Emerald</option><option value="royal">Royal</option>
+                <option value="rose">Rose</option><option value="arctic">Arctic</option><option value="coral">Coral</option>
+                <option value="graphite">Graphite</option></select>
+            </label>
           </div>
           <div class="toggles">
             <label class="switch"><input type="checkbox" id="fSidebar"><span></span>Show in sidebar</label>
             <label class="switch"><input type="checkbox" id="fAdmin"><span></span>Admins only</label>
             <label class="switch"><input type="checkbox" id="fNavbar"><span></span>Bottom navigation bar</label>
+            <label class="switch"><input type="checkbox" id="fPersonal"><span></span>Each person can choose theme &amp; colour</label>
+            <label class="switch"><input type="checkbox" id="fWallpaper"><span></span>Colour gradient as wallpaper</label>
           </div>
+        </div>
+
+        <div class="card">
+          <h2>Kiosk &amp; menu</h2>
+          <p class="desc">For wall tablets locked with a kiosk. A <b>⋯ More</b> button at the end of the bottom bar
+            gives people the pages that don't fit, their own theme &amp; colour, and (for those you allow) settings.
+            Each line decides <b>who</b> sees it. Use <i>Specific people</i> with Home Assistant user names
+            (the display name, e.g. <code>Mama, panel-majlis</code>).
+            Hiding Home Assistant's header / sidebar needs the <b>kiosk-mode</b> plugin (HACS) or
+            Fully Kiosk's full-screen mode.</p>
+          <div class="toggles"><label class="switch"><input type="checkbox" id="fMenu"><span></span>⋯ More button in the bottom bar</label></div>
+          <div class="kiosk-rules" id="kioskRules"></div>
         </div>
 
         <div class="card">

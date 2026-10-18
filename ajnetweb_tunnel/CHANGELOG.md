@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.3.0
+- **Licence authority for all AJ Netweb add-ons.** When this Home Assistant is activated and the
+  subscription is active, Remote Access publishes a signed licence signal
+  (`/config/.ajnetweb/remote_access.json`) every 10 minutes. Dashboard, Prayer & Adhan, CCTV, Intercom
+  and Guest Pass accept it, so no separate licence key is needed per add-on.
+  - The signal is signed with this device's private key, which never leaves `/data`, and carries the
+    client certificate issued by the AJ Netweb CA. It is valid for 72 hours.
+  - A copied signal stops working when it expires and can't be renewed without the device key. It is
+    rejected on another Home Assistant (wrong Install ID) and when forged with any certificate not issued
+    by the AJ Netweb CA.
+  - It follows the subscription: suspended → the add-ons lock; certificate revoked → the signal is
+    withdrawn. Up to 30 days without reaching the server are tolerated (internet outages).
+  - If the server's heartbeat includes an `entitlement` (AJ Netweb licence key), it is stored for the
+    dashboard's browser check.
+- The add-on page shows the licence signal given to the AJ Netweb add-ons.
+- **Closed-source build:** with `AJN_COMPILE=true` the agent (`agent.py`, `features.py`, `attest.py`) is
+  compiled to native modules with Nuitka. Docstrings and asserts are stripped, and no Python source is
+  shipped. A GitHub Actions workflow builds and publishes ready-made compiled images, see
+  `docs/remote-access-closed-source.md`.
+
+## 1.2.5
+- frp client updated 0.71.0 → 0.71.1 (upstream patch release; checksums verified at build time as before).
+
 ## 1.2.4
 - **Security:** the remote diagnostic console checked only the start of a command and ran it in a shell,
   so `uptime; <anything>` was executed (e.g. reading the client private key). Commands are now parsed and run

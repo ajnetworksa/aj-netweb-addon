@@ -58,6 +58,10 @@ _config_cache = {}
 import base64
 import socket
 
+import ajn_license
+
+LICENSE = ajn_license.License("cctv", "AJ Netweb CCTV & NVR Studio")
+
 # Valid 3.2KB JPEG byte frame (dark slate background with camera icon)
 FALLBACK_JPEG_B64 = (
     "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxOUlNSMj5aYVpQYEpRUk//"
@@ -441,11 +445,13 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         log.debug("%s - %s", self.client_address[0], fmt % args)
 
     def do_HEAD(self):
-        if self._allowed():
+        if self._allowed() and not ajn_license.handle(self, LICENSE):
             super().do_HEAD()
 
     def do_GET(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
@@ -637,6 +643,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         path = self._normalize_path()
 

@@ -21,15 +21,22 @@ THEME_FILE_NAME = "ajnetweb.yaml"
 
 def _mode(bg, base, card, border, text, text2, accent, primary=None, shadow="none",
           radius="20px", blur="0px", header=None, glow="transparent", surface_on=None, text_on=None,
-          sheet=None, nav=None):
-    dark = text.lower() in ("#eef1f6", "#eafcff", "#e8e8e8", "#f6efe4", "#efe9df", "#f5f5f7")
+          sheet=None, nav=None, is_dark=None, surface=None, saturate="1.4", solid=None, highlight=None,
+          gradient=None):
+    dark = is_dark if is_dark is not None else text.lower() in (
+        "#eef1f6", "#eafcff", "#e8e8e8", "#f6efe4", "#efe9df", "#f5f5f7")
+    # Dialogs, menus and pickers must stay opaque even when cards are glass, or text becomes unreadable
+    if not solid:
+        solid = card if not card.startswith("rgba") else (sheet if sheet and not sheet.startswith("rgba") else base)
     return {
         "primary-color": primary or accent,
         "accent-color": accent,
         "lovelace-background": bg,
         "primary-background-color": base,
         "secondary-background-color": base,
-        "card-background-color": card,
+        "card-background-color": solid,
+        "ha-dialog-surface-background": solid,
+        "mdc-theme-surface": solid,
         "ha-card-background": card,
         "ha-card-border-color": border,
         "ha-card-border-width": "1px",
@@ -47,7 +54,10 @@ def _mode(bg, base, card, border, text, text2, accent, primary=None, shadow="non
         "ajn-accent": accent,
         "ajn-glow": glow,
         "ajn-glass-blur": blur,
-        "ajn-surface": card,
+        "ajn-surface": surface or card,
+        "ajn-glass-saturate": saturate,
+        "ajn-highlight": highlight or "transparent",
+        "ajn-gradient": gradient or f"linear-gradient(135deg, {accent} 0%, {accent} 100%)",
         "ajn-border": border,
         "ajn-radius": radius,
         # "on" tiles turn bright (Apple Home style); sheet + nav bar surfaces for the UI kit
@@ -69,13 +79,14 @@ THEMES: Dict[str, Dict] = {
                            "#f2f4f8", "rgba(255, 255, 255, 0.5)", "rgba(255, 255, 255, 0.6)",
                            "#151823", "#5f6577", "#2f7dd1",
                            shadow="0 8px 24px rgba(20, 30, 60, 0.08)", blur="18px",
-                           header="rgba(242, 244, 248, 0.85)"),
+                           header="rgba(242, 244, 248, 0.85)", solid="#ffffff"),
             "dark": _mode("radial-gradient(1200px 800px at 10% -10%, #1d2a44 0%, transparent 60%), "
                           "radial-gradient(900px 700px at 110% 10%, #2a1f3d 0%, transparent 55%), #0d0f14 fixed",
                           "#0d0f14", "rgba(44, 47, 58, 0.55)", "rgba(255, 255, 255, 0.07)",
                           "#eef1f6", "#9aa3b5", "#5aa9ff",
                           shadow="0 10px 30px rgba(0, 0, 0, 0.35)", blur="18px",
-                          header="rgba(13, 15, 20, 0.85)", glow="rgba(90, 169, 255, 0.25)"),
+                          header="rgba(13, 15, 20, 0.85)", glow="rgba(90, 169, 255, 0.25)",
+                          solid="#1b1e27"),
         },
     },
     "cyber_luxury": {
@@ -87,7 +98,7 @@ THEMES: Dict[str, Dict] = {
                           "#05070c", "rgba(14, 22, 36, 0.72)", "rgba(0, 229, 255, 0.18)",
                           "#eafcff", "#86a3b4", "#00d8f0",
                           shadow="0 0 0 1px rgba(0,229,255,0.04), 0 12px 30px rgba(0,0,0,0.5)",
-                          blur="14px", header="#05070c", glow="rgba(0, 216, 240, 0.35)"),
+                          blur="14px", header="#05070c", glow="rgba(0, 216, 240, 0.35)", solid="#0c1422"),
         },
     },
     "scandinavian_minimal": {
@@ -107,7 +118,7 @@ THEMES: Dict[str, Dict] = {
         "description": "Solid rounded tiles in the style of Apple Home. High contrast on any screen.",
         "modes": {
             "light": _mode("#eceef2", "#eceef2", "rgba(255,255,255,0.6)", "rgba(0,0,0,0.04)", "#111318", "#6b7180",
-                           "#0a84ff", radius="24px", shadow="0 1px 2px rgba(0,0,0,0.06)"),
+                           "#0a84ff", radius="24px", shadow="0 1px 2px rgba(0,0,0,0.06)", solid="#ffffff"),
             "dark": _mode("#000000", "#000000", "#1c1c1e", "rgba(255,255,255,0.06)", "#f5f5f7", "#98989f",
                           "#0a84ff", radius="24px"),
         },
@@ -128,9 +139,112 @@ THEMES: Dict[str, Dict] = {
         "modes": {
             "dark": _mode("linear-gradient(170deg, #1a1512 0%, #0e0b09 100%) fixed", "#0e0b09",
                           "rgba(34, 27, 22, 0.82)", "rgba(212, 167, 92, 0.22)", "#f6efe4", "#b3a48e",
-                          "#d4a75c", radius="18px", blur="10px", glow="rgba(212, 167, 92, 0.25)"),
+                          "#d4a75c", radius="18px", blur="10px", glow="rgba(212, 167, 92, 0.25)",
+                          solid="#221b16"),
             "light": _mode("#f6f1e9", "#f6f1e9", "#fffdf9", "#e7dccb", "#2a211a", "#7b6c5b", "#a87a2e",
                            radius="18px"),
+        },
+    },
+    # ------------------------------------------------------------ 3.2 themes
+    "liquid_glass": {
+        "name": "AJ Netweb Liquid Glass",
+        "label": "Liquid Glass",
+        "description": "Apple iOS 26 style: very clear glass with a bright edge highlight over a vivid colour field.",
+        "modes": {
+            "dark": _mode("radial-gradient(900px 700px at 0% 0%, rgba(80, 120, 255, 0.55) 0%, transparent 60%), "
+                          "radial-gradient(800px 650px at 100% 15%, rgba(255, 80, 170, 0.40) 0%, transparent 60%), "
+                          "radial-gradient(900px 700px at 50% 110%, rgba(0, 210, 200, 0.40) 0%, transparent 60%), #0a0c14 fixed",
+                          "#0a0c14", "rgba(40, 44, 60, 0.42)", "rgba(255, 255, 255, 0.16)",
+                          "#f5f7fb", "#b4bccb", "#7cb6ff", is_dark=True,
+                          surface="rgba(255, 255, 255, 0.08)", blur="28px", saturate="1.9", radius="26px",
+                          shadow="inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(255, 255, 255, 0.05), "
+                                 "0 12px 32px rgba(0, 0, 0, 0.32)",
+                          highlight="rgba(255, 255, 255, 0.28)", header="rgba(10, 12, 20, 0.55)",
+                          glow="rgba(124, 182, 255, 0.35)", solid="#161a26", sheet="rgba(22, 26, 38, 0.78)",
+                          nav="rgba(255, 255, 255, 0.10)", surface_on="rgba(255, 255, 255, 0.88)",
+                          gradient="linear-gradient(135deg, #7cb6ff 0%, #b28dff 55%, #ff7ac6 100%)"),
+            "light": _mode("radial-gradient(900px 700px at 0% 0%, rgba(120, 160, 255, 0.55) 0%, transparent 60%), "
+                           "radial-gradient(800px 650px at 100% 10%, rgba(255, 150, 200, 0.45) 0%, transparent 60%), "
+                           "radial-gradient(900px 700px at 50% 110%, rgba(90, 230, 210, 0.45) 0%, transparent 60%), #eef1f8 fixed",
+                           "#eef1f8", "rgba(255, 255, 255, 0.50)", "rgba(255, 255, 255, 0.75)",
+                           "#10131c", "#4d5468", "#2a6ff0", is_dark=False,
+                           surface="rgba(255, 255, 255, 0.32)", blur="28px", saturate="1.9", radius="26px",
+                           shadow="inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 10px 30px rgba(40, 60, 120, 0.12)",
+                           highlight="rgba(255, 255, 255, 0.9)", header="rgba(238, 241, 248, 0.6)",
+                           glow="rgba(42, 111, 240, 0.25)", solid="#f7f8fc", sheet="rgba(247, 248, 252, 0.82)",
+                           nav="rgba(24, 28, 40, 0.58)", surface_on="#ffffff",
+                           gradient="linear-gradient(135deg, #2a6ff0 0%, #8a5cf5 55%, #e9528f 100%)"),
+        },
+    },
+    "native_blur": {
+        "name": "AJ Netweb Native Blur",
+        "label": "Native Blur",
+        "description": "Home Assistant's own colours with soft frosted cards. The safest choice next to stock HA pages.",
+        "modes": {
+            "light": _mode("#f2f4f7", "#fafafa", "rgba(255, 255, 255, 0.72)", "rgba(0, 0, 0, 0.06)",
+                           "#212121", "#727272", "#03a9f4", primary="#03a9f4", is_dark=False,
+                           blur="14px", radius="16px", shadow="0 2px 10px rgba(0, 0, 0, 0.06)",
+                           header="rgba(250, 250, 250, 0.8)", solid="#ffffff"),
+            "dark": _mode("#111111", "#111111", "rgba(32, 33, 36, 0.72)", "rgba(255, 255, 255, 0.07)",
+                          "#e1e1e1", "#9b9b9b", "#03a9f4", primary="#03a9f4", is_dark=True,
+                          blur="14px", radius="16px", shadow="0 2px 12px rgba(0, 0, 0, 0.35)",
+                          header="rgba(17, 17, 17, 0.8)", solid="#1c1c1c", glow="rgba(3, 169, 244, 0.25)"),
+        },
+    },
+    "aurora": {
+        "name": "AJ Netweb Aurora",
+        "label": "Aurora Gradient",
+        "description": "Northern-lights mesh gradient (green, teal, violet) behind dark glass. Striking on wall panels.",
+        "modes": {
+            "dark": _mode("radial-gradient(1000px 700px at 15% 0%, rgba(52, 211, 153, 0.45) 0%, transparent 60%), "
+                          "radial-gradient(900px 700px at 90% 20%, rgba(59, 130, 246, 0.45) 0%, transparent 60%), "
+                          "radial-gradient(1000px 800px at 60% 110%, rgba(168, 85, 247, 0.45) 0%, transparent 60%), #070a12 fixed",
+                          "#070a12", "rgba(16, 22, 34, 0.55)", "rgba(255, 255, 255, 0.10)",
+                          "#eef6f4", "#9fb3b0", "#34d399", is_dark=True,
+                          surface="rgba(14, 20, 32, 0.38)", blur="22px", saturate="1.6", radius="22px",
+                          shadow="inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 30px rgba(0, 0, 0, 0.35)",
+                          header="rgba(7, 10, 18, 0.6)", glow="rgba(52, 211, 153, 0.35)", solid="#111827",
+                          sheet="rgba(12, 18, 30, 0.85)",
+                          gradient="linear-gradient(135deg, #34d399 0%, #3b82f6 50%, #a855f7 100%)"),
+        },
+    },
+    "desert_dusk": {
+        "name": "AJ Netweb Desert Dusk",
+        "label": "Desert Dusk",
+        "description": "Gulf sunset gradient - sand, rose and violet - with warm glass. Made for GCC villas.",
+        "modes": {
+            "dark": _mode("linear-gradient(165deg, #2b1a2e 0%, #4a2433 38%, #7a3f2c 72%, #c27b3e 100%) fixed",
+                          "#1c1220", "rgba(40, 24, 34, 0.50)", "rgba(255, 214, 170, 0.16)",
+                          "#fff3e6", "#d8bba3", "#ffb867", is_dark=True,
+                          surface="rgba(40, 22, 30, 0.34)", blur="20px", saturate="1.5", radius="22px",
+                          shadow="inset 0 1px 0 rgba(255, 220, 180, 0.18), 0 12px 30px rgba(20, 5, 10, 0.4)",
+                          header="rgba(28, 18, 32, 0.6)", glow="rgba(255, 184, 103, 0.35)", solid="#2a1a26",
+                          sheet="rgba(36, 22, 32, 0.88)",
+                          gradient="linear-gradient(135deg, #ffcf8a 0%, #ff8a5c 50%, #d9487a 100%)"),
+            "light": _mode("linear-gradient(165deg, #fff4e6 0%, #ffe1cc 45%, #f7c9c9 75%, #e4c4e8 100%) fixed",
+                           "#fff4e6", "rgba(255, 255, 255, 0.55)", "rgba(255, 255, 255, 0.7)",
+                           "#2d1a14", "#7a5a4c", "#c2602f", is_dark=False,
+                           surface="rgba(255, 255, 255, 0.40)", blur="20px", saturate="1.5", radius="22px",
+                           shadow="inset 0 1px 0 rgba(255, 255, 255, 0.85), 0 10px 26px rgba(120, 60, 30, 0.12)",
+                           header="rgba(255, 244, 230, 0.7)", solid="#fffaf4", sheet="rgba(255, 250, 244, 0.9)",
+                           gradient="linear-gradient(135deg, #e8933e 0%, #d9573f 50%, #b8457a 100%)"),
+        },
+    },
+    "material_you": {
+        "name": "AJ Netweb Material",
+        "label": "Material You",
+        "description": "Google Material 3 look: tonal colour surfaces, big rounded corners, no blur. Fast on cheap tablets.",
+        "modes": {
+            "light": _mode("#f7f2fa", "#f7f2fa", "#ffffff", "#e7e0ec", "#1d1b20", "#49454f", "#6750a4",
+                           is_dark=False, radius="28px", surface="#f3edf7", solid="#ffffff",
+                           shadow="0 1px 2px rgba(0, 0, 0, 0.08)", surface_on="#eaddff", text_on="#21005d",
+                           nav="rgba(29, 27, 32, 0.9)",
+                           gradient="linear-gradient(135deg, #6750a4 0%, #7d5260 100%)"),
+            "dark": _mode("#141218", "#141218", "#211f26", "#36343b", "#e6e0e9", "#cac4d0", "#d0bcff",
+                          is_dark=True, radius="28px", surface="#211f26", solid="#2b2930",
+                          surface_on="#4f378b", text_on="#eaddff", nav="rgba(43, 41, 48, 0.96)",
+                          glow="rgba(208, 188, 255, 0.2)",
+                          gradient="linear-gradient(135deg, #d0bcff 0%, #efb8c8 100%)"),
         },
     },
 }

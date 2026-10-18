@@ -47,6 +47,7 @@ a{color:var(--accent)}button{font:inherit;font-size:12px;padding:3px 8px;border-
         <dt>Address</dt><dd id="url">—</dd>
         <dt>Server Ping</dt><dd id="lat">—</dd>
         <dt>Paid until</dt><dd id="paid">—</dd>
+        <dt>AJ Netweb add-ons</dt><dd id="lsig">—</dd>
         <dt>Device certificate</dt><dd id="cert">—</dd>
         <dt>Last check-in</dt><dd id="hb">—</dd>
         <dt>App version</dt><dd id="ver">—</dd>
@@ -124,6 +125,9 @@ async function load(){
 
   $("#url").innerHTML = s.public_url ? `<a href="${esc(s.public_url)}" target="_blank" rel="noopener">${esc(s.public_url)}</a>` : "—";
   set("#paid", s.paid_until ? new Date(s.paid_until).toLocaleDateString() : "—");
+  const ls = s.licence_signal || {};
+  set("#lsig", ls.status === "active" ? "Licensed (signal valid until " + new Date(ls.valid_until * 1000).toLocaleString() + ")"
+                : ls.status ? "Not licensed - " + ls.status : "No licence signal yet");
   set("#cert", s.cert_not_after ? "valid until " + dt(s.cert_not_after) + " (renews automatically)" : "—");
   set("#hb", dt(s.last_heartbeat)); set("#ver", s.agent_version);
   const y = s.system || {};

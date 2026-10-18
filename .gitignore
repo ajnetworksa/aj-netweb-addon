@@ -3,3 +3,10 @@ __pycache__/
 *$py.class
 .DS_Store
 Thumbs.db
+# AJ Netweb signing keys and licence register must never be committed
+*.pem
+*.key
+licences.csv
+ajnetweb-secrets/
+# the PUBLIC root CA certificate for Remote Access licensing is meant to be committed
+!licensing/root_ca.pem

@@ -1,5 +1,40 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.2.0 - themes, personal appearance, kiosk menu, licensing
+- **AJ Netweb licence:** the add-ons and the dashboard now need this Home Assistant to be licensed by
+  AJ Netweb, normally through **AJ Netweb Remote Access** (automatic, nothing to enter) or with an offline
+  licence key. New *Licence* tab shows the source, the Install ID and an Activate box. The add-on publishes `sensor.ajnetweb_license`, and the dashboard cards verify the signed licence
+  in the browser. Existing sites keep working for 14 days after updating. Developer builds without a
+  public key are not affected. See `licensing/README.md`.
+- **Five new themes:**
+  - **Liquid Glass**: Apple iOS 26 style, very clear glass, bright edge highlight, vivid colour field. Light and dark.
+  - **Native Blur**: Home Assistant's own colours with soft frosted cards.
+  - **Aurora Gradient**: northern-lights mesh behind dark glass.
+  - **Desert Dusk**: Gulf sunset gradient. Light and dark.
+  - **Material You**: Material 3 tonal surfaces, no blur, fast on cheap tablets.
+- **Personal appearance:** a palette button in the header lets each person choose their own theme,
+  one of 10 colour gradients and a gradient wallpaper. The choice is saved per Home Assistant user
+  (`frontend/set_user_data`), so it follows them to every phone and tablet. Admin rights are not needed.
+  The colour changes at once; a new theme or wallpaper reloads the page once.
+- New card `custom:ajnetweb-appearance-card` (the same picker, to place anywhere).
+- Studio → Design: default colour gradient for everyone, *Each person can choose theme & colour*
+  (on by default) and *Colour gradient as wallpaper*. New strategy options `personal`, `palette`,
+  `wallpaper`, `appearance_themes`.
+- Gradient accents on the music player (play button, progress, volume), the header title, the nav bar
+  and the current prayer.
+- Fixed for every theme: dialogs, menus and pickers now use an opaque surface
+  (`card-background-color`, `ha-dialog-surface-background`), so glass themes no longer make HA's
+  more-info dialogs see-through.
+- New theme variables: `ajn-gradient`, `ajn-glass-saturate`, `ajn-highlight`.
+- **Kiosk & ⋯ menu** for locked wall tablets:
+  - A ⋯ *More* button ends the bottom bar. It holds pages that don't fit, *My theme & colour*, *My profile*,
+    *Reload*, *Home Assistant settings*, *Dashboard Studio* and *Exit kiosk mode*.
+  - Each item has a rule: everyone / admins / non-admins / nobody / specific people.
+  - The same rules can hide HA's header and sidebar. The dashboard writes the `kiosk_mode` config for the
+    kiosk-mode plugin per user, and sets `ignore_disable_km` for people who may not exit.
+  - Set it in Studio → Design → *Kiosk & menu* or with the `kiosk` / `menu` strategy options.
+  - With the menu on, the appearance picker moves from the header into it.
+
 ## 3.1.0 - music and prayer times
 - **New music card** (`custom:ajnetweb-music-card`): built on Music Assistant, the official Home Assistant
   music server. Search YouTube Music, Spotify, Apple Music, Tidal, Deezer, SoundCloud and radio from the

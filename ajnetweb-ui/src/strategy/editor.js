@@ -1,6 +1,7 @@
 // Graphical options editor shown in Dashboard settings for strategy dashboards.
 // Plain inputs (no HA-internal form elements), so it keeps working across HA releases.
 import { esc } from "../core/base.js";
+import { PALETTES } from "../core/appearance.js";
 
 const VIEW_KEYS = [["panel", "Wall panel"], ["lights", "Lights"], ["climate", "Climate"], ["security", "Security"],
                    ["cameras", "Cameras"], ["media", "Media"], ["installer", "Installer (admins)"]];
@@ -57,15 +58,21 @@ export class AjnetwebStrategyEditor extends HTMLElement {
           <select data-k="room_tap"><option value="popup">Opens a sheet with its devices</option>
             <option value="navigate" ${c.room_tap === "navigate" ? "selected" : ""}>Opens the room page</option></select></label>
         <label>Header image URL (optional)<input type="text" data-k="header_image" value="${esc(c.header_image || "")}"></label>
+        <label>Colour gradient
+          <select data-k="palette"><option value="">Theme colour</option>
+            ${Object.entries(PALETTES).map(([k, p]) => `<option value="${k}" ${k === c.palette ? "selected" : ""}>${esc(p.en)}</option>`).join("")}</select></label>
         <h4>Views</h4>
         <div class="checks">
           ${VIEW_KEYS.map(([k, l]) => `<label><input type="checkbox" data-view="${k}" ${views[k] === false ? "" : "checked"}>${l}</label>`).join("")}
           <label><input type="checkbox" data-k="navbar" ${c.navbar === false ? "" : "checked"}>Bottom navigation bar</label>
+          <label><input type="checkbox" data-k="personal" ${c.personal === false ? "" : "checked"}>Each person can choose theme &amp; colour</label>
+          <label><input type="checkbox" data-k="wallpaper" data-default-off ${c.wallpaper ? "checked" : ""}>Colour as wallpaper</label>
         </div>
       </div>`;
     this.querySelectorAll("[data-k]").forEach((el) => {
       el.addEventListener("change", () => {
-        if (el.type === "checkbox") this._set(el.dataset.k, el.checked ? undefined : false);
+        if (el.type === "checkbox" && "defaultOff" in el.dataset) this._set(el.dataset.k, el.checked ? true : undefined);
+        else if (el.type === "checkbox") this._set(el.dataset.k, el.checked ? undefined : false);
         else this._set(el.dataset.k, el.value.trim());
       });
     });

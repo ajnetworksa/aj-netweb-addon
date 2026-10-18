@@ -33,7 +33,8 @@ maintenance. Levels 1–3 keep the dashboard self-updating; level 4 freezes it; 
 All options live in the add-on (`/data/project.json`) and are re-applied on every deploy:
 
 - **Design**: title, URL path, language (or follow each user), weather entity, theme, views on/off,
-  room tap (sheet or page), header image, bottom navigation bar, live camera options.
+  room tap (sheet or page), header image, bottom navigation bar, live camera options, default colour
+  gradient, personal appearance on/off, gradient wallpaper.
 - **Rooms & Devices**: hide rooms, exclude devices, ★ favourites (shown on Home).
 - **Support Info**: company/phone/email/notes on the admin-only Installer page.
 - **Deploy & Backups**: deploy, see the generated options (*Show config*), restore older versions.
@@ -71,6 +72,17 @@ strategy:
   music: true                         # music card on Home + Music page
   music_players: []                   # limit which speakers the music card offers
   music_assistant_entry: 01J...       # lets non-admin users search Music Assistant (Studio sets it)
+  personal: true                      # palette button: each person picks theme / colour / wallpaper
+  palette: desert                     # default colour gradient (ocean aurora sunset desert emerald
+                                      #   royal rose arctic coral graphite)
+  wallpaper: false                    # true = default palette as page background
+  appearance_themes: [AJ Netweb Liquid Glass, AJ Netweb Desert Dusk]   # optional: limit choices
+  menu: true                          # ⋯ More button at the end of the bottom bar
+  kiosk:                              # wall tablets - see 05-wall-panels.md
+    hide_header: non_admins           # all | admins | non_admins | none | [user names]
+    hide_sidebar: non_admins
+    menu: { settings: admins, studio: admins, exit_kiosk: admins, appearance: all, pages: all,
+            profile: all, reload: all }
   panel_live_cameras: true            # live video on the Wall Panel page
   cameras_live: false                 # live video on the Cameras page (more bandwidth)
   shortcuts:                          # extra buttons on Home (e.g. add-on panels, other dashboards)
@@ -118,7 +130,11 @@ the add-on on sites — never patch the JS file on one client's server.
 | "Show the pool pump on Home" | 2 | ★ in Studio |
 | "Hide the store room" | 2 | Untick the room in Studio |
 | "Use our villa photo at the top" | 2 | Header image (upload to `/config/www/`, use `/local/...`) |
-| "Make it gold" | 2 / 5 | Hospitality theme, or a brand theme ([04](04-themes-branding.md)) |
+| "Make it gold" | 2 / 5 | Desert Dusk / Hospitality theme + *Desert gold* palette, or a brand theme ([04](04-themes-branding.md)) |
+| "Like the new iPhone" | 2 | Liquid Glass theme |
+| "My daughter wants pink" | — | She taps the palette button → Rose (only her account changes) |
+| "Nobody may change the look" | 2 | Studio → Design → untick *Each person can choose theme & colour* |
+| "Lock the majlis tablet, but Mama can change colours" | 2 | Studio → Kiosk & menu: hide header for `panel-majlis`, *My theme & colour* → Specific people `Mama` |
 | "Arabic for my mother, English for me" | 2 | Language: follow each user |
 | "Staff must not see the master bedroom" | — | Room & Guest Pass Studio → permission matrix → Sync |
 | "One page with only the garden irrigation" | 4 | Second dashboard, linked via `shortcuts` |

@@ -104,7 +104,7 @@ export class AjnetwebPrayerCard extends AjnBase {
       .p .n { font-size: 12px; color: var(--_text2); margin-top: 2px; }
       .p .tm { font-size: 14px; font-weight: 600; color: var(--_text); font-variant-numeric: tabular-nums; }
       .p.past { opacity: .5; }
-      .p.now { background: var(--_surface-on); }
+      .p.now { background: var(--_surface-on); box-shadow: inset 0 0 0 2px var(--_accent); }
       .p.now .n, .p.now .tm { color: var(--_text-on); }
       .p.now ha-icon { color: rgb(${COLORS.green}); }
       .ctrls { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -11,15 +11,31 @@
 //   branding: { company, phone, email, website, notes }, admins: [user ids]
 //   prayer: true (prayer card when prayer times exist), music: true, music_players: [...],
 //   music_assistant_entry: <config entry id> (enables search/favourites for non-admin users)
+//   personal: true (each person may pick theme / colour / wallpaper, palette button in the header)
+//   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
+//   appearance_themes: [theme names] (limit what people can pick)
+//   menu: false (no ⋯ "More" button in the navigation bar), studio_path: <Dashboard Studio panel path>
+//   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
+//            menu: { pages, appearance, profile, reload, settings, studio, exit_kiosk } }  rules per item
+//     rule = all | admins | non_admins | none | [user names / ids]   (see core/access.js)
 import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
 import { hasPrayerTimes } from "../cards/prayer.js";
 import { musicPlayers } from "../cards/music.js";
+import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.js";
+import { allowed } from "../core/access.js";
+import { licenseState } from "../core/license.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
 export async function generateDashboard(config, hass) {
   const cfg = config || {};
+  const lic = licenseState(hass);
+  if (!lic.ok) {
+    // one page that says so (the cards render the notice) instead of the whole dashboard
+    return { title: cfg.title || "Home", views: [{ title: "AJ Netweb", path: "home", type: "sections", max_columns: 1,
+      sections: [{ type: "grid", cards: [{ type: "custom:ajnetweb-actions-card", actions: [], grid_options: { columns: 12 } }] }] }] };
+  }
   const lang = langOf(hass, cfg.language);
   const t = (k, n, v) => translate(lang, k, n, v);
   const on = (k) => (cfg.views || {})[k] !== false;
@@ -31,6 +47,27 @@ export async function generateDashboard(config, hass) {
   const ids = (g, domain) => all(g).filter((e) => !domain || e.domain === domain).map((e) => e.entity_id);
   const roomPath = (r) => path(`room-${slug(r.id)}`);
   const withLang = (c) => (cfg.language ? Object.assign(c, { language: cfg.language }) : c);
+
+  // personal appearance (per HA user): theme and wallpaper are part of the generated views
+  const personal = cfg.personal !== false;
+  const me = personal ? await loadAppearance(hass) : {};
+  const themeNames = Object.keys((hass.themes && hass.themes.themes) || {});
+  const myTheme = me.theme && themeNames.includes(me.theme) &&
+    (!cfg.appearance_themes || cfg.appearance_themes.includes(me.theme)) ? me.theme : null;
+  const theme = myTheme || cfg.theme;
+  const wallPalette = PALETTES[(personal && me.palette) || cfg.palette] || PALETTES.ocean;
+  const wallOn = personal && me.wallpaper !== undefined ? me.wallpaper : cfg.wallpaper;
+  const background = wallOn && wallPalette ? paletteWallpaper(wallPalette, !!(hass.themes && hass.themes.darkMode)) : null;
+
+  // kiosk tablets: who gets HA's header/sidebar hidden, and who sees which ⋯ menu item.
+  // generate() runs in each user's own browser, so rules are resolved for this user right here.
+  const kiosk = cfg.kiosk || {};
+  const rules = kiosk.menu || {};
+  const hideHeader = kiosk.hide_header !== undefined && allowed(kiosk.hide_header, hass, "none");
+  const hideSidebar = kiosk.hide_sidebar !== undefined && allowed(kiosk.hide_sidebar, hass, "none");
+  const kioskOn = hideHeader || hideSidebar;
+  const menuOn = cfg.menu !== false && cfg.navbar !== false;
+  const canAppearance = personal && allowed(rules.appearance, hass, "all");
 
   const showPrayer = cfg.prayer !== false && hasPrayerTimes(hass);
   const players = cfg.music === false ? [] : (cfg.music_players || musicPlayers(hass));
@@ -112,6 +149,9 @@ export async function generateDashboard(config, hass) {
       ...(weather ? { weather } : {}), ...(alarm ? { alarm, alarm_navigation_path: path("security") } : {}),
       ...(model.house.persons.length ? { persons: model.house.persons.slice(0, 6) } : {}),
       ...(cfg.header_image ? { image: cfg.header_image } : {}),
+      // with the ⋯ menu the picker lives there; the header button is for dashboards without the bar
+      ...(canAppearance && !menuOn ? { appearance: true } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
+      ...(cfg.appearance_themes ? { appearance_themes: cfg.appearance_themes } : {}),
     });
   };
 
@@ -178,7 +218,7 @@ export async function generateDashboard(config, hass) {
   };
   const view = (title, p, icon, sections, extra = {}) => Object.assign({
     title, path: p, icon, type: "sections", max_columns: extra.max_columns || 4, dense_section_placement: true,
-    sections, ...(cfg.theme ? { theme: cfg.theme } : {}),
+    sections, ...(theme ? { theme } : {}), ...(background ? { background } : {}),
   }, extra, { max_columns: extra.max_columns || 4 });
 
   const perRoom = (groups, layout) => rooms.map((r) => {
@@ -237,11 +277,43 @@ export async function generateDashboard(config, hass) {
 
   // floating navigation bar on the main views
   if (cfg.navbar !== false) {
-    const items = views.filter((v) => !v.subview && v.path !== "tablet" && v.path !== "installer").slice(0, 5).map((v) => ({ icon: v.icon, label: v.title, path: path(v.path) }));
-    views.filter((v) => !v.subview).forEach((v) => v.sections.push(
-      section([{ type: "custom:ajnetweb-nav-card", items, grid_options: { columns: "full" } }], 4)));
+    const main = views.filter((v) => !v.subview);
+    const inBar = main.filter((v) => v.path !== "tablet" && v.path !== "installer").slice(0, menuOn ? 4 : 5);
+    const items = inBar.map((v) => ({ icon: v.icon, label: v.title, path: path(v.path) }));
+    const menu = menuOn ? moreMenu(main.filter((v) => !inBar.includes(v))) : null;
+    main.forEach((v) => v.sections.push(section([withLang({ type: "custom:ajnetweb-nav-card", items,
+      ...(menu ? { menu } : {}), grid_options: { columns: "full" } })], 4)));
   }
-  return { title: cfg.title || hass.config.location_name || "Home", views };
+  // dashboard-wide default colour for every AJ Netweb card (a person's own choice still wins)
+  if (cfg.palette && PALETTES[cfg.palette]) {
+    views.forEach((v) => v.sections.forEach((sec) => sec.cards.forEach((c) => {
+      if (String(c.type).startsWith("custom:ajnetweb-")) c.palette = cfg.palette;
+    })));
+  }
+  const out = { title: cfg.title || hass.config.location_name || "Home", views };
+  // read by the kiosk-mode plugin (HACS) from the generated dashboard; ignored when it isn't installed
+  if (kiosk.hide_header !== undefined || kiosk.hide_sidebar !== undefined) {
+    out.kiosk_mode = { hide_header: hideHeader, hide_sidebar: hideSidebar };
+    // people who may not exit kiosk mode can't do it by adding ?disable_km to the URL either
+    if (kioskOn && !allowed(rules.exit_kiosk, hass, "admins")) out.kiosk_mode.ignore_disable_km = true;
+  }
+  return out;
+
+  function moreMenu(extraViews) {
+    const items = [];
+    const add = (group, rule, fallback, item) => { if (allowed(rule, hass, fallback)) items.push({ group: t(group), ...item }); };
+    extraViews.forEach((v) => add("pages", rules.pages, "all", { icon: v.icon, label: v.title, path: path(v.path) }));
+    if (canAppearance) items.push({ group: t("for_me"), icon: "mdi:palette", label: t("appearance"), action: "appearance" });
+    add("for_me", rules.profile, "all", { icon: "mdi:account-circle", label: t("my_profile"), path: "/profile" });
+    add("system", rules.reload, "all", { icon: "mdi:refresh", label: t("reload"), action: "reload" });
+    add("system", rules.settings, "admins", { icon: "mdi:cog", label: t("ha_settings"), path: "/config" });
+    if (cfg.studio_path) add("system", rules.studio, "admins", { icon: "mdi:view-dashboard-edit", label: t("studio"), path: cfg.studio_path });
+    if (kioskOn) add("system", rules.exit_kiosk, "admins", { icon: "mdi:fullscreen-exit", label: t("exit_kiosk"), action: "exit_kiosk" });
+    if (!items.length) return null;
+    return { label: t("menu"), items,
+      appearance: { ...(cfg.palette ? { palette: cfg.palette } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
+        ...(cfg.appearance_themes ? { themes: cfg.appearance_themes } : {}) } };
+  }
 }
 
 function roomView(r, { t, view, section, heading, device, camera, actions }) {

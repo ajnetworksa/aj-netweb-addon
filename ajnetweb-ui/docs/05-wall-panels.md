@@ -25,12 +25,63 @@ cameras first, scenes, access and rooms. Phones use `/<dashboard-url>/home`.
    - Remote admin: on, so you can reload the page from your office.
 4. Optional: integrate Fully Kiosk in HA (built-in integration) to control brightness/screen from automations.
 
-## Hiding Home Assistant's header and sidebar
+## Kiosk lock: hide HA's header and sidebar, keep a ⋯ menu
 
-The generated pages already look full-screen on phones. On panels you may want to hide the top bar:
-- Per user: Profile → *Always hide the sidebar*.
-- Kiosk-style full screen: Fully Kiosk "Fullscreen mode", or the community **kiosk-mode** card via
-  HACS (optional, see the policy in [03](03-cards-reference.md)).
+When a tablet is locked in a kiosk, HA's header (with its ⋮ menu and *Edit dashboard*) and the sidebar
+should disappear, but people still need a few things. The bottom bar has a **⋯ More** button for this,
+and **you decide per person what is inside it**:
+
+| Menu item | Default | What it does |
+|---|---|---|
+| Other pages | Everyone | Pages that don't fit in the bar (Wall Panel, Cameras, Music, Installer…) |
+| My theme & colour | Everyone | The personal Appearance picker ([04](04-themes-branding.md)) |
+| My profile | Everyone | HA profile page: language, dark mode, … |
+| Reload | Everyone | Reloads the page (after a change, or if the tablet looks stuck) |
+| Home Assistant settings | Admins only | `/config` |
+| Dashboard Studio | Admins only | Opens the Studio add-on |
+| Exit kiosk mode | Admins only | Reloads with `?disable_km` (shown only while kiosk mode is on for that user) |
+
+Each item and the header/sidebar hiding take a **rule**: *Everyone*, *Admins only*, *Everyone except
+admins*, *Nobody*, or *Specific people*. Specific people means HA **user names**, the display name and not the
+login, e.g. `Mama, panel-majlis`; case doesn't matter.
+
+**Set it up (Studio → Design → Kiosk & menu):**
+1. Install **kiosk-mode** from HACS (Frontend). It is the one community plugin we use. Our dashboard
+   writes its `kiosk_mode:` config for you, so you never edit it by hand.
+2. *Hide Home Assistant header* and *Hide Home Assistant sidebar*: usually **Everyone except admins**, or
+   **Specific people** with the panel users only (`panel-majlis, panel-kitchen`). Then family phones keep
+   the normal header.
+3. Choose who sees each menu item.
+4. **Deploy**, then reload the tablet.
+
+How it works:
+- The dashboard is generated in each user's browser, so the rules are resolved for that user and
+  the menu only contains what they may see.
+- People who may not exit kiosk mode get `ignore_disable_km`, so typing `?disable_km` in the URL doesn't
+  work for them either.
+- To get out on a locked tablet as installer: log in with an admin user, or use Fully Kiosk's
+  PIN / remote admin.
+- Without kiosk-mode installed, the hide options do nothing, but the ⋯ menu still works. Use Fully
+  Kiosk's *Fullscreen mode* to hide the browser bars.
+
+YAML (strategy options, Level 3):
+
+```yaml
+kiosk:
+  hide_header: [panel-majlis, panel-kitchen]   # or: non_admins | all | admins | none
+  hide_sidebar: non_admins
+  menu:
+    pages: all
+    appearance: [Mama, Sara, non_admins]       # lists can mix names with admins / non_admins
+    profile: all
+    reload: all
+    settings: admins
+    studio: admins
+    exit_kiosk: admins
+menu: true            # false = no ⋯ button
+```
+
+Other ways to hide the sidebar for one user: Profile → *Always hide the sidebar*.
 
 ## Hardware notes
 

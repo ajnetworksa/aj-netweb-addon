@@ -27,12 +27,13 @@ any Home Assistant project.
 | `custom:ajnetweb-actions-card` | Big buttons or scene chips with tap-again confirmation |
 | `custom:ajnetweb-prayer-card` | Next prayer countdown, times, Hijri date, adhan controls |
 | `custom:ajnetweb-music-card` | Music player: Music Assistant search, favourites, rooms, volume |
+| `custom:ajnetweb-appearance-card` | Each person picks their own theme, colour gradient and wallpaper |
 | `custom:ajnetweb-nav-card` | Floating glass navigation bar |
 
 ## Use it in any project
 
 1. Copy `dist/ajnetweb-ui.js` to `/config/www/ajnetweb-ui.js`.
-2. Settings → Dashboards → ⋮ → Resources → add `/local/ajnetweb-ui.js?v=3.1.0` as **JavaScript module**.
+2. Settings → Dashboards → ⋮ → Resources → add `/local/ajnetweb-ui.js?v=3.2.0` as **JavaScript module**.
 3. Create the dashboard:
    - HA 2026.5+: Settings → Dashboards → **Add dashboard** → *Community dashboards* → **AJ Netweb Home**.
    - Older: add a blank dashboard, open the raw configuration editor and paste

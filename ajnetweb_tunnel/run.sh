@@ -18,7 +18,7 @@ umask 077
 readonly DATA=/data/ajn
 readonly NGX_CONF=/tmp/ajn-nginx.conf
 readonly LOCAL_PORT=18123
-readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.4}"
+readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.3.0}"
 export AGENT_VERSION
 mkdir -p "${DATA}" && chmod 700 "${DATA}"
 # Never act on a stale cached copy of the options (e.g. right after the license key was changed)
@@ -164,6 +164,8 @@ enroll() {
     jq '{tenant_id, instance_uid, site_name, subdomain, public_url, cert_not_after, tunnel, turn, heartbeat_interval}' "${r}" > "${DATA}/state.json"
     rm -f "${r}"
     license_fingerprint > "${DATA}/license.sha256"
+    # a successful activation means the subscription is active: give the other add-ons their signal now
+    jq -n --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{status: "active", _at: $at}' > "${DATA}/last_heartbeat.json"
     bashio::log.info "Activated. Instance ID: $(state .instance_uid)  Remote address: $(state .public_url)"
     return 0
 }
@@ -488,7 +490,7 @@ except Exception:
     pass
 out = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    'agent_version': os.environ.get('AGENT_VERSION', '1.2.4'),
+    'agent_version': os.environ.get('AGENT_VERSION', '1.3.0'),
     'instance_uid': st.get('instance_uid'),
     'site_name': st.get('site_name'),
     'public_url': st.get('public_url'),
@@ -520,7 +522,7 @@ heartbeat_loop &
 PIDS+=($!)
 # management agent: telemetry, installer commands (allow-listed), status page
 AJN_SERVER_RESOLVED="${SERVER}" AJN_INSTALL_ID="${INSTALL_ID}" AJN_AGENT_VERSION="${AGENT_VERSION}" \
-    python3 -u /usr/lib/ajn/agent.py &
+    python3 -u -c 'import sys; sys.path.insert(0, "/usr/lib/ajn"); import agent; agent.main()' &
 PIDS+=($!)
 if bashio::config.true 'allow_installer_management'; then
     bashio::log.info "Installer management: ENABLED (every action is listed on the AJ Netweb sidebar page)"

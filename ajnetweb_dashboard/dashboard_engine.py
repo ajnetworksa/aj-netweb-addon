@@ -29,7 +29,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.1.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.2.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -59,7 +59,43 @@ DEFAULT_PROJECT = {
     "room_tap": "popup",
     "header_image": "",
     "navbar": True,
+    "personal": True,
+    "palette": "",
+    "wallpaper": False,
+    "menu": True,
+    "kiosk": {"hide_header": "none", "hide_sidebar": "none",
+              "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
+                       "settings": "admins", "studio": "admins", "exit_kiosk": "admins"}},
 }
+
+
+KIOSK_MENU_ITEMS = ("pages", "appearance", "profile", "reload", "settings", "studio", "exit_kiosk")
+KIOSK_WORDS = ("all", "admins", "non_admins", "none")
+
+
+def _kiosk_rule(rule):
+    """Studio stores all | admins | non_admins | none | [names]; anything else is dropped."""
+    if isinstance(rule, str) and rule in KIOSK_WORDS:
+        return rule
+    if isinstance(rule, list):
+        names = [str(n).strip() for n in rule if str(n).strip()]
+        return names or None
+    return None
+
+
+def _kiosk_options(kiosk) -> Optional[Dict[str, Any]]:
+    if not isinstance(kiosk, dict):
+        return None
+    out = {}
+    for key in ("hide_header", "hide_sidebar"):
+        rule = _kiosk_rule(kiosk.get(key))
+        if rule is not None and rule != "none":
+            out[key] = rule
+    menu = {k: r for k, r in ((k, _kiosk_rule((kiosk.get("menu") or {}).get(k))) for k in KIOSK_MENU_ITEMS)
+            if r is not None}
+    if menu:
+        out["menu"] = menu
+    return out or None
 
 
 def normalize_url_path(raw: str) -> str:
@@ -179,6 +215,12 @@ class DashboardEngine:
             "prayer": False if (project.get("views") or {}).get("prayer") is False else None,
             "music_assistant_entry": self._music_assistant_entry(),
             "navbar": project.get("navbar", True),
+            "personal": False if project.get("personal") is False else None,
+            "palette": project.get("palette") or None,
+            "wallpaper": True if project.get("wallpaper") else None,
+            "menu": False if project.get("menu") is False else None,
+            "kiosk": _kiosk_options(project.get("kiosk")),
+            "studio_path": ctx.get("studio_path") or None,
             "panel_live_cameras": project.get("panel_live_cameras", True),
             "cameras_live": project.get("cameras_view_live") or None,
             "shortcuts": shortcuts,

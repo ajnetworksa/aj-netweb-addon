@@ -1,5 +1,11 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.6.0
+- **AJ Netweb licence:** this add-on now needs this Home Assistant to be licensed by AJ Netweb, normally
+  through **AJ Netweb Remote Access** (no key to enter), or with an offline licence key (see `licensing/README.md`). Existing installations keep
+  working for 14 days after updating; the add-on page shows the Install ID and an Activate box.
+  Developer builds without a public key are not affected.
+
 ## 1.5.0
 - **Security:** port 8091 (host network) was open to the LAN, so anyone on Wi-Fi could unlock doors.
   The studio now only answers Home Assistant ingress.

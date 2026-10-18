@@ -24,6 +24,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
+import attest
 import features as F
 
 DATA = "/data/ajn"
@@ -31,7 +32,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.4")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.3.0")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -49,7 +50,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.2.4"
+        AGENT_VERSION = "1.3.0"
     return AGENT_VERSION
 
 LABELS = {
@@ -653,6 +654,15 @@ def auto_update_loop() -> None:
 
 
 # ------------------------------------------------------------------ local status page
+def licence_signal() -> dict:
+    try:
+        with open(attest.SIGNAL, encoding="utf-8") as f:
+            p = json.load(f)["payload"]
+        return {k: p.get(k) for k in ("status", "valid_until", "products")}
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
 def write_status() -> None:
     st = state()
     hb = {}
@@ -696,6 +706,7 @@ def write_status() -> None:
             "supervisor": (t.get("supervisor") or {}).get("version") or sys_cached.get("supervisor"),
             "os": (t.get("os") or {}).get("version") or sys_cached.get("os"),
         },
+        "licence_signal": licence_signal(),
         "oplog": read_oplog(),
         "temp_logins": [{"username": u["username"], "expires": u["expires"]} for u in F._load_temp()],
     }
@@ -727,6 +738,9 @@ def main() -> None:
     threading.Thread(target=worker, args=(fast,), daemon=True).start()
     threading.Thread(target=poll_commands, args=(q, fast), daemon=True).start()
     threading.Thread(target=auto_update_loop, daemon=True).start()
+    # licence "green signal" for the other AJ Netweb add-ons (see attest.py)
+    threading.Thread(target=attest.loop, args=(os.environ.get("AJN_INSTALL_ID", ""), get_addon_version(), log),
+                     daemon=True, name="licence-signal").start()
     finish_pending_self_update()
     next_tel = next_cleanup = 0.0
     while True:

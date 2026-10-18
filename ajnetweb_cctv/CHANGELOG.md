@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb CCTV & NVR Studio
 
+## 1.3.0
+- **AJ Netweb licence:** this add-on now needs this Home Assistant to be licensed by AJ Netweb, normally
+  through **AJ Netweb Remote Access** (no key to enter), or with an offline licence key (see `licensing/README.md`). Existing installations keep
+  working for 14 days after updating; the add-on page shows the Install ID and an Activate box.
+  Developer builds without a public key are not affected.
+- The add-on now maps the Home Assistant config folder (needed to read the Install ID).
+
 ## 1.2.0
 - **Security:** the studio runs on the host network, so port 8098 was open to the whole LAN with full NVR
   control and no login. It now only answers Home Assistant ingress.

@@ -29,13 +29,13 @@ for doing that quickly and to the same standard on every project.
 
 | Product | Type | Version | Status |
 |---|---|---|---|
-| Dashboard Suite + UI kit | Add-on + Lovelace strategy/cards | 3.1.0 | Production |
-| Prayer & Adhan | Add-on | 1.0.0 | **New — field trial** |
+| Dashboard Suite + UI kit | Add-on + Lovelace strategy/cards | 3.2.0 | Production (11 themes, personal appearance) |
+| Prayer & Adhan | Add-on | 1.1.0 | **New — field trial** |
 | Music (Music Assistant + our music card) | Official add-on + our card | MA 2.x / kit 3.1 | **New — field trial** |
-| Intercom & Door Station | Add-on | 1.5.0 | Production |
-| CCTV & NVR Studio | Add-on | 1.2.0 | Production |
-| Room & Guest Pass Studio | Add-on | 1.1.0 | Production |
-| Remote Access | Add-on | 1.2.4 | Production |
+| Intercom & Door Station | Add-on | 1.6.0 | Production |
+| CCTV & NVR Studio | Add-on | 1.3.0 | Production |
+| Room & Guest Pass Studio | Add-on | 1.2.0 | Production |
+| Remote Access | Add-on | 1.3.0 | Production |
 | Alexa Matter Bridge | Add-on (own repo) | 1.1.0 | Production |
 | Wall panel kit (tablet + mount + kiosk profile) | Hardware bundle | — | Planned (Q1 2027) |
 | Installer portal / fleet monitoring | Cloud service | — | Planned (Q2 2027) |
@@ -105,7 +105,7 @@ and pay for, **P2** helps the business scale.
 | 20 | **Separate UI kit repository** published on HACS | Other integrators and our own non-add-on sites get updates | S |
 | 21 | **Installer portal**: list of sites, versions, health, backups, one-click remote session | Built on items 6, 7 and Remote Access | L |
 | 22 | **Site templates**: save a finished project (Studio options, scenes, blueprints) and start the next villa from it | Big time saver for compounds with identical villas | M |
-| 23 | **Licensing / activation** for paid add-ons (offline-tolerant) | Only if we sell software separately | M |
+| 23 | ~~Licensing / activation~~ **done (offline signed licences, Oct 2026)**. Next: private repo, pre-built images in a private registry, compiled Python | Protects the software; see `licensing/README.md` | M |
 | 24 | **Client app branding**: white-label theme per developer/compound | For real estate developers | S |
 | 25 | **Documentation site** (MkDocs) from `ajnetweb-ui/docs` + training videos for installers | Onboarding new installers | S |
 

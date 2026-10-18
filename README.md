@@ -12,6 +12,9 @@ Add this repository in Home Assistant (Settings → Add-ons → Add-on store →
 | [Remote Access](ajnetweb_tunnel/) | Secure remote access and installer support |
 | [Prayer & Adhan](ajnetweb_adhan/) | Prayer times (Umm Al-Qura and others), adhan on chosen speakers, pauses TVs/music, reminders, Hijri date |
 
+**Proprietary.** These add-ons are AJ Netweb software ([LICENSE](LICENSE)). They run only on Home
+Assistant installations activated with an AJ Netweb licence key. See [licensing/README.md](licensing/README.md).
+
 Alexa Matter Bridge lives in its own repository: <https://github.com/ajnetworksa/alexa_bridge>.
 
 ## AJ Netweb UI kit
@@ -23,6 +26,11 @@ Home Assistant project. **Team playbook:** start with
 Music uses **Music Assistant** (official HA add-on, installed from the default store) together with our
 music card. No custom music server is needed.
 
-## Product plan
+## Product plan and records
 
-Packages, roadmap and the improvement backlog: [docs/product-plan.md](docs/product-plan.md).
+- [docs/product-plan.md](docs/product-plan.md): packages, roadmap and the improvement backlog
+- [docs/project-record.md](docs/project-record.md): every release, what changed and why, decisions, open items
+- [docs/recommended-services.md](docs/recommended-services.md): which official HA add-ons and integrations
+  to install alongside ours (music, Zigbee, Matter, voice, NVR)
+- [ajnetweb-ui/docs/04-themes-branding.md](ajnetweb-ui/docs/04-themes-branding.md): themes, colours,
+  per-person appearance

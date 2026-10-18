@@ -4,6 +4,16 @@
 // `hass-more-info`, `location-changed` and `hass-notification`.
 import { langOf, translate } from "./i18n.js";
 import { TOKENS } from "./styles.js";
+import { applyPalette, loadAppearance } from "./appearance.js";
+import { licenseNotice, licenseState } from "./license.js";
+
+// Live cards, so a personal colour change repaints them all at once
+const LIVE = new Set();
+window.addEventListener("ajn-appearance", () => {
+  LIVE.forEach((card) => card._config && applyPalette(card, card._config.palette));
+  // cards of rebuilt views are gone for good; keep the set small
+  if (LIVE.size > 400) LIVE.forEach((card) => !card.isConnected && LIVE.delete(card));
+});
 
 export const OFFLINE = ["unavailable", "unknown"];
 
@@ -149,12 +159,17 @@ export class AjnBase extends HTMLElement {
     this.validate(config);
     this._config = config;
     this._snapshot = null;
+    applyPalette(this, config.palette);
     if (this._hass) this._update(true);
   }
 
   validate() {}
 
   set hass(hass) {
+    if (!this._hass) {
+      LIVE.add(this);
+      loadAppearance(hass); // cached per user; repaints via the ajn-appearance event
+    }
     this._hass = hass;
     this._update(false);
   }
@@ -171,10 +186,15 @@ export class AjnBase extends HTMLElement {
   _update(force) {
     if (!this._config || !this._hass) return;
     const states = this._hass.states;
-    const snap = [this.lang(), ...this.watched().map((id) => states[id])];
+    const snap = [this.lang(), states["sensor.ajnetweb_license"], ...this.watched().map((id) => states[id])];
     if (!force && this._snapshot && snap.length === this._snapshot.length &&
         snap.every((v, i) => v === this._snapshot[i])) return;
     this._snapshot = snap;
+    const lic = licenseState(this._hass);
+    if (!lic.ok) {
+      this.html(licenseNotice(lic));
+      return;
+    }
     this.render();
   }
 
