@@ -6,7 +6,15 @@ CANONICAL COPY: licensing/ajn_license.py. Each add-on folder holds a copy (Docke
 their own folder); run `python3 tools/license/ajn-license.py sync` after changing this file or the
 public key, and CI / review should reject copies that differ.
 
-How it works
+How it works - two ways to be licensed, Remote Access first:
+1. AJ Netweb Remote Access ("green signal", no key to type). Remote Access is activated by the AJ Netweb
+   server, which gives it a client certificate (CN = Install ID) signed by the AJ Netweb CA and a private
+   key that never leaves its /data. Every 10 minutes it writes /homeassistant/.ajnetweb/remote_access.json:
+   a statement {install id, subscription status, products, valid_until (+72 h)} signed with that key.
+   We check: certificate chain -> pinned AJ Netweb root CA (ROOT_CA_PEM), CN == our Install ID,
+   signature made by the certificate's key, status active, not expired. A copied statement expires and
+   can't be re-signed without the device key.
+2. Offline licence key (sites without Remote Access):
 - AJ Netweb signs a licence with its private Ed25519 key (kept offline by AJ Netweb, never in this repo).
 - The licence names the Home Assistant installation it belongs to (the Install ID = HA's own
   instance UUID from /homeassistant/.storage/core.uuid, the same ID Remote Access uses), the products
@@ -16,7 +24,7 @@ How it works
   /homeassistant/.ajnetweb/license.key (plus a copy in each add-on's /data).
 - New or updated installations without a licence get GRACE_DAYS to be activated, then the add-on
   locks: its pages show the activation screen and its API answers 402.
-- While PUBLIC_KEY is empty (developer build) nothing is enforced.
+- While both PUBLIC_KEY and ROOT_CA_PEM are empty (developer build) nothing is enforced.
 
 Licence format (one line):  AJN1.<base64url(payload JSON)>.<base64url(signature)>
 payload: {"v":1, "id":"AJN-2026-0001", "customer":"Villa Al Noor", "install":"<Install ID>",
@@ -36,6 +44,11 @@ log = logging.getLogger("ajnetweb.license")
 
 # AJ Netweb public key (raw Ed25519, base64). Set by `ajn-license.py keygen --install` + `sync`.
 PUBLIC_KEY = ""
+# AJ Netweb root CA certificate (PEM) that signs Remote Access client certificates. Set by
+# putting it in licensing/root_ca.pem + `ajn-license.py sync`.
+ROOT_CA_PEM = """"""
+# subscription states (from the AJ Netweb server heartbeat) that count as licensed
+GREEN = ("active", "trial", "trialing", "grace")
 
 GRACE_DAYS = 14
 PREFIX = "AJN1."
@@ -44,12 +57,17 @@ DATA_DIR = os.environ.get("AJN_DATA_DIR", os.environ.get("ADDON_DATA_DIR", "/dat
 SHARED_DIR = os.path.join(CONFIG_DIR, ".ajnetweb")
 SHARED_KEY = os.path.join(SHARED_DIR, "license.key")
 SHARED_STATE = os.path.join(SHARED_DIR, "license_state.json")
+REMOTE_SIGNAL = os.path.join(SHARED_DIR, "remote_access.json")
 
 MESSAGES = {
     "unconfigured": "Developer build - licensing is not enforced.",
     "active": "Activated.",
     "grace": "Not activated yet. This add-on keeps working for {days} more day(s).",
-    "locked": "Not activated. Send the Install ID to AJ Netweb to receive your licence key.",
+    "locked": "Not activated. Activate AJ Netweb Remote Access on this Home Assistant, or send the Install ID "
+              "to AJ Netweb for a licence key.",
+    "ra_inactive": "AJ Netweb Remote Access reports the subscription as '{status}'. Contact AJ Netweb.",
+    "ra_stale": "AJ Netweb Remote Access has not confirmed the licence recently - is it running?",
+    "ra_invalid": "The AJ Netweb Remote Access licence signal is not valid for this Home Assistant.",
     "expired": "The licence expired on {expires}. Contact AJ Netweb to renew it.",
     "wrong_install": "This licence belongs to another Home Assistant installation.",
     "wrong_product": "This licence does not include this add-on.",
@@ -139,6 +157,80 @@ def verify(key: str, product: str, iid: str, public_key: str = None) -> Dict[str
     return {"ok": True, "reason": "active", "payload": payload}
 
 
+def remote_access(product: str, iid: str, root_pem: str = None, path: str = None) -> Dict[str, Any]:
+    """Check Remote Access's signed licence signal. Returns {ok, reason, info}."""
+    root_pem = ROOT_CA_PEM if root_pem is None else root_pem
+    if not root_pem.strip():
+        return {"ok": False, "reason": "ra_off", "info": None}
+    try:
+        with open(path or REMOTE_SIGNAL, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+        payload, sig = doc["payload"], base64.b64decode(doc["sig"])
+        leaf_pem, chain_pem = doc["cert_pem"].encode(), (doc.get("chain_pem") or "").encode()
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"ok": False, "reason": "ra_none", "info": None}
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+        from cryptography.x509.oid import NameOID
+    except ImportError:
+        return {"ok": False, "reason": "error", "info": None}
+    info = {"id": payload.get("instance_uid"), "customer": payload.get("site_name"), "products": payload.get("products"),
+            "expires": payload.get("paid_until"), "source": "remote_access", "status": payload.get("status")}
+    try:
+        root = x509.load_pem_x509_certificate(root_pem.encode())
+        leaf = x509.load_pem_x509_certificates(leaf_pem)[0]
+        chain = x509.load_pem_x509_certificates(chain_pem) if chain_pem.strip() else []
+        now = time.time()
+
+        def valid_time(c):
+            return c.not_valid_before_utc.timestamp() - 300 <= now <= c.not_valid_after_utc.timestamp()
+
+        # leaf <- (optional intermediate from the chain) <- pinned root
+        issuers = [root] + [c for c in chain if c.fingerprint(hashes.SHA256()) != root.fingerprint(hashes.SHA256())]
+        trusted = False
+        for issuer in issuers:
+            try:
+                leaf.verify_directly_issued_by(issuer)
+            except Exception:  # noqa: BLE001 - not this issuer
+                continue
+            if issuer is root:
+                trusted = True
+            else:
+                try:
+                    issuer.verify_directly_issued_by(root)
+                    trusted = valid_time(issuer)
+                except Exception:  # noqa: BLE001
+                    trusted = False
+            if trusted:
+                break
+        if not trusted or not valid_time(leaf):
+            return {"ok": False, "reason": "ra_invalid", "info": info}
+        cn = leaf.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if not iid or not cn or cn[0].value.lower() != iid.lower() or str(payload.get("install_id", "")).lower() != iid.lower():
+            return {"ok": False, "reason": "ra_invalid", "info": info}
+        data = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        pub = leaf.public_key()
+        if isinstance(pub, ec.EllipticCurvePublicKey):
+            pub.verify(sig, data, ec.ECDSA(hashes.SHA256()))
+        elif isinstance(pub, rsa.RSAPublicKey):
+            pub.verify(sig, data, padding.PKCS1v15(), hashes.SHA256())
+        else:
+            return {"ok": False, "reason": "ra_invalid", "info": info}
+    except Exception:  # noqa: BLE001 - any parsing / signature problem = not valid
+        return {"ok": False, "reason": "ra_invalid", "info": info}
+    if not (int(payload.get("issued_at", 0)) - 300 <= now <= int(payload.get("valid_until", 0))):
+        return {"ok": False, "reason": "ra_stale", "info": info}
+    if str(payload.get("status")) not in GREEN:
+        return {"ok": False, "reason": "ra_stale" if payload.get("status") in ("stale", "unknown") else "ra_inactive",
+                "info": info}
+    products = payload.get("products") or ["*"]
+    if "*" not in products and product not in products:
+        return {"ok": False, "reason": "wrong_product", "info": info}
+    return {"ok": True, "reason": "active", "info": info}
+
+
 # ---------------------------------------------------------------------------- licence state
 class License:
     """Licence state of one add-on. Cheap to call: the result is cached for a minute."""
@@ -192,25 +284,39 @@ class License:
     def _compute(self) -> Dict[str, Any]:
         iid = install_id()
         base = {"product": self.product, "name": self.name, "install_id": iid, "grace_days": GRACE_DAYS}
-        if not PUBLIC_KEY:
+        if not PUBLIC_KEY and not ROOT_CA_PEM.strip():
             return dict(base, state="unconfigured", allowed=True, message=MESSAGES["unconfigured"])
+        # 1. AJ Netweb Remote Access says this Home Assistant is licensed
+        ra = remote_access(self.product, iid)
+        if ra["ok"]:
+            st = dict(base, state="active", allowed=True, source="remote_access", license=ra["info"],
+                      message="Licensed through AJ Netweb Remote Access.")
+            key = self._key()   # a server-issued AJN1 licence too? lets the browser check the signature
+            if key and PUBLIC_KEY and verify(key, self.product, iid)["ok"]:
+                st["key"] = key
+            return st
+        # 2. offline licence key
         key = self._key()
-        res = verify(key, self.product, iid) if key else {"ok": False, "reason": "locked", "payload": None}
+        res = verify(key, self.product, iid) if key and PUBLIC_KEY else {"ok": False, "reason": "locked", "payload": None}
+        if not res["ok"] and res["reason"] == "locked" and ra["reason"] in ("ra_inactive", "ra_stale", "ra_invalid"):
+            res = {"ok": False, "reason": ra["reason"], "payload": None}
+        base["remote_access"] = ra["reason"]
         p = res.get("payload") or {}
         lic = {k: p.get(k) for k in ("id", "customer", "products", "issued", "expires")} if p else None
         if res["ok"]:
-            return dict(base, state="active", allowed=True, license=lic, key=key,
+            return dict(base, state="active", allowed=True, source="key", license=lic, key=key,
                         message=MESSAGES["active"])
         first = self._first_seen()
         left = GRACE_DAYS - int(max(0.0, time.time() - first) // 86400)
         reason = res["reason"]
-        if left > 0 and reason in ("locked", "invalid", "wrong_install", "wrong_product"):
+        if left > 0 and reason in ("locked", "invalid", "wrong_install", "wrong_product", "ra_stale", "ra_invalid"):
             msg = MESSAGES["grace"].format(days=left)
             if reason != "locked":
-                msg = MESSAGES[reason] + " " + msg
+                msg = MESSAGES[reason].format(status="", expires="") + " " + msg
             return dict(base, state="grace", allowed=True, days_left=left, reason=reason, license=lic, message=msg)
+        status = ((ra.get("info") or {}).get("status")) or ""
         return dict(base, state="locked", allowed=False, reason=reason, license=lic,
-                    message=MESSAGES.get(reason, MESSAGES["locked"]).format(expires=p.get("expires", "")))
+                    message=MESSAGES.get(reason, MESSAGES["locked"]).format(expires=p.get("expires", ""), status=status))
 
     def allowed(self) -> bool:
         return bool(self.status()["allowed"])
@@ -218,7 +324,8 @@ class License:
     def activate(self, key: str) -> Dict[str, Any]:
         key = "".join((key or "").split())
         if not PUBLIC_KEY:
-            return {"ok": False, "error": MESSAGES["unconfigured"], "status": self.status(True)}
+            return {"ok": False, "error": "Offline licence keys are not enabled in this build - use AJ Netweb Remote Access.",
+                    "status": self.status(True)}
         res = verify(key, self.product, install_id())
         if not res["ok"]:
             return {"ok": False, "error": MESSAGES.get(res["reason"], MESSAGES["invalid"]).format(
@@ -246,7 +353,7 @@ def publish(lic: License) -> None:
     attrs = {"friendly_name": "AJ Netweb licence", "icon": "mdi:license", "install_id": st.get("install_id"),
              "products": (st.get("license") or {}).get("products"), "customer": (st.get("license") or {}).get("customer"),
              "expires": (st.get("license") or {}).get("expires"), "key": st.get("key", ""),
-             "days_left": st.get("days_left"), "published_by": lic.product}
+             "days_left": st.get("days_left"), "source": st.get("source"), "published_by": lic.product}
     try:
         import urllib.request
         req = urllib.request.Request("http://supervisor/core/api/states/sensor.ajnetweb_license",
@@ -359,7 +466,9 @@ ACTIVATION_PAGE = """<!doctype html><html><head><meta charset="utf-8">
  <h1>__NAME__</h1><p class="s">AJ Netweb licence</p>
  <div id="st" class="st">…</div>
  <dl id="info"></dl>
- <label>Install ID - send this to AJ Netweb</label>
+ <p class="s" style="margin:14px 0 0">Easiest: install and activate <b>AJ Netweb Remote Access</b> on this Home Assistant -
+   every AJ Netweb add-on is then licensed automatically. Otherwise send the Install ID to AJ Netweb for a licence key.</p>
+ <label>Install ID</label>
  <div class="id"><code id="iid">…</code><button class="g" id="copy">Copy</button></div>
  <label>Licence key</label>
  <textarea id="key" placeholder="AJN1...." spellcheck="false"></textarea>
@@ -371,7 +480,8 @@ const base = location.pathname.replace(/\\/license\\/?$/, "/").replace(/\\/?$/, 
 function show(s) {
   $("st").className = "st " + (s.state === "expired" ? "locked" : s.state); $("st").textContent = s.message;
   $("iid").textContent = s.install_id || "(not found - is the Home Assistant config folder mapped?)";
-  const l = s.license || {}; const rows = [["Customer", l.customer], ["Licence", l.id], ["Products", (l.products || []).map((x) => x === "*" ? "All AJ Netweb add-ons" : x).join(", ")], ["Expires", l.expires || (l.id ? "never" : "")]];
+  const l = s.license || {}; const rows = [["Licensed by", s.source === "remote_access" ? "AJ Netweb Remote Access" : s.source === "key" ? "Licence key" : ""],
+    ["Customer", l.customer], ["Licence", l.id], ["Products", (l.products || []).map((x) => x === "*" ? "All AJ Netweb add-ons" : x).join(", ")], [s.source === "remote_access" ? "Paid until" : "Expires", l.expires || (l.id && s.source === "key" ? "never" : "")]];
   $("info").innerHTML = rows.filter((r) => r[1]).map((r) => `<dt>${r[0]}</dt><dd style="margin:0">${String(r[1]).replace(/[<&]/g, "")}</dd>`).join("");
 }
 fetch(base + "api/license").then((r) => r.json()).then(show);

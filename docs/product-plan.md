@@ -35,7 +35,7 @@ for doing that quickly and to the same standard on every project.
 | Intercom & Door Station | Add-on | 1.6.0 | Production |
 | CCTV & NVR Studio | Add-on | 1.3.0 | Production |
 | Room & Guest Pass Studio | Add-on | 1.2.0 | Production |
-| Remote Access | Add-on | 1.2.5 | Production |
+| Remote Access | Add-on | 1.3.0 | Production |
 | Alexa Matter Bridge | Add-on (own repo) | 1.1.0 | Production |
 | Wall panel kit (tablet + mount + kiosk profile) | Hardware bundle | — | Planned (Q1 2027) |
 | Installer portal / fleet monitoring | Cloud service | — | Planned (Q2 2027) |

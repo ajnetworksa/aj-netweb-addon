@@ -1,9 +1,9 @@
 # Changelog - AJ Netweb Dashboard Suite
 
 ## 3.2.0 - themes, personal appearance, kiosk menu, licensing
-- **AJ Netweb licence:** the add-ons and the dashboard now need an AJ Netweb licence key for this Home
-  Assistant. New *Licence* tab shows the Install ID and takes the key; one key activates every AJ Netweb
-  add-on. The add-on publishes `sensor.ajnetweb_license`, and the dashboard cards verify the signed licence
+- **AJ Netweb licence:** the add-ons and the dashboard now need this Home Assistant to be licensed by
+  AJ Netweb, normally through **AJ Netweb Remote Access** (automatic, nothing to enter) or with an offline
+  licence key. New *Licence* tab shows the source, the Install ID and an Activate box. The add-on publishes `sensor.ajnetweb_license`, and the dashboard cards verify the signed licence
   in the browser. Existing sites keep working for 14 days after updating. Developer builds without a
   public key are not affected. See `licensing/README.md`.
 - **Five new themes:**

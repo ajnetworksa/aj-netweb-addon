@@ -8,3 +8,5 @@ Thumbs.db
 *.key
 licences.csv
 ajnetweb-secrets/
+# the PUBLIC root CA certificate for Remote Access licensing is meant to be committed
+!licensing/root_ca.pem

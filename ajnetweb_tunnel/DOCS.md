@@ -71,3 +71,14 @@ do it remotely.
 * Cloud backups are encrypted on this Home Assistant before they are uploaded.
 * AJ Netweb's gateway inspects web requests to block attacks and bans addresses that try to guess
   passwords. See AJ Netweb's privacy policy for details.
+
+## Licence for the other AJ Netweb add-ons
+
+Remote Access is the licence authority on this Home Assistant. When it is activated and the subscription
+is active, Dashboard, Prayer & Adhan, CCTV, Intercom and Guest Pass are licensed automatically. Nothing
+needs to be entered in those add-ons. The add-on page shows *AJ Netweb add-ons: Licensed*.
+
+- Keep Remote Access **running**: the licence signal is renewed every 10 minutes and is valid for 72 hours.
+- Internet outages of up to 30 days don't affect the other add-ons.
+- If the subscription is suspended, the other add-ons lock too.
+

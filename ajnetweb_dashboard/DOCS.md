@@ -74,6 +74,7 @@ over manually and stop deploying to it.
 ## Licence
 
 The Dashboard Suite and the AJ Netweb dashboard work only on a Home Assistant activated by AJ Netweb.
-Open **Dashboard Studio → Licence**, copy the **Install ID**, send it to AJ Netweb and paste the licence
-key you receive. One key activates every AJ Netweb add-on here. Without a key everything runs for 14 days,
+With **AJ Netweb Remote Access** activated, everything is licensed automatically (Dashboard Studio → Licence
+shows *Licensed by AJ Netweb Remote Access*). Without Remote Access: open **Dashboard Studio → Licence**,
+copy the **Install ID**, send it to AJ Netweb and paste the licence key you receive. Without a key everything runs for 14 days,
 then the add-on shows the activation screen and the dashboard cards show "AJ Netweb - not activated".

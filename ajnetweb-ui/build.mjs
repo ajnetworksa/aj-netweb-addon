@@ -8,6 +8,8 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)))
 // AJ Netweb licence public key (empty = developer build, licence not enforced). See licensing/README.md.
 const pubFile = new URL("../licensing/public_key.txt", import.meta.url);
 const pubKey = existsSync(pubFile) ? readFileSync(pubFile, "utf8").trim() : "";
+const rootCa = new URL("../licensing/root_ca.pem", import.meta.url);
+const enforced = !!pubKey || (existsSync(rootCa) && readFileSync(rootCa, "utf8").includes("BEGIN CERTIFICATE"));
 const options = {
   entryPoints: ["src/index.js"],
   bundle: true,
@@ -16,7 +18,8 @@ const options = {
   outfile: "dist/ajnetweb-ui.js",
   minify: true,
   legalComments: "eof", // keeps the MIT notices of bundled libraries (noble-ed25519, noble-hashes)
-  define: { __VERSION__: JSON.stringify(pkg.version), __AJN_PUBKEY__: JSON.stringify(pubKey) },
+  define: { __VERSION__: JSON.stringify(pkg.version), __AJN_PUBKEY__: JSON.stringify(pubKey),
+            __AJN_ENFORCED__: JSON.stringify(enforced) },
   banner: { js: `/* AJ Netweb UI ${pkg.version} - https://github.com/ajnetworksa/aj-netweb-addon */` },
   plugins: [{
     name: "copy-to-addon",
@@ -25,7 +28,7 @@ const options = {
         if (res.errors.length) return;
         // The add-on registers this file name as a Lovelace resource; keep it stable.
         copyFileSync("dist/ajnetweb-ui.js", "../ajnetweb_dashboard/www/ajnetweb-card-suite.js");
-        console.log(`built dist/ajnetweb-ui.js (${pkg.version}, licence ${pubKey ? "enforced" : "not enforced"}) and copied to the add-on`);
+        console.log(`built dist/ajnetweb-ui.js (${pkg.version}, licence ${enforced ? "enforced" : "not enforced"}) and copied to the add-on`);
       });
     },
   }],

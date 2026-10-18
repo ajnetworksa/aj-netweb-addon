@@ -16,7 +16,8 @@ try {
 
 const ctx = await context({
   entryPoints: ["dev/preview.js"], bundle: true, format: "esm", outfile: "dev/preview.bundle.js",
-  define: { __VERSION__: '"preview"', __AJN_PUBKEY__: JSON.stringify(process.env.AJN_PUBKEY || "") }, sourcemap: true, logLevel: "info",
+  define: { __VERSION__: '"preview"', __AJN_PUBKEY__: JSON.stringify(process.env.AJN_PUBKEY || ""),
+            __AJN_ENFORCED__: JSON.stringify(!!process.env.AJN_PUBKEY) }, sourcemap: true, logLevel: "info",
 });
 await ctx.watch();
 const { port } = await ctx.serve({ servedir: "dev", port: 5173 });

@@ -5,7 +5,8 @@ AJ Netweb licence tool - for AJ Netweb only. Run it on your own computer, never 
   keygen                 create the signing key pair (once). The private key is encrypted with a passphrase.
   issue                  sign a licence for one Home Assistant installation (Install ID)
   inspect <licence>      show what a licence contains and whether the signature is valid
-  sync                   copy licensing/ajn_license.py (with the public key) into every add-on
+  sync                   copy licensing/ajn_license.py (with the public key and the Remote Access root CA)
+                         into every add-on
 
 Requires: pip install cryptography
 
@@ -29,6 +30,7 @@ from datetime import date
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CANON = os.path.join(ROOT, "licensing", "ajn_license.py")
 PUBFILE = os.path.join(ROOT, "licensing", "public_key.txt")
+ROOTCA = os.path.join(ROOT, "licensing", "root_ca.pem")
 ADDONS = ["ajnetweb_dashboard", "ajnetweb_adhan", "ajnetweb_cctv", "ajnetweb_intercom", "ajnetweb_sharing"]
 PRODUCTS = ["dashboard", "adhan", "cctv", "intercom", "sharing"]
 
@@ -159,12 +161,22 @@ def cmd_sync(_a):
     with open(CANON, encoding="utf-8") as f:
         src = f.read()
     src = re.sub(r'^PUBLIC_KEY = ".*"$', f'PUBLIC_KEY = "{pub}"', src, count=1, flags=re.M)
+    ca = open(ROOTCA).read().strip() if os.path.exists(ROOTCA) else ""
+    if ca:
+        need_crypto()
+        from cryptography import x509
+        cert = x509.load_pem_x509_certificate(ca.encode())   # fails loudly on a bad file
+        if "PRIVATE KEY" in ca:
+            sys.exit("licensing/root_ca.pem must contain only the CA CERTIFICATE, never its private key.")
+        print(f"Remote Access root CA: {cert.subject.rfc4514_string()} (valid until {cert.not_valid_after_utc:%Y-%m-%d})")
+    src = re.sub(r'^ROOT_CA_PEM = """.*?"""$', lambda m: f'ROOT_CA_PEM = """{ca}"""', src, count=1, flags=re.M | re.S)
     with open(CANON, "w", encoding="utf-8") as f:
         f.write(src)
     for d in ADDONS:
         with open(os.path.join(ROOT, d, "ajn_license.py"), "w", encoding="utf-8") as f:
             f.write(src)
-    print(f"Synced ajn_license.py into {len(ADDONS)} add-ons ({'key set' if pub else 'no key - not enforced'}).")
+    mode = ", ".join(x for x in (pub and "licence keys", ca and "Remote Access signal") if x) or "nothing - not enforced"
+    print(f"Synced ajn_license.py into {len(ADDONS)} add-ons (accepts: {mode}).")
     print("The dashboard cards read licensing/public_key.txt at build time: run  npm run build  in ajnetweb-ui/.")
 
 

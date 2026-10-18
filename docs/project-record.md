@@ -16,7 +16,7 @@ Versions at the time of writing:
 | Intercom & Door Station | 1.6.0 |
 | CCTV & NVR Studio | 1.3.0 |
 | Room & Guest Pass Studio | 1.2.0 |
-| Remote Access | 1.2.5 |
+| Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
 ---
@@ -66,6 +66,24 @@ records of everything.
   - Not enforced until the owner creates the key pair and commits `licensing/public_key.txt`.
   - CCTV now maps the config folder (to read the Install ID).
   - Versions: Adhan 1.1.0, CCTV 1.3.0, Intercom 1.6.0, Sharing 1.2.0.
+- **Remote Access = licence authority** (follow-up: "all apps should ask Remote Access; no separate key per app"):
+  - Remote Access 1.3.0 signs a "green signal" every 10 minutes (`/config/.ajnetweb/remote_access.json`,
+    valid 72 h) with its device key, attaching the client certificate issued by the AJ Netweb CA.
+  - The other add-ons verify the chain to the pinned root CA (`licensing/root_ca.pem`), CN = Install ID,
+    the signature, status and expiry.
+  - It follows the subscription (suspended → lock, certificate revoked → signal withdrawn) and tolerates
+    30 days offline.
+  - The offline licence keys stay as a fallback. A heartbeat `entitlement` (AJN1) is stored for the
+    browser check.
+  - Works with the current server unchanged.
+- **Remote Access closed-source build:**
+  - `AJN_COMPILE=true` compiles the agent with Nuitka 4.2.2 (no docstrings or asserts, no `.py` in
+    the image).
+  - The workflow `.github/workflows/remote-access-image.yml` publishes compiled images to GHCR.
+  - The steps to switch the add-on to images and move the source to a private repo are in
+    `docs/remote-access-closed-source.md`.
+  - Compilation was verified locally. The full image build runs in Actions, because the sandbox can't
+    pull the HA base image.
 - Docs: `04-themes-branding.md` rewritten (themes, market comparison, personal appearance, variables, the
   glass rule), options in `02`, card in `03`, playbook checks, `recommended-services.md`, this record.
 
@@ -84,7 +102,10 @@ records of everything.
 - *Offline signed licences instead of an online licence server* for the add-ons: villas often have weak
   internet, and nothing can be "switched off" by an outage. Revocation works through expiry dates.
   Remote Access keeps its online activation.
-- *Licensing ships disabled* (no public key in the repo) so that merging can't lock any site by accident.
+- *No "hidden secret key" in the code.* A secret inside client software can be extracted. The protection
+  rests on the per-device key that never leaves the device, the CA key on the server, and short-lived
+  signals bound to the Install ID.
+- *Licensing ships disabled* (no public key or root CA in the repo) so that merging can't lock any site by accident.
   The owner enables it by committing their own public key. The private key never touches the repo or
   this session.
 
