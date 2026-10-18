@@ -218,6 +218,7 @@
       return;
     }
     state.layout = res.layout;
+    if (state.project) renderLayoutRooms();
     if (res.error) toast(res.error);
     renderKpis();
     renderRooms();
@@ -374,17 +375,194 @@
         <span class="badge ${b.installed ? "ok" : "off"}">${b.installed ? "Installed" : "Not installed"}</span></div>`).join("");
   }
 
+  // ------------------------------------------------------------------ layout (drag and drop, no YAML)
+  const BANDS = {
+    top: ["🕐", "Header + top row", "Clock, status chips, weather · prayer · music / Right now"],
+    scenes: ["🎬", "Scenes & quick actions", "Scenes, all lights off, AC off, shades, shortcuts"],
+    access: ["🔐", "Access", "Gates, doors, garage, locks"],
+    favorites: ["⭐", "Favourites", "Devices you starred in Rooms & Devices"],
+    rooms: ["🏠", "Rooms", "Room tiles with floor tabs"],
+    climate: ["❄️", "Climate", "AC controls"],
+    cameras: ["📹", "Cameras", "Large pictures; gate/garage buttons on the picture"],
+    custom: ["🧩", "My cards", "Your own cards from the My cards dashboard"],
+  };
+  const DEFAULT_ORDER = {
+    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "cameras", "custom"],
+    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "custom"],
+  };
+  const TOP = { weather: ["🌤️", "Weather forecast"], prayer: ["🕌", "Prayer times"], media: ["🎵", "Music / Right now"] };
+
+  // A list that can be reordered by drag and drop (mouse) or ▲▼ (touch), each row with an on/off box.
+  function sortable(box, rows, onChange, onAction) {
+    box.innerHTML = rows.map((r, i) => `
+      <div class="srow ${r.on ? "" : "off"}" draggable="true" data-i="${i}">
+        <span class="grip" title="Drag">⋮⋮</span><span class="ic">${r.icon || ""}</span>
+        <span class="tx"><b>${esc(r.title)}</b>${r.sub ? `<span>${esc(r.sub)}</span>` : ""}</span>
+        <span class="mv">${(r.actions || []).map(([k, label, tip]) => `<button data-act="${k}" data-ai="${i}" title="${esc(tip)}">${label}</button>`).join("")}<button data-up="${i}" aria-label="Up">▲</button><button data-dn="${i}" aria-label="Down">▼</button></span>
+        ${r.fixed ? `<span class="tag">${esc(r.fixed)}</span>` : `<input type="checkbox" data-on="${i}" ${r.on ? "checked" : ""} title="Show">`}
+      </div>`).join("");
+    const commit = (list) => { onChange(list); sortable(box, list, onChange, onAction); };
+    box.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => onAction && onAction(b.dataset.act, rows[+b.dataset.ai], b)));
+    let from = null;
+    box.querySelectorAll(".srow").forEach((el) => {
+      el.addEventListener("dragstart", (e) => { from = +el.dataset.i; el.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; });
+      el.addEventListener("dragend", () => el.classList.remove("drag"));
+      el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("over"); });
+      el.addEventListener("dragleave", () => el.classList.remove("over"));
+      el.addEventListener("drop", (e) => {
+        e.preventDefault(); el.classList.remove("over");
+        const to = +el.dataset.i;
+        if (from === null || from === to) return;
+        const list = rows.slice(); const [m] = list.splice(from, 1); list.splice(to, 0, m); from = null; commit(list);
+      });
+    });
+    box.querySelectorAll("[data-up],[data-dn]").forEach((b) => b.addEventListener("click", () => {
+      const i = +(b.dataset.up ?? b.dataset.dn); const j = b.dataset.up !== undefined ? i - 1 : i + 1;
+      if (j < 0 || j >= rows.length) return;
+      const list = rows.slice(); [list[i], list[j]] = [list[j], list[i]]; commit(list);
+    }));
+    box.querySelectorAll("[data-on]").forEach((cb) => cb.addEventListener("change", () => {
+      const list = rows.slice(); list[+cb.dataset.on] = Object.assign({}, list[+cb.dataset.on], { on: cb.checked }); commit(list);
+    }));
+  }
+
+  function renderLayout() {
+    const p = state.project;
+    p.layout = p.layout || {};
+    ["home", "panel"].forEach((page) => {
+      const conf = p.layout[page] || {};
+      const order = [...(conf.order || []).filter((b) => BANDS[b]), ...DEFAULT_ORDER[page].filter((b) => !(conf.order || []).includes(b))];
+      const hidden = new Set(conf.hidden || []);
+      sortable($(page === "home" ? "lyHome" : "lyPanel"),
+        order.map((b) => ({ id: b, icon: BANDS[b][0], title: BANDS[b][1], sub: BANDS[b][2], on: !hidden.has(b) })),
+        (list) => {
+          p.layout = Object.assign({}, p.layout, { [page]: { order: list.map((r) => r.id), hidden: list.filter((r) => !r.on).map((r) => r.id) } });
+          saveSoon();
+        });
+    });
+    const topOn = Array.isArray(p.top_cards) ? p.top_cards : Object.keys(TOP);
+    const topOrder = [...topOn, ...Object.keys(TOP).filter((k) => !topOn.includes(k))];
+    sortable($("lyTop"), topOrder.map((k) => ({ id: k, icon: TOP[k][0], title: TOP[k][1], on: topOn.includes(k) })), (list) => {
+      p.top_cards = list.filter((r) => r.on).map((r) => r.id); saveSoon();
+    });
+    if (!state.lyBound) {   // inputs read state.project when they change, so bind them once
+      state.lyBound = true;
+      bind("fRoomStyle", (el) => (state.project.room_style = el.value), (el) => (el.value = p.room_style === "photo" ? "photo" : "tile"), "change");
+      bind("fHomeCams", (el) => (state.project.home_cameras = Math.max(1, Math.min(8, parseInt(el.value, 10) || 4))), (el) => (el.value = p.home_cameras || 4));
+    }
+    renderLayoutRooms();
+    const mc = $("btnMyCards");
+    mc.textContent = p.custom_dashboard ? "Open My cards editor" : "Create My cards";
+    $("myCardsInfo").textContent = p.custom_dashboard ? `/${p.custom_dashboard} - hidden from the sidebar` : "";
+    mc.onclick = async () => {
+      let url = p.custom_dashboard;
+      if (!url) {
+        mc.disabled = true;
+        const r = await api("api/my_cards", {});
+        mc.disabled = false;
+        if (!r.ok) return toast(r.error || "Could not create the My cards dashboard");
+        state.project = r.project; url = r.url_path;
+        toast("My cards created - press Apply so the dashboard picks it up");
+        renderLayout();
+      }
+      window.open(`/${url}/home?edit=1`, "_blank");
+    };
+    $("pvOpen").href = `/${p.url_path}/${state.pv || "home"}`;
+  }
+
+  // rooms and cameras come from discovery (loaded a moment after the project)
+  function renderLayoutRooms() {
+    const p = state.project;
+    if (!state.layout || !$("lyRooms")) return;
+    const floors = Object.fromEntries((state.layout.floors || []).map((f) => [f.id, f.name]));
+    const areas = state.layout.areas.filter((a) => ((p.areas || {})[a.id] || {}).included !== false);
+    const ord = p.room_order || [];
+    const sorted = areas.map((a, i) => [a, ord.includes(a.id) ? ord.indexOf(a.id) : 1000 + i]).sort((x, y) => x[1] - y[1]).map(([a]) => a);
+    sortable($("lyRooms"), sorted.map((a) => ({ id: a.id, icon: a.picture ? `<img src="${esc(a.picture)}" alt="">` : "🚪", title: a.name,
+      on: true, fixed: floors[a.floor_id] || "No floor", actions: [["rename", "✏️", "Rename room"], ["photo", "📷", "Upload room photo"]] })),
+      (list) => { p.room_order = list.map((r) => r.id); saveSoon(); },
+      (act, row) => (act === "rename" ? renameRoom(row) : pickPhoto(row)));
+    const cams = state.layout.areas.flatMap((a) => (a.cameras || []).map((c) => Object.assign({ area: a.name }, c)));
+    const chosen = p.cameras && p.cameras.length ? p.cameras : cams.map((c) => c.entity_id);
+    const camRows = [...chosen.map((id) => cams.find((c) => c.entity_id === id)).filter(Boolean), ...cams.filter((c) => !chosen.includes(c.entity_id))];
+    sortable($("lyCams"), camRows.map((c) => ({ id: c.entity_id, icon: "📹", title: c.name, sub: c.area, on: chosen.includes(c.entity_id) })),
+      (list) => { const on = list.filter((r) => r.on).map((r) => r.id); p.cameras = on.length === cams.length && on.every((id, i) => id === cams[i].entity_id) ? [] : on; saveSoon(); });
+  }
+
+  async function renameRoom(row) {
+    const name = prompt("Room name", row.title);
+    if (!name || name.trim() === row.title) return;
+    const r = await api("api/room", { area_id: row.id, name: name.trim() });
+    if (!r.ok) return toast(r.error || "Rename failed");
+    const a = state.layout.areas.find((x) => x.id === row.id);
+    if (a) a.name = r.name;
+    toast("Room renamed - the dashboard updates by itself");
+    renderLayoutRooms(); renderRooms();
+  }
+
+  // pick a photo, shrink it in the browser (max 1600 px, JPEG) and set it as the HA area picture
+  function pickPhoto(row) {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*";
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const img = new Image();
+      img.onload = async () => {
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(img.src);
+        toast("Uploading photo…");
+        const r = await api("api/room", { area_id: row.id, photo: c.toDataURL("image/jpeg", 0.85) });
+        if (!r.ok) return toast(r.error || "Upload failed");
+        const a = state.layout.areas.find((x) => x.id === row.id);
+        if (a) a.picture = r.picture;
+        toast("Photo set - it shows on the photo room cards and room sheets");
+        renderLayoutRooms();
+      };
+      img.onerror = () => toast("That file is not an image");
+      img.src = URL.createObjectURL(file);
+    };
+    input.click();
+  }
+
+  function loadPreview() {
+    const p = state.project;
+    const src = `/${p.url_path}/${state.pv || "home"}`;
+    $("pvFrame").src = src;
+    $("pvOpen").href = src;
+  }
+
+  async function applyLayout() {
+    const b = $("btnApplyLayout");
+    b.disabled = true; b.textContent = "Applying…";
+    await saveNow();
+    const res = await api("api/deploy", { project: state.project });
+    b.disabled = false; b.textContent = "Apply";
+    if (!res.ok) return toast(res.error || "Apply failed");
+    toast("Dashboard updated");
+    loadPreview();
+  }
+
   // ------------------------------------------------------------------ tabs & init
   function activateTab(name) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
     if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
+    if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
   }
 
   async function init() {
     document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => activateTab(t.dataset.tab)));
     $("btnDeploy").addEventListener("click", deploy);
     $("btnDeployTop").addEventListener("click", deploy);
+    $("btnApplyLayout").addEventListener("click", applyLayout);
+    document.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
+      document.querySelectorAll("[data-pv]").forEach((x) => x.classList.toggle("on", x === b));
+      state.pv = b.dataset.pv; loadPreview();
+    }));
     $("btnPreview").addEventListener("click", preview);
     $("btnClosePreview").addEventListener("click", () => $("previewDialog").close());
     $("btnCopy").addEventListener("click", () => {

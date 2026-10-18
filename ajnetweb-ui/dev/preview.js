@@ -35,6 +35,11 @@ const hass = {
   themes: { themes: registry, darkMode: modeQ === "dark" },
   callWS: async (msg) => {
     if (msg.type === "frontend/get_user_data") return { value: userData };
+    if (msg.type === "lovelace/config") return { views: [   // a sample "My cards" dashboard
+      { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: [{ type: "heading", heading: "Pool & garden" },
+        { type: "custom:ajnetweb-device-card", entity: "light.living_room_ceiling", name: "Pool lights", grid_options: { columns: 6 } },
+        { type: "custom:ajnetweb-device-card", entity: "switch.main_gate", name: "Sprinklers", grid_options: { columns: 6 } }] }] },
+      { title: "Garden", path: "garden", sections: [{ type: "grid", cards: [{ type: "heading", heading: "Garden" }] }] }] };
     if (msg.type === "call_service" && msg.service === "get_forecasts") {
       const conds = ["sunny", "partlycloudy", "sunny", "cloudy", "sunny", "windy"];
       return { response: { [msg.target.entity_id]: { forecast: conds.map((c, i) => ({

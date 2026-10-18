@@ -15,6 +15,11 @@
 //   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
 //   appearance_themes: [theme names] (limit what people can pick)
 //   menu: false (no ⋯ "More" button in the navigation bar), studio_path: <Dashboard Studio panel path>
+//   layout: { home: { order: [band ids], hidden: [band ids] }, panel: {...} }   bands: top scenes access
+//           favorites rooms climate cameras custom          (Studio "Layout" tab, drag and drop)
+//   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
+//   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
+//           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
 //   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
 //            menu: { pages, appearance, profile, reload, settings, studio, exit_kiosk } }  rules per item
 //     rule = all | admins | non_admins | none | [user names / ids]   (see core/access.js)
@@ -42,7 +47,17 @@ export async function generateDashboard(config, hass) {
   const base = "/" + (window.location.pathname.split("/")[1] || "lovelace");
   const path = (p) => `${base}/${p}`;
   const model = buildModel(hass, { exclude_entities: cfg.exclude_entities, hidden_areas: cfg.hidden_areas });
-  const rooms = model.rooms;
+  // room order from the Studio (drag and drop); rooms not in the list keep their place after it
+  const roomOrder = Array.isArray(cfg.room_order) ? cfg.room_order : [];
+  const rank = (r, i) => { const k = roomOrder.indexOf(r.id); return k >= 0 ? k : 1000 + i; };
+  const rooms = roomOrder.length
+    ? model.rooms.map((r, i) => [r, rank(r, i)]).sort((a, b) => a[1] - b[1]).map(([r]) => r) : model.rooms;
+  // "My cards": a normal HA dashboard edited with HA's own visual editor; its first view is merged into
+  // Home / Wall Panel, its other views become extra pages here (see docs/02 "My cards")
+  let custom = null;
+  if (cfg.custom_dashboard && typeof hass.callWS === "function") {
+    try { custom = await hass.callWS({ type: "lovelace/config", url_path: cfg.custom_dashboard }); } catch (e) { custom = null; }
+  }
   const all = (g) => rooms.flatMap((r) => r[g]);
   const ids = (g, domain) => all(g).filter((e) => !domain || e.domain === domain).map((e) => e.entity_id);
   const roomPath = (r) => path(`room-${slug(r.id)}`);
@@ -208,11 +223,33 @@ export async function generateDashboard(config, hass) {
 
   // ---------------------------------------------------------------- views
   const views = [];
+  // Studio "Layout": order of the Home / Wall Panel bands, and which are hidden. Bands added in later
+  // versions appear at their default place unless hidden, so saved layouts never lose new features.
+  const BANDS = {
+    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "cameras", "custom"],
+    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "custom"],
+  };
+  const layoutOf = (panel) => {
+    const key = panel ? "panel" : "home";
+    const conf = (cfg.layout || {})[key] || {};
+    const order = (conf.order || []).filter((b) => BANDS[key].includes(b));
+    const hidden = new Set(conf.hidden || []);
+    return [...order, ...BANDS[key].filter((b) => !order.includes(b))].filter((b) => !hidden.has(b));
+  };
+  const TOP = ["weather", "prayer", "media"];
+  const topCards = Array.isArray(cfg.top_cards) ? cfg.top_cards.filter((c) => TOP.includes(c)) : TOP;
+  const customBands = () => {
+    const v = custom && Array.isArray(custom.views) ? custom.views[0] : null;
+    if (!v) return [];
+    if (Array.isArray(v.sections)) return v.sections.filter((sec) => (sec.cards || []).length);
+    return Array.isArray(v.cards) && v.cards.length ? [band(v.cards.map((c) => Object.assign({ grid_options: { columns: 12 } }, c)))] : [];
+  };
+
   const homeSections = (panel) => {
-    const out = [];
-    // 1. top band: compact header, then one row of equal cards - weather, prayer, music. A native
-    //    horizontal-stack keeps them in one row with equal widths and heights at any screen width;
-    //    phones get the cards stacked instead (weather is in the header there).
+    const built = {};
+    // top: compact header, then one row of equal cards - weather, prayer, music / "Right now". A native
+    // horizontal-stack keeps them in one row with equal widths and heights at any screen width; phones
+    // get the cards stacked instead (weather is in the header there).
     const media = (variant) => {
       const status = statusCard();
       delete status.grid_options;
@@ -222,55 +259,56 @@ export async function generateDashboard(config, hass) {
       return [{ type: "conditional", conditions: playingCond, card: music },
               { type: "conditional", conditions: [{ condition: "not", conditions: playingCond }], card: status }];
     };
-    const wideRow = [
-      weather ? { type: "custom:ajnetweb-weather-card", entity: weather } : null,
-      showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default" }) : null,
-      ...media("full"),
-    ].filter(Boolean).map((c) => { delete c.grid_options; return c; });
-    out.push(band([
-      header(panel ? "panel" : "default", { weather_wide: weather ? false : undefined }),
+    const topBuilders = {
+      weather: () => (weather ? [{ type: "custom:ajnetweb-weather-card", entity: weather }] : []),
+      prayer: () => (showPrayer ? [withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default" })] : []),
+      media: () => media("full"),
+    };
+    const wideRow = topCards.flatMap((k) => topBuilders[k]()).map((c) => { delete c.grid_options; return c; });
+    built.top = band([
+      header(panel ? "panel" : "default", { weather_wide: weather && topCards.includes("weather") ? false : undefined }),
       wideRow.length ? { type: "horizontal-stack", cards: wideRow, grid_options: { columns: "full" }, ...onlyWide } : null,
-      showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
-      players.length ? musicCard({ variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
-      statusCard({ grid_options: { columns: "full" }, ...onlyNarrow }),
-    ]));
-    // 2. scenes, access, favourites
-    const quick = [];
+      showPrayer && topCards.includes("prayer") ? withLang({ type: "custom:ajnetweb-prayer-card", variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+      players.length && topCards.includes("media") ? musicCard({ variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+      topCards.includes("media") ? statusCard({ grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+    ]);
+    // scenes + house-wide buttons (all lights off, AC off, shades, add-on shortcuts)
     const scenes = all("scenes");
+    const sceneCards = [];
     if (scenes.length) {
-      quick.push(heading(t("scenes"), "mdi:palette"),
+      sceneCards.push(heading(t("scenes"), "mdi:palette"),
         actions(scenes.slice(0, 12).map((e) => ({ name: e.full_name, icon: (hass.states[e.entity_id].attributes.icon) || "mdi:palette",
                                                     action: "scene.turn_on", target: { entity_id: e.entity_id } })), "chips"));
     }
-    // house-wide buttons (all lights off, AC off, shades, add-on shortcuts) as one chip row
     const acts = actions([...(cfg.shortcuts || []), lightsOff(), acOff(), ...shades()], "chips");
-    if (acts) quick.push(...(scenes.length ? [] : [heading(t("quick_actions"), "mdi:gesture-tap-button")]), acts);
+    if (acts) sceneCards.push(...(scenes.length ? [] : [heading(t("quick_actions"), "mdi:gesture-tap-button")]), acts);
+    built.scenes = sceneCards.length ? band(sceneCards) : null;
     const access = all("access");
-    if (access.length) quick.push(heading(t("access"), "mdi:shield-key", path("security")),
-      ...access.slice(0, 8).map((e) => device(e, { name: e.full_name })));
-    const favIds = new Set(cfg.favorites || []);
-    const favs = rooms.flatMap((r) => Object.values(r).filter(Array.isArray).flat()).filter((e) => e && favIds.has(e.entity_id));
-    if (favs.length) quick.push(heading(t("favorites"), "mdi:star"), ...favs.slice(0, 16).map((e) => device(e, { name: e.full_name })));
-    const quickBand = quick.length ? band(quick) : null;
-    // 3. cameras: a row of large pictures (Wall Panel: right after the top band, live if enabled)
-    const cams = all("cameras");
-    // wide screens: balanced rows of large pictures (4 -> 4, 5 -> 3+2, 6 -> 3+3, 7 -> 4+3, 8 -> 4+4);
-    // phones: two per row
-    const camList = cams.slice(0, panel ? 8 : 4);
+    built.access = access.length ? band([heading(t("access"), "mdi:shield-key", path("security")),
+      ...access.slice(0, 8).map((e) => device(e, { name: e.full_name }))]) : null;
+    const favIds = cfg.favorites || [];
+    const pool = new Map(rooms.flatMap((r) => Object.values(r).filter(Array.isArray).flat()).filter((e) => e && e.entity_id).map((e) => [e.entity_id, e]));
+    const favs = favIds.map((id) => pool.get(id)).filter(Boolean);   // in the order chosen in the Studio
+    built.favorites = favs.length ? band([heading(t("favorites"), "mdi:star"), ...favs.slice(0, 16).map((e) => device(e, { name: e.full_name }))]) : null;
+    // cameras: wide screens get balanced rows of large pictures (4 -> 4, 5 -> 3+2, 6 -> 3+3, 7 -> 4+3,
+    // 8 -> 4+4); phones two per row. Wall Panel: live video if enabled.
+    const camPick = Array.isArray(cfg.cameras) && cfg.cameras.length
+      ? cfg.cameras.map((id) => all("cameras").find((c) => c.entity_id === id)).filter(Boolean) : all("cameras");
+    const camList = camPick.slice(0, panel ? 8 : (Number(cfg.home_cameras) || 4));
     const live = panel && cfg.panel_live_cameras !== false;
     const camRows = [];
     const perRow = camList.length <= 4 ? 4 : Math.ceil(camList.length / Math.ceil(camList.length / 4));
     for (let i = 0; i < camList.length; i += perRow) camRows.push(camList.slice(i, i + perRow));
-    const camBand = camList.length ? band([heading(t("cameras"), "mdi:cctv", path("cameras")),
+    built.cameras = camList.length ? band([heading(t("cameras"), "mdi:cctv", path("cameras")),
       ...camRows.map((row) => ({ type: "horizontal-stack", grid_options: { columns: "full" }, ...onlyWide,
         cards: row.map((c) => { const x = camera(c, live); delete x.grid_options; return x; }) })),
       ...camList.map((c) => Object.assign(camera(c, false), { grid_options: { columns: 6 } }, onlyNarrow))]) : null;
     const climates = all("climates");
-    const climateBand = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
+    built.climate = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
       ...climates.slice(0, 8).map((e) => device(e, { name: e.full_name, layout: "wide" }))]) : null;
-    if (panel) out.push(camBand, roomsBand(), quickBand, climateBand);
-    else out.push(quickBand, roomsBand(), climateBand, camBand);
-    return out.filter(Boolean);
+    built.rooms = roomsBand();
+    built.custom = customBands();
+    return layoutOf(panel).flatMap((k) => built[k] || []).filter(Boolean);
   };
   const view = (title, p, icon, sections, extra = {}) => Object.assign({
     title, path: p, icon, type: "sections", max_columns: extra.max_columns || 4, dense_section_placement: true,
@@ -284,6 +322,9 @@ export async function generateDashboard(config, hass) {
   }).filter(Boolean);
 
   views.push(view(t("home"), "home", "mdi:home", homeSections(false)));
+  // further views of "My cards" become pages of this dashboard (after the generated ones, before rooms)
+  const myPages = (custom && Array.isArray(custom.views) ? custom.views.slice(1) : []).map((v, i) =>
+    Object.assign({}, v, { path: `my-${slug(v.path || v.title || String(i + 1))}`, ...(theme ? { theme } : {}), ...(background ? { background } : {}) }));
   if (on("panel")) views.push(view(t("panel"), "tablet", "mdi:tablet-dashboard", homeSections(true)));
   if (on("lights") && all("lights").length) {
     views.push(view(t("lights"), "lights", "mdi:lightbulb-group",
@@ -329,6 +370,7 @@ export async function generateDashboard(config, hass) {
   if (on("installer") && hass.user && hass.user.is_admin) views.push(await installerView(cfg, hass, t, model, view, section, heading));
 
   // room pages (opened from room cards with a long-press, or with room_tap: navigate)
+  views.push(...myPages);
   rooms.forEach((r) => views.push(roomView(r, { t, view, section, heading, device, camera, actions, path })));
 
   // floating navigation bar on the main views
@@ -366,6 +408,8 @@ export async function generateDashboard(config, hass) {
     add("system", rules.reload, "all", { icon: "mdi:refresh", label: t("reload"), action: "reload" });
     add("system", rules.settings, "admins", { icon: "mdi:cog", label: t("ha_settings"), path: "/config" });
     if (cfg.studio_path) add("system", rules.studio, "admins", { icon: "mdi:view-dashboard-edit", label: t("studio"), path: cfg.studio_path });
+    if (cfg.custom_dashboard) add("system", rules.studio, "admins", { icon: "mdi:card-plus-outline", label: t("edit_my_cards"),
+                                                                      path: `/${cfg.custom_dashboard}/0?edit=1` });
     if (kioskOn) add("system", rules.exit_kiosk, "admins", { icon: "mdi:fullscreen-exit", label: t("exit_kiosk"), action: "exit_kiosk" });
     if (!items.length) return null;
     return { label: t("menu"), items,

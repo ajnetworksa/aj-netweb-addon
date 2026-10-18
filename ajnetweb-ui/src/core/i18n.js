@@ -31,7 +31,7 @@ export const STRINGS = {
     pages: "Pages", for_me: "For me", system: "System", my_profile: "My profile (language, dark mode)",
     reload: "Reload", ha_settings: "Home Assistant settings", studio: "Dashboard Studio",
     exit_kiosk: "Exit kiosk mode", no_picture: "No picture", weather: "Weather", today: "Today",
-    quick_actions: "Quick actions",
+    quick_actions: "Quick actions", edit_my_cards: "Edit my cards",
   },
   ar: {
     morning: "صباح الخير", afternoon: "مساء الخير", evening: "مساء الخير", night: "تصبح على خير",
@@ -64,7 +64,7 @@ export const STRINGS = {
     pages: "الصفحات", for_me: "لي", system: "النظام", my_profile: "ملفي الشخصي (اللغة، الوضع الداكن)",
     reload: "إعادة التحميل", ha_settings: "إعدادات Home Assistant", studio: "استوديو اللوحة",
     exit_kiosk: "الخروج من وضع الكشك", no_picture: "لا توجد صورة", weather: "الطقس", today: "اليوم",
-    quick_actions: "إجراءات سريعة",
+    quick_actions: "إجراءات سريعة", edit_my_cards: "تعديل بطاقاتي",
   },
 };
 

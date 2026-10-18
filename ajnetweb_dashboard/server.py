@@ -134,6 +134,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
         if path == "/api/project":
             self._guard(lambda: self._send_json({"ok": True, "project": engine.save_project(payload)}))
+        elif path == "/api/room":
+            self._guard(lambda: respond(engine.room_update(payload.get("area_id"), payload.get("name"), payload.get("photo"))))
+        elif path == "/api/my_cards":
+            self._guard(lambda: respond(engine.my_cards()))
         elif path == "/api/deploy":
             self._guard(lambda: respond(engine.deploy(payload.get("project"))))
         elif path == "/api/preview":

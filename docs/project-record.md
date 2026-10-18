@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.2.0 |
+| Dashboard Suite + UI kit | 3.4.0 |
 | Prayer & Adhan | 1.1.0 |
 | Intercom & Door Station | 1.6.0 |
 | CCTV & NVR Studio | 1.3.0 |
@@ -20,6 +20,31 @@ Versions at the time of writing:
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
 ---
+
+## PR #7 — Edit the dashboard without YAML (Dashboard Suite 3.4.0)
+
+**Asked for:** "something still feels missing, and the dashboard feels YAML-based if it needs editing".
+
+**Done:**
+- Studio → **Layout** tab: drag-and-drop block order and visibility for Home and Wall Panel, top-row cards,
+  room order, rename and photo upload, room style, camera choice and order, live preview + Apply.
+- **My cards**: a native HA dashboard (`ajnetweb-cards`) edited with HA's visual editor. Its first page is
+  merged into Home/Wall Panel, its other pages become extra pages; *Edit my cards* in the ⋯ menu for admins.
+- Room tiles show the area photo.
+
+**Decisions:**
+- *HA's own visual editor for custom cards*, instead of building our own card editor. Every HA and HACS
+  card works, it's familiar to installers, and it is stored in HA (backed up with HA).
+- *Merge, don't replace:* the generated dashboard keeps following the house; the custom cards are read
+  with `lovelace/config` (no admin needed to read) each time the dashboard is built.
+- *Room names and photos go to the HA area registry*, so every other card and app sees the same names.
+
+**Open:** test on a real HA that non-admin users see the merged cards; photo upload from the Companion
+app on iOS.
+
+## PR #6 — Organised layout, Flux-style rooms, Right now card (Dashboard Suite 3.3.0)
+
+See `ajnetweb_dashboard/CHANGELOG.md` 3.3.0.
 
 ## PR #5 — Themes, personal appearance, kiosk menu, licensing, add-on updates (October 2026)
 

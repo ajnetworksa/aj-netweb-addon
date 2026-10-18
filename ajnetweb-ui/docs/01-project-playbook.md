@@ -72,7 +72,8 @@ The dashboard is built **from Areas**. Good areas = good dashboard.
 
 1. Take a **landscape** photo of each main room in good light (no people, lights on, curtains open).
 2. Crop to roughly **16:10**, ~1200 px wide, under 300 KB (any phone editor or squoosh.app).
-3. Settings → Areas → open the area → ✏️ → **Picture** → upload.
+3. Studio → **Layout** → Rooms → 📷 next to the room → pick the photo (it is resized for you).
+   Or: Settings → Areas → open the area → ✏️ → **Picture** → upload.
 
 Rooms without a photo get a soft gradient matched to the room type — fine for corridors, stores, etc.
 
@@ -84,6 +85,8 @@ Open **Dashboard Studio** from the sidebar:
 |---|---|
 | Overview | All checks must be green. Fix anything red first. |
 | Design | Title, URL (`villa-home`), language, theme, which views, room tap (sheet/page), header image |
+| Layout | Drag blocks into the order the client wants, top-row cards, room order and names, cameras. **Apply** and check the preview on phone and tablet width |
+| My cards (in Layout) | Anything special (irrigation, energy graph, gate buttons): add it with HA's visual editor — no YAML |
 | Rooms & Devices | Untick rooms/devices the client must not see; ★ pin the 4–8 things used daily |
 | Support Info | Your company, phone, email — shown on the admin-only Installer page |
 | Deploy | **Deploy** → open Home and Wall Panel to check |

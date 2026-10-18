@@ -31,6 +31,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="overview" role="tab">Overview</button>
       <button class="tab" data-tab="design" role="tab">Design</button>
+      <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
@@ -58,6 +59,64 @@
             </ol>
             <p class="desc">Your choices are saved in the add-on. Add new devices in Home Assistant, then deploy again –
               customisations are kept and the previous version is backed up automatically.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- LAYOUT -->
+      <section class="panel" id="tab-layout">
+        <div class="layout-grid">
+          <div class="layout-col">
+            <div class="card">
+              <h2>Home page</h2>
+              <p class="desc">Drag the sections into the order you want (or use ▲▼). Untick to hide.</p>
+              <div class="sortable" id="lyHome"></div>
+            </div>
+            <div class="card">
+              <h2>Wall Panel page</h2>
+              <div class="sortable" id="lyPanel"></div>
+            </div>
+            <div class="card">
+              <h2>Top row</h2>
+              <p class="desc">Cards next to each other under the clock. "Music / Right now" shows the player while
+                something plays, otherwise what needs attention.</p>
+              <div class="sortable" id="lyTop"></div>
+            </div>
+            <div class="card">
+              <h2>Rooms</h2>
+              <div class="form-grid">
+                <label>Room style
+                  <select id="fRoomStyle"><option value="tile">Tiles with quick buttons</option><option value="photo">Photo cards</option></select>
+                </label>
+              </div>
+              <p class="desc" style="margin-top:12px">Drag rooms into order. Rooms are grouped by floor on the dashboard.</p>
+              <div class="sortable" id="lyRooms"></div>
+            </div>
+            <div class="card">
+              <h2>Cameras</h2>
+              <div class="form-grid"><label>Cameras on Home<input id="fHomeCams" type="number" min="1" max="8"></label></div>
+              <p class="desc" style="margin-top:12px">Order and choice of cameras (Wall Panel shows up to 8).</p>
+              <div class="sortable" id="lyCams"></div>
+            </div>
+            <div class="card">
+              <h2>My cards</h2>
+              <p class="desc">Add <b>anything</b> with Home Assistant's own visual editor - drag and drop, card picker,
+                no YAML. Your cards appear on Home and Wall Panel where <i>My cards</i> sits in the lists above, and
+                every extra page you add there becomes a page of this dashboard. Everything else stays automatic.</p>
+              <div class="row-btns"><button class="btn primary" id="btnMyCards">Create My cards</button>
+                <span class="muted" id="myCardsInfo"></span></div>
+            </div>
+          </div>
+          <div class="layout-col preview-col">
+            <div class="card sticky">
+              <div class="card-head"><h2>Preview</h2>
+                <div class="seg"><button class="seg-b on" data-pv="home">Home</button><button class="seg-b" data-pv="tablet">Wall Panel</button></div>
+              </div>
+              <p class="desc">Changes are saved automatically. Press <b>Apply</b> to update the dashboard and the preview.</p>
+              <div class="row-btns"><button class="btn primary" id="btnApplyLayout">Apply</button>
+                <a class="btn" id="pvOpen" target="_blank">Open in new tab</a></div>
+              <div class="pv-frame"><iframe id="pvFrame" title="Dashboard preview" loading="lazy"></iframe></div>
+            </div>
           </div>
         </div>
       </section>

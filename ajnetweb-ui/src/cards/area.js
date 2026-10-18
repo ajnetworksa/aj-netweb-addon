@@ -145,6 +145,8 @@ export class AjnetwebAreaCard extends AjnBase {
              background: var(--_muted); color: var(--_text2); transition: background .3s, color .3s, box-shadow .3s; }
       .big ha-icon { --mdc-icon-size: 30px; }
       .lit .big { background: rgba(${COLORS.amber}, .2); color: rgb(${COLORS.amber}); box-shadow: 0 0 24px rgba(${COLORS.amber}, .25); }
+      .big.pic { width: 64px; height: 64px; background-size: cover; background-position: center; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+      .lit .big.pic { box-shadow: 0 0 0 3px rgb(${COLORS.amber}), 0 0 24px rgba(${COLORS.amber}, .35); }
       .alerts { display: flex; gap: 4px; margin-top: 6px; }
       .alerts ha-icon { --mdc-icon-size: 15px; color: rgb(var(--c)); }
       .btns { display: flex; flex-direction: column; gap: 6px; justify-content: flex-start; }
@@ -181,7 +183,8 @@ export class AjnetwebAreaCard extends AjnBase {
           <div class="info">
             <div><div class="name">${esc(r.name)}</div><div class="sub">${sub.join(" · ") || "&nbsp;"}</div>
               ${alerts.length ? `<div class="alerts">${alerts.map(([i, c]) => `<ha-icon icon="${i}" style="--c:${c}"></ha-icon>`).join("")}</div>` : ""}</div>
-            <div class="big"><ha-icon icon="${esc(r.icon)}"></ha-icon></div>
+            ${r.picture ? `<div class="big pic" style='background-image:${esc(cssUrl(r.picture))}'></div>`
+                        : `<div class="big"><ha-icon icon="${esc(r.icon)}"></ha-icon></div>`}
           </div>
           ${q.length ? `<div class="btns">${q.map((b, i) => `<button class="q ${b.on ? "on" : ""} ${b.spin ? "spin" : ""}" data-q="${i}"
               style="--c:${b.color}" aria-label="${esc(b.label)}" title="${esc(b.label)}"><ha-icon icon="${b.icon}"></ha-icon>${b.text ? `<b>${esc(b.text)}</b>` : ""}</button>`).join("")}</div>` : ""}

@@ -1,5 +1,19 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.4.0 - edit the dashboard without YAML
+- **New Studio tab: Layout**, with a live preview (phone or tablet width) and an **Apply** button.
+  - Drag the Home and Wall Panel blocks into any order, or untick one to hide it.
+  - Pick the top-row cards (weather, prayer, music).
+  - Rooms: drag the order, ✏️ rename, 📷 upload a photo (resized in the browser, saved to
+    `/config/www/ajnetweb/rooms/` and set as the HA area picture), tiles or photo cards.
+  - Cameras: which ones, in what order, how many on Home.
+- **My cards**: one click creates a normal HA dashboard (`ajnetweb-cards`) edited with HA's visual editor.
+  - Its first page is merged into Home and the Wall Panel as the *My cards* block.
+  - Its other pages become extra pages in the bottom bar.
+  - Admins get **Edit my cards** in the ⋯ menu.
+- Room tiles show the room photo when the area has one.
+- New strategy options: `layout`, `top_cards`, `room_order`, `cameras`, `home_cameras`, `custom_dashboard`.
+
 ## 3.3.0 - organised Home and Wall Panel layout
 - **Home and Wall Panel are now built from full-width bands**, so there are no more big empty areas.
   - Before, a short Cameras section could sit next to a tall Access section; Home Assistant's sections
