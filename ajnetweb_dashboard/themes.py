@@ -20,7 +20,9 @@ THEME_FILE_NAME = "ajnetweb.yaml"
 
 
 def _mode(bg, base, card, border, text, text2, accent, primary=None, shadow="none",
-          radius="20px", blur="0px", header=None, glow="transparent"):
+          radius="20px", blur="0px", header=None, glow="transparent", surface_on=None, text_on=None,
+          sheet=None, nav=None):
+    dark = text.lower() in ("#eef1f6", "#eafcff", "#e8e8e8", "#f6efe4", "#efe9df", "#f5f5f7")
     return {
         "primary-color": primary or accent,
         "accent-color": accent,
@@ -48,6 +50,12 @@ def _mode(bg, base, card, border, text, text2, accent, primary=None, shadow="non
         "ajn-surface": card,
         "ajn-border": border,
         "ajn-radius": radius,
+        # "on" tiles turn bright (Apple Home style); sheet + nav bar surfaces for the UI kit
+        "ajn-surface-on": surface_on or ("rgba(255, 255, 255, 0.94)" if dark else "#ffffff"),
+        "ajn-text-on": text_on or "#15171c",
+        "ajn-sheet-bg": sheet or base,
+        "ajn-nav-bg": nav or ("rgba(28, 30, 38, 0.72)" if dark else "rgba(30, 32, 40, 0.78)"),
+        "ajn-tile-height": "116px",
     }
 
 
@@ -58,13 +66,13 @@ THEMES: Dict[str, Dict] = {
         "description": "Translucent iOS-style glass over a soft gradient. Follows the device light/dark setting.",
         "modes": {
             "light": _mode("linear-gradient(160deg, #e8eef6 0%, #f4efe9 55%, #e9f0f2 100%) fixed",
-                           "#f2f4f8", "rgba(255, 255, 255, 0.72)", "rgba(255, 255, 255, 0.55)",
+                           "#f2f4f8", "rgba(255, 255, 255, 0.5)", "rgba(255, 255, 255, 0.6)",
                            "#151823", "#5f6577", "#2f7dd1",
                            shadow="0 8px 24px rgba(20, 30, 60, 0.08)", blur="18px",
                            header="rgba(242, 244, 248, 0.85)"),
             "dark": _mode("radial-gradient(1200px 800px at 10% -10%, #1d2a44 0%, transparent 60%), "
                           "radial-gradient(900px 700px at 110% 10%, #2a1f3d 0%, transparent 55%), #0d0f14 fixed",
-                          "#0d0f14", "rgba(30, 33, 42, 0.62)", "rgba(255, 255, 255, 0.08)",
+                          "#0d0f14", "rgba(44, 47, 58, 0.55)", "rgba(255, 255, 255, 0.07)",
                           "#eef1f6", "#9aa3b5", "#5aa9ff",
                           shadow="0 10px 30px rgba(0, 0, 0, 0.35)", blur="18px",
                           header="rgba(13, 15, 20, 0.85)", glow="rgba(90, 169, 255, 0.25)"),
@@ -98,8 +106,8 @@ THEMES: Dict[str, Dict] = {
         "label": "Modern Bento",
         "description": "Solid rounded tiles in the style of Apple Home. High contrast on any screen.",
         "modes": {
-            "light": _mode("#eceef2", "#eceef2", "#ffffff", "rgba(0,0,0,0.05)", "#111318", "#6b7180", "#0a84ff",
-                           radius="24px", shadow="0 1px 2px rgba(0,0,0,0.06)"),
+            "light": _mode("#eceef2", "#eceef2", "rgba(255,255,255,0.6)", "rgba(0,0,0,0.04)", "#111318", "#6b7180",
+                           "#0a84ff", radius="24px", shadow="0 1px 2px rgba(0,0,0,0.06)"),
             "dark": _mode("#000000", "#000000", "#1c1c1e", "rgba(255,255,255,0.06)", "#f5f5f7", "#98989f",
                           "#0a84ff", radius="24px"),
         },

@@ -109,10 +109,13 @@
     bind("fTitle", (el) => (p.title = el.value), (el) => (el.value = p.title || ""));
     bind("fUrl", (el) => (p.url_path = el.value), (el) => (el.value = p.url_path || ""));
     $("fUrl").addEventListener("blur", saveNow);
-    bind("fLanguage", (el) => (p.language = el.value), (el) => (el.value = p.language || "en"), "change");
+    bind("fLanguage", (el) => (p.language = el.value), (el) => (el.value = p.language || ""), "change");
     bind("fSidebar", (el) => (p.show_in_sidebar = el.checked), (el) => (el.checked = p.show_in_sidebar !== false), "change");
     bind("fAdmin", (el) => (p.require_admin = el.checked), (el) => (el.checked = !!p.require_admin), "change");
     bind("fPanelLive", (el) => (p.panel_live_cameras = el.checked), (el) => (el.checked = p.panel_live_cameras !== false), "change");
+    bind("fRoomTap", (el) => (p.room_tap = el.value), (el) => (el.value = p.room_tap || "popup"), "change");
+    bind("fHeaderImage", (el) => (p.header_image = el.value.trim()), (el) => (el.value = p.header_image || ""));
+    bind("fNavbar", (el) => (p.navbar = el.checked), (el) => (el.checked = p.navbar !== false), "change");
     bind("fCamsLive", (el) => (p.cameras_view_live = el.checked), (el) => (el.checked = !!p.cameras_view_live), "change");
 
     const vt = $("viewToggles");
@@ -276,7 +279,8 @@
         <div class="links">${main.map((v) =>
           `<a class="btn small" href="${esc(base + "/" + v.path)}" target="_top">${esc(v.title)}</a>`).join("")}</div>
         <p class="muted">Tip: on wall tablets open <code>${esc(base)}/tablet</code> in the Companion app or kiosk browser.
-          If a card shows "Custom element doesn't exist", refresh the browser once to load the new card suite.</p></div>`;
+          Room photos come from Settings → Areas (add a picture to each area). If the page shows
+          "Custom element doesn't exist", refresh the browser once to load the new UI kit.</p></div>`;
       toast("Deployed");
       loadBackups();
       loadHealth();

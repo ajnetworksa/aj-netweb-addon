@@ -1,0 +1,65 @@
+// AJ Netweb UI - premium cards + dashboard strategy for Home Assistant.
+// Load this one file as a dashboard resource (type: module) in any Home Assistant.
+import { AjnetwebDeviceCard } from "./cards/device.js";
+import { AjnetwebAreaCard } from "./cards/area.js";
+import { AjnetwebCameraCard } from "./cards/camera.js";
+import { AjnetwebHeaderCard } from "./cards/header.js";
+import { AjnetwebActionsCard } from "./cards/actions.js";
+import { AjnetwebNavCard } from "./cards/nav.js";
+import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
+import { generateDashboard } from "./strategy/dashboard.js";
+import { AjnetwebStrategyEditor } from "./strategy/editor.js";
+import "./cards/sheet.js";
+
+const VERSION = __VERSION__; // replaced at build time
+const DOCS = "https://github.com/ajnetworksa/aj-netweb-addon/tree/main/ajnetweb-ui";
+
+const CARDS = [
+  ["ajnetweb-device-card", AjnetwebDeviceCard, "AJ Netweb Device", "Premium tile for any device: tap, drag to dim, hold for details."],
+  ["ajnetweb-area-card", AjnetwebAreaCard, "AJ Netweb Room", "Room photo card with live status; opens a sheet with the room's devices."],
+  ["ajnetweb-camera-card", AjnetwebCameraCard, "AJ Netweb Camera", "Clean camera tile; tap for the live stream."],
+  ["ajnetweb-header-card", AjnetwebHeaderCard, "AJ Netweb Header", "Greeting, clock, weather, alarm and live status chips."],
+  ["ajnetweb-actions-card", AjnetwebActionsCard, "AJ Netweb Actions", "Large buttons or scene chips with tap-again confirmation."],
+  ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],
+  ["ajnetweb-room-card", AjnetwebRoomCard, "AJ Netweb Hero (legacy)", "Kept for dashboards created by v1."],
+  ["ajnetweb-quick-scenes", AjnetwebQuickScenes, "AJ Netweb Scenes (legacy)", "Kept for dashboards created by v1."],
+];
+
+window.customCards = window.customCards || [];
+CARDS.forEach(([tag, cls, name, description]) => {
+  if (!customElements.get(tag)) customElements.define(tag, cls);
+  if (!window.customCards.some((c) => c.type === tag)) {
+    window.customCards.push({ type: tag, name, description, preview: !tag.includes("nav"), documentationURL: DOCS });
+  }
+});
+
+class AjnetwebDashboardStrategy extends HTMLElement {
+  static getCreateSuggestions(hass) {
+    return { title: (hass && hass.config && hass.config.location_name) || "Home", icon: "mdi:home-assistant" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ajnetweb-strategy-editor");
+  }
+
+  static async generate(config, hass) {
+    return generateDashboard(config, hass);
+  }
+}
+
+if (!customElements.get("ajnetweb-strategy-editor")) customElements.define("ajnetweb-strategy-editor", AjnetwebStrategyEditor);
+if (!customElements.get("ll-strategy-dashboard-ajnetweb")) customElements.define("ll-strategy-dashboard-ajnetweb", AjnetwebDashboardStrategy);
+
+// HA 2026.5+: shows "AJ Netweb Home" under Community dashboards in the New dashboard dialog
+window.customStrategies = window.customStrategies || [];
+if (!window.customStrategies.some((s) => s.type === "ajnetweb")) {
+  window.customStrategies.push({
+    type: "ajnetweb", strategyType: "dashboard", name: "AJ Netweb Home",
+    description: "Premium room-based dashboard for phones, tablets and wall panels, generated from your areas.",
+    documentationURL: DOCS,
+  });
+}
+
+console.info(`%c AJ NETWEB UI %c ${VERSION} `,
+  "background:#2f7dd1;color:#fff;font-weight:700;border-radius:3px 0 0 3px",
+  "background:#151823;color:#fff;border-radius:0 3px 3px 0");
