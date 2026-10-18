@@ -8,7 +8,7 @@
 //   temperature / humidity       # optional sensor ids
 //   tap_action: popup | navigate ; navigation_path: /dashboard/room-living-room
 //   size: normal | large
-import { AjnBase, OFFLINE, bindGestures, esc, haptic } from "../core/base.js";
+import { AjnBase, OFFLINE, bindGestures, cssUrl, esc, haptic } from "../core/base.js";
 import { COLORS, roomGradient } from "../core/styles.js";
 import { buildModel, roomEntities } from "../core/model.js";
 import { openRoomSheet } from "./sheet.js";
@@ -151,7 +151,7 @@ export class AjnetwebAreaCard extends AjnBase {
     if (motion) pills.push(["mdi:motion-sensor", COLORS.teal, ""]);
     if (playing) pills.push(["mdi:music", COLORS.purple, ""]);
 
-    const bg = r.picture ? `background-image:url("${esc(r.picture)}")` : `background:${roomGradient(`${r.name} ${r.icon}`)}`;
+    const bg = r.picture ? `background-image:${cssUrl(r.picture)}` : `background:${roomGradient(`${r.name} ${r.icon}`)}`;
     const hasLights = (r.entities.lights || []).length > 0;
 
     this.html(`

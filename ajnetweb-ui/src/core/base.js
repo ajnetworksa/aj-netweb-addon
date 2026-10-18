@@ -11,6 +11,9 @@ export const esc = (s) =>
   String(s == null ? "" : s).replace(/[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+/** Safe value for CSS url(): quotes/parentheses in image URLs would break the style. */
+export const cssUrl = (u) => `url("${String(u || "").replace(/["'()\\\s]/g, (c) => encodeURIComponent(c))}")`;
+
 export function haptic(kind = "light") {
   // Companion app listens for this event; browsers fall back to the Vibration API
   window.dispatchEvent(new CustomEvent("haptic", { detail: kind }));

@@ -137,6 +137,39 @@ actions:
     data: { variables: { minutes: 30 } }
 ```
 
+### `custom:ajnetweb-prayer-card` — prayer times
+
+```yaml
+type: custom:ajnetweb-prayer-card
+entity: sensor.ajnetweb_next_prayer   # default; created by the Prayer & Adhan add-on
+variant: default                      # default | compact (no times row) | panel (larger)
+show_controls: true                   # adhan on/off, mute next, play now (needs the add-on)
+```
+Shows the next prayer with a live countdown, today's five times (next one highlighted, past ones
+dimmed) and the Hijri date. **Without the add-on** it reads Home Assistant's own *Islamic Prayer
+Times* sensors directly — times only, no adhan controls or Hijri date.
+
+### `custom:ajnetweb-music-card` — music player
+
+```yaml
+type: custom:ajnetweb-music-card
+entities:                             # default: all Music Assistant players, else all speakers (no TVs)
+  - media_player.majlis_speakers
+  - media_player.kitchen_speaker
+entity: media_player.majlis_speakers  # start with this one (default: whichever is playing)
+variant: full                         # full | compact (one row: art, title, play/pause, next)
+search: true                          # search box (Music Assistant players only)
+favorites: true                       # favourite playlists / radio / albums (Music Assistant)
+music_assistant_entry: 01J...         # optional: config entry id (needed for non-admin users;
+                                      # the Studio fills it in automatically)
+```
+Full variant: artwork, title/artist, live progress, shuffle / previous / play-pause / next / repeat,
+drag-to-set volume and mute, room chips to switch speakers, **Move music here** (Music Assistant
+`transfer_queue`), search across every provider you added to Music Assistant (YouTube Music,
+Spotify, Apple Music, Tidal, Deezer, SoundCloud, TuneIn, radio…) and favourites. Tapping a result
+plays it on the selected speaker. Plain media players (Cast, Sonos, AirPlay, Spotify Connect) get
+all playback controls; search needs Music Assistant.
+
 ### `custom:ajnetweb-nav-card` — floating navigation bar
 
 ```yaml
@@ -164,7 +197,7 @@ These are maintained by Home Assistant and migrate automatically — prefer them
 | `tile` + features | Alarm panel (`alarm-modes`) | Features: `light-brightness`, `cover-position`, `target-temperature`, `climate-hvac-modes`, `fan-speed`, `lock-commands`, `alarm-modes`, `vacuum-commands` |
 | `thermostat` | Room pages (full AC control) | Add `features: [{type: climate-hvac-modes, hvac_modes: [...]}]` |
 | `picture-entity` | Live cameras on the Wall Panel | `camera_view: live` |
-| `media-control` | Media page, room pages | Artwork + controls |
+| `media-control` | Hand-edited dashboards | Replaced by `ajnetweb-music-card` in generated pages |
 | `entity-filter` | "Open right now", Installer page lists | `conditions:` like conditional cards |
 | `markdown` | Installer support info | Supports templates `{{ states(...) }}` |
 

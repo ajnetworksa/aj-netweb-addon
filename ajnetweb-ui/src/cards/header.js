@@ -2,7 +2,7 @@
 //   chips: [{ icon, entities, active | inactive, label, ok_label, ok_icon, color, navigation_path }]
 //   variant: default | panel (large clock for wall tablets)
 //   image: optional background image URL for a hero header
-import { AjnBase, bindGestures, esc, formatState } from "../core/base.js";
+import { AjnBase, bindGestures, cssUrl, esc, formatState } from "../core/base.js";
 import { COLORS } from "../core/styles.js";
 
 const WEATHER_ICONS = {
@@ -164,7 +164,7 @@ export class AjnetwebHeaderCard extends AjnBase {
         <ha-icon icon="${esc(ch.icon)}"></ha-icon>${esc(ch.text)}</div>`).join("");
 
     this.html(`
-      <ha-card class="${c.image ? "hero" : ""}" ${c.image ? `style="--_hero:url('${esc(c.image)}')"` : ""}>
+      <ha-card class="${c.image ? "hero" : ""}" ${c.image ? `style="--_hero:${esc(cssUrl(c.image))}"` : ""}>
         <div class="wrap">
           <div class="top">
             <div>
