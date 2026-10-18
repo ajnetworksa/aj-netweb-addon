@@ -5,7 +5,7 @@ import "../src/index.js";
 
 const params = new URLSearchParams(location.search);
 const q = (k, d) => params.get(k) || d;
-const data = await (await fetch("sample-house.json")).json();
+const data = await (await fetch(q("house", "sample-house") + ".json")).json();
 const themes = await (await fetch("themes.json")).json();
 const modeQ = q("mode", "dark");
 // HA-style theme registry (name -> {modes}) so the strategy and the appearance picker see real themes
@@ -35,6 +35,12 @@ const hass = {
   themes: { themes: registry, darkMode: modeQ === "dark" },
   callWS: async (msg) => {
     if (msg.type === "frontend/get_user_data") return { value: userData };
+    if (msg.type === "call_service" && msg.service === "get_forecasts") {
+      const conds = ["sunny", "partlycloudy", "sunny", "cloudy", "sunny", "windy"];
+      return { response: { [msg.target.entity_id]: { forecast: conds.map((c, i) => ({
+        datetime: new Date(Date.now() + i * 86400000).toISOString(), condition: c,
+        temperature: 38 + (i % 3) - (i === 3 ? 4 : 0), templow: 27 + (i % 2) })) } } };
+    }
     if (msg.type === "frontend/set_user_data") {
       try { localStorage.setItem("ajn-preview-me", JSON.stringify(msg.value)); } catch (e) { /* private mode */ }
       params.delete("me");
@@ -87,21 +93,45 @@ const v = cfg.views.find((x) => x.path === viewPath) || cfg.views[0];
 const viewThemeKey = Object.keys(themes).find((k) => themes[k].__name === v.theme);
 if (viewThemeKey && !params.get("theme")) applyTheme(viewThemeKey);
 if (v.background) document.body.style.background = v.background;
-const cols = Math.min(v.max_columns || 4, innerWidth < 600 ? 1 : innerWidth < 1000 ? 2 : innerWidth < 1400 ? 3 : 4);
+// Same column rules as HA's sections view (hui-sections-view.ts): min 320 px, max 500 px per column,
+// 32 px gaps (8 px under 600 px), capped by max_columns; each section has a 12 x column_span grid.
+const narrow = innerWidth <= 600;
+const gap = narrow ? 8 : 32;
+const fit = Math.max(1, Math.floor((innerWidth - 2 * gap + gap) / (320 + gap)));
+const cols = Math.min(v.max_columns || 4, fit);
 const view = document.getElementById("view");
 view.style.setProperty("--cols", cols);
+view.style.setProperty("--gap", gap + "px");
+view.style.maxWidth = `${cols * 500 + (cols - 1) * gap}px`;
 for (const s of v.sections) {
   const sec = document.createElement("div");
   sec.className = "sec";
-  sec.style.gridColumn = `span ${Math.min(s.column_span || 1, cols)}`;
+  const span = Math.min(s.column_span || 1, cols);
+  sec.style.gridColumn = `span ${span}`;
+  sec.style.gridRow = `span ${s.row_span || 1}`;
+  sec.style.setProperty("--gc", 12 * span);
   view.appendChild(sec);
   for (const c of s.cards) {
-    const span = c.grid_options && c.grid_options.columns === "full" ? 12 : (c.grid_options && c.grid_options.columns) || 12;
+    // card visibility (HA "screen" conditions)
+    if ((c.visibility || []).some((v) => v.condition === "screen" && !matchMedia(v.media_query).matches)) continue;
+    const go = c.grid_options || {};
+    const span = go.columns === "full" || c.type === "heading" ? "full" : (go.columns || 12);
     let el;
     if (c.type.startsWith("custom:")) { el = document.createElement(c.type.slice(7)); el.setConfig(c); el.hass = hass; }
+    else if (c.type === "horizontal-stack") {
+      // like HA's hui-horizontal-stack-card: one row, equal widths, equal heights
+      el = document.createElement("div"); el.style.cssText = "display:flex;gap:8px;align-items:stretch;min-width:0";
+      c.cards.forEach((cc) => {
+        let x;
+        if (cc.type.startsWith("custom:")) { x = document.createElement(cc.type.slice(7)); x.setConfig(cc); x.hass = hass; }
+        else { x = document.createElement("div"); x.className = "ph"; x.textContent = `native ${cc.type}: ${cc.entity || ""}`; }
+        x.style.cssText = "flex:1 1 0;min-width:0"; el.appendChild(x);
+      });
+    }
     else if (c.type === "heading") { el = document.createElement("div"); el.className = "heading"; el.innerHTML = `<ha-icon icon="${c.icon || ""}"></ha-icon>${c.heading}`; }
     else { el = document.createElement("div"); el.className = "ph"; el.textContent = `native ${c.type}: ${c.entity || c.name || ""}`; }
-    el.style.setProperty("--c", span);
+    if (span === "full") el.style.gridColumn = "1 / -1";
+    else el.style.gridColumn = `span min(${span}, ${12 * Math.min(s.column_span || 1, cols)})`;
     sec.appendChild(el);
   }
 }

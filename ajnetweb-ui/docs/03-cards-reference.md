@@ -170,6 +170,17 @@ Spotify, Apple Music, Tidal, Deezer, SoundCloud, TuneIn, radio…) and favourite
 plays it on the selected speaker. Plain media players (Cast, Sonos, AirPlay, Spotify Connect) get
 all playback controls; search needs Music Assistant.
 
+### `custom:ajnetweb-weather-card` — current weather + forecast
+
+```yaml
+type: custom:ajnetweb-weather-card
+entity: weather.forecast_home
+days: 5                  # forecast days (default 5)
+```
+Current temperature and condition, today's high/low, and one row per day with a temperature-range bar
+(blue → yellow → orange, scaled to the week). Uses the `weather.get_forecasts` action, refreshed every
+30 minutes. Tap opens HA's weather details.
+
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 
 ```yaml

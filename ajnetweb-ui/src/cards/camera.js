@@ -1,6 +1,7 @@
 // custom:ajnetweb-camera-card - clean camera tile. Shows the camera's signed snapshot URL
 // (entity_picture) refreshed every few seconds; tap opens HA's live stream dialog.
 import { AjnBase, OFFLINE, bindGestures, esc } from "../core/base.js";
+import { niceName } from "../core/model.js";
 import { COLORS } from "../core/styles.js";
 
 export class AjnetwebCameraCard extends AjnBase {
@@ -45,6 +46,8 @@ export class AjnetwebCameraCard extends AjnBase {
     img.onload = () => {
       const cur = this.shadowRoot.querySelector("img.cur");
       if (cur) cur.src = img.src;
+      const card = this.shadowRoot.querySelector("ha-card");
+      if (card) card.classList.remove("broken");
     };
     img.src = url;
   }
@@ -61,8 +64,14 @@ export class AjnetwebCameraCard extends AjnBase {
              animation: blink 2s infinite; }
       .offline .dot { background: rgb(${COLORS.grey}); box-shadow: none; animation: none; }
       @keyframes blink { 50% { opacity: .35; } }
-      .empty { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255,255,255,.5); }
-      .empty ha-icon { --mdc-icon-size: 40px; }
+      .empty { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 6px;
+               color: rgba(255,255,255,.55); font-size: 12px; font-weight: 600;
+               background: radial-gradient(120% 90% at 50% 0%, #1d2532 0%, #0b0d12 70%); }
+      .empty ha-icon { --mdc-icon-size: 34px; }
+      ha-card.broken img { display: none; }
+      ha-card:not(.broken) .empty.fallback { display: none; }
+      .state { margin-inline-start: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+               background: rgba(0,0,0,.45); letter-spacing: .02em; }
     `;
   }
 
@@ -71,14 +80,22 @@ export class AjnetwebCameraCard extends AjnBase {
     const st = this.st(c.entity);
     const offline = !st || OFFLINE.includes(st.state);
     const url = this._url();
-    const name = c.name || (st && st.attributes.friendly_name) || c.entity;
+    const name = c.name || niceName((st && st.attributes.friendly_name) || c.entity.split(".")[1]);
+    const noPic = `<div class="empty ${url ? "fallback" : ""}"><ha-icon icon="mdi:cctv-off"></ha-icon>${esc(offline ? this.t("offline") : this.t("no_picture"))}</div>`;
     this.html(`
       <ha-card class="tap ${offline ? "offline" : ""}" tabindex="0" role="button" aria-label="${esc(name)}">
-        ${url ? `<img class="cur" src="${esc(url)}" alt=""><img class="next" alt="">` : `<div class="empty"><ha-icon icon="mdi:cctv-off"></ha-icon></div>`}
+        ${url ? `<img class="cur" src="${esc(url)}" alt=""><img class="next" alt="">` : ""}${noPic}
         <div class="shade"></div>
-        <div class="label"><span class="dot"></span>${esc(name)}</div>
+        <div class="label"><span class="dot"></span>${esc(name)}${offline ? `<span class="state">${esc(this.t("offline"))}</span>` : ""}</div>
       </ha-card>`);
-    bindGestures(this.shadowRoot.querySelector("ha-card"), { onTap: () => this.moreInfo(c.entity) });
+    const card = this.shadowRoot.querySelector("ha-card");
+    // snapshot can't be loaded (camera asleep, stream-only, proxy error): show a clean placeholder, keep retrying
+    const cur = this.shadowRoot.querySelector("img.cur");
+    if (cur) {
+      cur.onerror = () => card.classList.add("broken");
+      cur.onload = () => card.classList.remove("broken");
+    }
+    bindGestures(card, { onTap: () => this.moreInfo(c.entity) });
   }
 
   getCardSize() {
@@ -86,6 +103,6 @@ export class AjnetwebCameraCard extends AjnBase {
   }
 
   getGridOptions() {
-    return { columns: 6, min_columns: 4, rows: "auto" };
+    return { columns: 12, min_columns: 6, rows: "auto" };
   }
 }
