@@ -10,7 +10,9 @@
     "preview": "node dev/serve.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.24.2",
-    "@mdi/js": "7.4.47"
+    "@mdi/js": "7.4.47",
+    "@noble/ed25519": "3.2.0",
+    "@noble/hashes": "2.4.0",
+    "esbuild": "0.24.2"
   }
 }

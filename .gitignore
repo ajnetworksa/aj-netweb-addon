@@ -3,3 +3,8 @@ __pycache__/
 *$py.class
 .DS_Store
 Thumbs.db
+# AJ Netweb signing keys and licence register must never be committed
+*.pem
+*.key
+licences.csv
+ajnetweb-secrets/

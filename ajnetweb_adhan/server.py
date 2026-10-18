@@ -27,6 +27,10 @@ import ha
 import player
 import prayer
 
+import ajn_license
+
+LICENSE = ajn_license.License("adhan", "AJ Netweb Prayer & Adhan")
+
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("adhan.server")
 
@@ -156,6 +160,9 @@ def notify_phones(title: str, message: str):
 
 
 def run_adhan(key: str, manual: bool = False):
+    if not LICENSE.allowed():
+        log.warning("Adhan not played: %s", LICENSE.status()["message"])
+        return
     s = load_settings()
     lang = s.get("language", "ar")
     name = prayer.NAMES.get(lang, prayer.NAMES["en"]).get(key, key)
@@ -196,6 +203,8 @@ def run_adhan(key: str, manual: bool = False):
 
 def tick():
     """Every few seconds: refresh times, fire due adhans / reminders."""
+    if not LICENSE.allowed():
+        return
     s = load_settings()
     all_states = ha.states()
     if not STATE["sensors"] or any(e not in all_states for e in STATE["sensors"].values()):
@@ -319,8 +328,14 @@ class Handler(SimpleHTTPRequestHandler):
             log.exception("request failed")
             self._json({"ok": False, "error": str(e)}, 500)
 
+    def do_HEAD(self):
+        if self._ok() and not ajn_license.handle(self, LICENSE):
+            super().do_HEAD()
+
     def do_GET(self):
         if not self._ok():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         p = self._path()
         if p == "/api/status":
@@ -350,6 +365,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if not self._ok():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         p = self._path()
         length = int(self.headers.get("Content-Length") or 0)

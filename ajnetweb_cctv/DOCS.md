@@ -57,3 +57,10 @@ The add-on accurately identifies the physical channel capacity of your hardware:
 - Click **Search Recordings** to pull the timeline directly from your NVR hard drive via ISAPI/CGI.
 - The 24-hour bar shows green blocks for continuous recording and red blocks for motion/event detection.
 - Click anywhere on the timeline or select a clip from the list to begin video playback.
+
+## Licence
+
+This add-on works only on a Home Assistant activated by AJ Netweb. Open the add-on (or Dashboard Studio →
+Licence), copy the **Install ID**, send it to AJ Netweb and paste the licence key you receive. One key
+activates all AJ Netweb add-ons on this Home Assistant. Without a key the add-on runs for 14 days, then
+shows the activation screen only.

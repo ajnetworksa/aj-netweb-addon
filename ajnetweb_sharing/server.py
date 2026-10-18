@@ -18,6 +18,10 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from threading import Lock
 
+import ajn_license
+
+LICENSE = ajn_license.License("sharing", "AJ Netweb Room & Guest Pass Studio")
+
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("sharing.server")
 
@@ -523,11 +527,14 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         return False
 
     def do_HEAD(self):
-        if self._allowed() and self._guest_path_ok(self._normalize_path()):
+        if (self._allowed() and not ajn_license.handle(self, LICENSE, endpoints=not self.guest_only)
+                and self._guest_path_ok(self._normalize_path())):
             super().do_HEAD()
 
     def do_GET(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE, endpoints=not self.guest_only):
             return
         if self.guest_only and self._normalize_path() == "/":
             self.path = "/guest.html" + (("?" + urllib.parse.urlparse(self.path).query) if "?" in self.path else "")
@@ -668,6 +675,8 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE, endpoints=not self.guest_only):
             return
         path = self._normalize_path()
         if not self._guest_path_ok(path):

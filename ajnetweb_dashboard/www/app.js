@@ -378,6 +378,7 @@
   function activateTab(name) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
+    if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
   }
 
   async function init() {

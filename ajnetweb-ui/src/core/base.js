@@ -5,6 +5,7 @@
 import { langOf, translate } from "./i18n.js";
 import { TOKENS } from "./styles.js";
 import { applyPalette, loadAppearance } from "./appearance.js";
+import { licenseNotice, licenseState } from "./license.js";
 
 // Live cards, so a personal colour change repaints them all at once
 const LIVE = new Set();
@@ -185,10 +186,15 @@ export class AjnBase extends HTMLElement {
   _update(force) {
     if (!this._config || !this._hass) return;
     const states = this._hass.states;
-    const snap = [this.lang(), ...this.watched().map((id) => states[id])];
+    const snap = [this.lang(), states["sensor.ajnetweb_license"], ...this.watched().map((id) => states[id])];
     if (!force && this._snapshot && snap.length === this._snapshot.length &&
         snap.every((v, i) => v === this._snapshot[i])) return;
     this._snapshot = snap;
+    const lic = licenseState(this._hass);
+    if (!lic.ok) {
+      this.html(licenseNotice(lic));
+      return;
+    }
     this.render();
   }
 

@@ -12,16 +12,16 @@ Versions at the time of writing:
 | Product | Version |
 |---|---|
 | Dashboard Suite + UI kit | 3.2.0 |
-| Prayer & Adhan | 1.0.0 |
-| Intercom & Door Station | 1.5.0 |
-| CCTV & NVR Studio | 1.2.0 |
-| Room & Guest Pass Studio | 1.1.0 |
+| Prayer & Adhan | 1.1.0 |
+| Intercom & Door Station | 1.6.0 |
+| CCTV & NVR Studio | 1.3.0 |
+| Room & Guest Pass Studio | 1.2.0 |
 | Remote Access | 1.2.5 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
 ---
 
-## PR #5 — Themes, personal appearance, add-on updates (October 2026)
+## PR #5 — Themes, personal appearance, kiosk menu, licensing, add-on updates (October 2026)
 
 **Asked for:** better themes (native blur, liquid glass, popular market styles), gradient colours, colours
 each person can change from their profile, updates to the add-ons where needed, and documentation and
@@ -52,6 +52,20 @@ records of everything.
     nobody or named people), set in Studio → Design → *Kiosk & menu*.
   - The strategy writes `kiosk_mode` for the kiosk-mode plugin. kiosk-mode reads the generated dashboard
     config (`lovelace.config`); I checked its source.
+- **Proprietary licensing** (request: "only I should be able to make those work"):
+  - Offline Ed25519-signed licence keys, bound to the HA Install ID (`core.uuid`), with products and an
+    optional expiry.
+  - One key activates every AJ Netweb add-on on that HA (stored in `/config/.ajnetweb/license.key`).
+  - Each add-on checks it (`ajn_license.py`). When locked, its pages show the activation screen, its API
+    answers 402 and background work stops (adhan, doorbell events). Existing sites get a 14-day grace
+    period after updating.
+  - The Dashboard add-on publishes `sensor.ajnetweb_license`; the UI kit verifies the signed key in the
+    browser (noble-ed25519) and caches the last valid one per browser.
+  - Owner tool `tools/license/ajn-license.py`: keygen, issue (with a licences.csv register), inspect, sync.
+  - Proprietary `LICENSE` file. The owner guide is `licensing/README.md`.
+  - Not enforced until the owner creates the key pair and commits `licensing/public_key.txt`.
+  - CCTV now maps the config folder (to read the Install ID).
+  - Versions: Adhan 1.1.0, CCTV 1.3.0, Intercom 1.6.0, Sharing 1.2.0.
 - Docs: `04-themes-branding.md` rewritten (themes, market comparison, personal appearance, variables, the
   glass rule), options in `02`, card in `03`, playbook checks, `recommended-services.md`, this record.
 
@@ -67,7 +81,16 @@ records of everything.
 - *Kiosk rules resolved in the strategy*, not in the cards. The dashboard is generated per user, so a
   user's generated config only contains what they may see.
 
+- *Offline signed licences instead of an online licence server* for the add-ons: villas often have weak
+  internet, and nothing can be "switched off" by an outage. Revocation works through expiry dates.
+  Remote Access keeps its online activation.
+- *Licensing ships disabled* (no public key in the repo) so that merging can't lock any site by accident.
+  The owner enables it by committing their own public key. The private key never touches the repo or
+  this session.
+
 **Open / to verify on real hardware:**
+- Licensing: generate the real key pair and commit the public key; test activation on a real HA;
+  add the same check to Alexa Bridge (other repo); consider a private repo plus pre-built images.
 - kiosk-mode with a strategy dashboard on a real HA (expected to work: kiosk-mode reads the generated
   config). Exiting kiosk as installer: log in as admin, or use the Fully Kiosk PIN.
 - Blur cost on cheap Android tablets with Liquid Glass and Aurora (Material, Bento and OLED are the fallbacks).

@@ -44,3 +44,10 @@ Home Assistant lacks a granular native Role-Based Access Control (RBAC) system f
    - Go to the **User Room Matrix** tab.
    - Check or uncheck rooms for each user.
    - Click **Save Permissions** and **⚡ 1-Click Sync to HA Dashboards**.
+
+## Licence
+
+This add-on works only on a Home Assistant activated by AJ Netweb. Open the add-on (or Dashboard Studio →
+Licence), copy the **Install ID**, send it to AJ Netweb and paste the licence key you receive. One key
+activates all AJ Netweb add-ons on this Home Assistant. Without a key the add-on runs for 14 days, then
+shows the activation screen only.

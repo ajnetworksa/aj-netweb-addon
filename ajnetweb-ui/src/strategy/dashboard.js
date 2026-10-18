@@ -24,11 +24,18 @@ import { hasPrayerTimes } from "../cards/prayer.js";
 import { musicPlayers } from "../cards/music.js";
 import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.js";
 import { allowed } from "../core/access.js";
+import { licenseState } from "../core/license.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
 export async function generateDashboard(config, hass) {
   const cfg = config || {};
+  const lic = licenseState(hass);
+  if (!lic.ok) {
+    // one page that says so (the cards render the notice) instead of the whole dashboard
+    return { title: cfg.title || "Home", views: [{ title: "AJ Netweb", path: "home", type: "sections", max_columns: 1,
+      sections: [{ type: "grid", cards: [{ type: "custom:ajnetweb-actions-card", actions: [], grid_options: { columns: 12 } }] }] }] };
+  }
   const lang = langOf(hass, cfg.language);
   const t = (k, n, v) => translate(lang, k, n, v);
   const on = (k) => (cfg.views || {})[k] !== false;

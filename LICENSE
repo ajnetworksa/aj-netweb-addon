@@ -1,0 +1,25 @@
+AJ Netweb Smart Home Platform - Proprietary Licence
+
+Copyright (c) 2026 AJ Netweb. All rights reserved.
+
+This repository and everything in it (the Home Assistant add-ons, the AJ Netweb UI kit, themes,
+blueprints, documentation and tools) is proprietary software of AJ Netweb. It is not open source.
+
+1. Use. The software may only be installed and used on a Home Assistant installation that AJ Netweb
+   (or an installer authorised by AJ Netweb in writing) has activated with a valid AJ Netweb licence key.
+   Each licence key is issued for one Home Assistant installation.
+2. Restrictions. Without prior written permission from AJ Netweb you may not copy, redistribute,
+   publish, sell, sublicense, modify, translate, reverse engineer, or remove or work around the
+   licence check of the software, or use it to provide services to third parties.
+3. Ownership. The software is licensed, not sold. AJ Netweb keeps all rights, title and interest,
+   including all intellectual property rights.
+4. Termination. The right to use the software ends automatically if these terms are broken, or when
+   the licence key expires or is revoked.
+5. No warranty. The software is provided "as is", without warranty of any kind. To the extent the law
+   allows, AJ Netweb is not liable for any damages arising from its use.
+
+Third-party components keep their own licences, for example Home Assistant base images (Apache-2.0),
+noble-ed25519 and noble-hashes (MIT, notices kept in the built file), frp (Apache-2.0), Matterbridge
+(Apache-2.0). Their terms apply to those components only.
+
+Contact AJ Netweb for licensing.

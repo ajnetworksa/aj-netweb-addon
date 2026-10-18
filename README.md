@@ -12,6 +12,9 @@ Add this repository in Home Assistant (Settings → Add-ons → Add-on store →
 | [Remote Access](ajnetweb_tunnel/) | Secure remote access and installer support |
 | [Prayer & Adhan](ajnetweb_adhan/) | Prayer times (Umm Al-Qura and others), adhan on chosen speakers, pauses TVs/music, reminders, Hijri date |
 
+**Proprietary.** These add-ons are AJ Netweb software ([LICENSE](LICENSE)). They run only on Home
+Assistant installations activated with an AJ Netweb licence key. See [licensing/README.md](licensing/README.md).
+
 Alexa Matter Bridge lives in its own repository: <https://github.com/ajnetworksa/alexa_bridge>.
 
 ## AJ Netweb UI kit

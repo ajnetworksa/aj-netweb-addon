@@ -29,6 +29,10 @@ except ImportError:
 from intercom_dahua import DahuaIntercomClient
 from intercom_hikvision import HikvisionIntercomClient
 
+import ajn_license
+
+LICENSE = ajn_license.License("intercom", "AJ Netweb Intercom & Door Station")
+
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("intercom.server")
 
@@ -851,7 +855,8 @@ def ha_action_listener_worker():
                     elif mtype == "event":
                         ev_data = msg.get("event", {}).get("data", {})
                         action = ev_data.get("action")
-                        handle_mobile_notification_action(action, ev_data)
+                        if LICENSE.allowed():
+                            handle_mobile_notification_action(action, ev_data)
                 except Exception as err:
                     log.error("Error processing HA WebSocket event: %s", err)
 
@@ -887,6 +892,8 @@ def start_ha_action_listener():
 def on_door_event(event_info: dict):
     """Callback triggered whenever an event is received from Door Station."""
     global _last_ring_time
+    if not LICENSE.allowed():
+        return
     ev = event_info.get("event")
     log.info("Received Door Station Event: %s", event_info)
 
@@ -1048,11 +1055,13 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         log.debug("%s - %s", self.client_address[0], fmt % args)
 
     def do_HEAD(self):
-        if self._allowed():
+        if self._allowed() and not ajn_license.handle(self, LICENSE):
             super().do_HEAD()
 
     def do_GET(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
@@ -1354,6 +1363,8 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()

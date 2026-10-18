@@ -12,6 +12,10 @@ from socketserver import ThreadingMixIn
 
 from dashboard_engine import ADDON_VERSION, DashboardEngine
 
+import ajn_license
+
+LICENSE = ajn_license.License("dashboard", "AJ Netweb Dashboard Suite")
+
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s")
 log = logging.getLogger("dashboard.server")
 
@@ -73,6 +77,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if not self._allowed():
             return
+        if ajn_license.handle(self, LICENSE):
+            return
         path = self._path()
         routes = {
             "/api/status": lambda: {"ready": True, "version": ADDON_VERSION,
@@ -94,7 +100,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_HEAD(self):
-        if self._allowed():
+        if self._allowed() and not ajn_license.handle(self, LICENSE):
             super().do_HEAD()
 
     def _discovery(self):
@@ -112,6 +118,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
     # ------------------------------------------------------------------ POST
     def do_POST(self):
         if not self._allowed():
+            return
+        if ajn_license.handle(self, LICENSE):
             return
         path = self._path()
         length = int(self.headers.get("Content-Length") or 0)
@@ -144,6 +152,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
 
 def main():
+    ajn_license.start_publisher(LICENSE)
     log.info("AJ Netweb Dashboard Suite %s listening on ingress port %s", ADDON_VERSION, PORT)
     log.info("Home Assistant config folder: %s", engine.config_dir)
     # Keep the card suite file current after add-on updates so existing dashboards get fixes

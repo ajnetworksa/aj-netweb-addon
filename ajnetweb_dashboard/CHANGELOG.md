@@ -1,6 +1,11 @@
 # Changelog - AJ Netweb Dashboard Suite
 
-## 3.2.0 - themes and personal appearance
+## 3.2.0 - themes, personal appearance, kiosk menu, licensing
+- **AJ Netweb licence:** the add-ons and the dashboard now need an AJ Netweb licence key for this Home
+  Assistant. New *Licence* tab shows the Install ID and takes the key; one key activates every AJ Netweb
+  add-on. The add-on publishes `sensor.ajnetweb_license`, and the dashboard cards verify the signed licence
+  in the browser. Existing sites keep working for 14 days after updating. Developer builds without a
+  public key are not affected. See `licensing/README.md`.
 - **Five new themes:**
   - **Liquid Glass**: Apple iOS 26 style, very clear glass, bright edge highlight, vivid colour field. Light and dark.
   - **Native Blur**: Home Assistant's own colours with soft frosted cards.
