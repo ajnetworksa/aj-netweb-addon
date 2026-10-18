@@ -1,5 +1,24 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.5.0
+- **Security:** port 8091 (host network) was open to the LAN, so anyone on Wi-Fi could unlock doors.
+  The studio now only answers Home Assistant ingress.
+- **Privacy:** visitor photos for notifications were published under `/local` (no login needed) with
+  guessable names (`latest_ring.jpg`). They now get random names and only the latest 20 are kept.
+- Fixed: notification links pointed to one specific installation (`/67bcea52_ajnetweb_intercom`) and to
+  `/ajnetweb`. The add-on path and the AJ Netweb dashboard are now detected automatically
+  (or set `dashboard_path`).
+- Fixed: snapshot fallback used camera ids from one site (`camera.192_168_8_2`). New option
+  `doorbell_camera_entity`, otherwise door/gate cameras are detected automatically.
+- Fixed: the WebRTC config contained an installer's LAN STUN server (`192.168.8.214`). New optional
+  `stun_server` option instead.
+- Fixed: live audio/talk asked go2rtc for a stream (`doorbell_live`) that was never created. The door
+  station is now registered with go2rtc automatically (RTSP + ISAPI two-way audio on Hikvision), and both
+  the built-in go2rtc and the go2rtc add-on are supported.
+- Fixed: snapshots were written to the unmounted `/config/www`.
+- Same settings fixes as CCTV (password placeholder, `ui_settings.json`), passwords redacted in responses.
+- The server no longer silently moves to another port when 8091 is busy (ingress can't follow it).
+
 ## 1.4.4
 - **Native Two-Way WebRTC Audio & Microphone Backchannel**:
   - Integrated zero-latency WebRTC live audio monitoring and bidirectional microphone backchannel directly into the addon UI.

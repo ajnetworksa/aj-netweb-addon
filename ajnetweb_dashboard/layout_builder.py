@@ -35,6 +35,7 @@ STRINGS = {
         "unavailable": "Offline devices", "low_battery": "Low batteries", "updates": "Updates available",
         "open_now": "Open right now", "support": "Support", "system": "System health",
         "ac_off_q": "Turn off every AC in the house?", "lights_off_q": "Turn off every light in the house?",
+        "door_station": "Door station", "cctv": "CCTV",
     },
     "ar": {
         "home": "الرئيسية", "lights": "الإضاءة", "climate": "التكييف", "security": "الأمان",
@@ -48,6 +49,7 @@ STRINGS = {
         "unavailable": "أجهزة غير متصلة", "low_battery": "بطاريات منخفضة", "updates": "تحديثات متاحة",
         "open_now": "مفتوح الآن", "support": "الدعم الفني", "system": "حالة النظام",
         "ac_off_q": "إيقاف جميع المكيفات في المنزل؟", "lights_off_q": "إطفاء جميع الإضاءة في المنزل؟",
+        "door_station": "الإنتركم", "cctv": "الكاميرات",
     },
 }
 
@@ -222,6 +224,16 @@ class LayoutBuilder:
              "target": {"entity_id": ids}},
         ]
 
+    def addon_actions(self):
+        """Shortcuts to the AJ Netweb Door Station / CCTV studios when those add-ons are installed."""
+        out = []
+        if self.ctx.get("intercom_path"):
+            out.append({"name": self.t["door_station"], "icon": "mdi:doorbell-video",
+                        "navigation_path": self.ctx["intercom_path"]})
+        if self.ctx.get("cctv_path"):
+            out.append({"name": self.t["cctv"], "icon": "mdi:cctv", "navigation_path": self.ctx["cctv_path"]})
+        return out
+
     def weather(self) -> Optional[str]:
         w = self.project.get("weather_entity")
         if w:
@@ -338,7 +350,8 @@ class LayoutBuilder:
         if favs:
             quick.append(self.heading(t["favorites"], "mdi:star"))
             quick += [self.tile(e, cols=6, name=self._with_room(e)) for e in favs[:12]]
-        acts = self.actions([self.lights_off_action(), self.ac_off_action()] + self.shades_actions())
+        acts = self.actions(self.addon_actions() + [self.lights_off_action(), self.ac_off_action()]
+                            + self.shades_actions())
         if acts:
             quick.append(acts)
         scenes = self.all("scenes")

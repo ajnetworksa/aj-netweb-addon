@@ -1,5 +1,23 @@
 # Changelog - AJ Netweb Room & Guest Pass Studio
 
+## 1.1.0
+- **Fixed guest links.** Links pointed to the ingress URL, which needs a Home Assistant login, so guests
+  could never open them. Guests now use a dedicated port (**8097**) that serves only the guest page and the
+  token-checked guest API. The link uses the host's LAN address, or set `guest_base_url`
+  (e.g. a remote-access URL).
+- **Fixed freeze.** The first guest action deadlocked the add-on (a lock was taken twice); every later
+  request hung until restart.
+- **Security:** the guest PIN was stored but never checked. It is now required, with a 15-minute lockout
+  after 5 wrong attempts.
+- **Security:** guests could call any service on any device in their rooms, and `allow_guest_*` options
+  were not enforced. Services are now allow-listed per domain, the domain comes from the entity itself, and
+  the add-on options cap what a pass can include (locks stay off unless `allow_guest_locks` is on).
+- **Security:** the admin studio only answers Home Assistant ingress; wildcard CORS removed.
+- Fixed dashboard sync: views were hidden from admins and matched rooms by substring ("bed" matched
+  "bedroom-2"). Admins now always keep access, matching is exact (including Dashboard Suite `room-<area>`
+  pages), all storage dashboards are covered, and a backup is saved first to `/share/ajnetweb/sharing_backups`.
+- Admin flag now detected correctly; Supervisor/system users hidden from the user list.
+
 ## 1.0.0
 - Initial release of AJ Netweb Room & Guest Pass Studio for Home Assistant.
 - Instant QR Code & Guest Link generator for temporary visitors, Airbnb, cleaners, and guests (zero app, zero account, zero YAML).

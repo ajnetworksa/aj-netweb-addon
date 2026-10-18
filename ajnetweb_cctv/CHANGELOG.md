@@ -1,5 +1,15 @@
 # Changelog - AJ Netweb CCTV & NVR Studio
 
+## 1.2.0
+- **Security:** the studio runs on the host network, so port 8098 was open to the whole LAN with full NVR
+  control and no login. It now only answers Home Assistant ingress.
+- **Security:** device passwords are no longer returned by the save and adopt endpoints.
+- Fixed: saving settings in the UI could replace the real password with the `••••••••` placeholder.
+- Fixed: UI settings were written to `/data/options.json`, which the Supervisor rewrites on every start
+  (changes were lost). They are now kept in `/data/ui_settings.json`.
+- Faster: re-connecting devices no longer freezes the UI, and viewers of the same camera share one NVR
+  snapshot request (less load on the NVR with several wall panels open).
+
 ## 1.0.0
 - Initial release of AJ Netweb CCTV & NVR Studio.
 - Dual-brand native support: Hikvision (ISAPI) and Dahua / Amcrest (CGI / RPC).

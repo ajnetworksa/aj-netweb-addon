@@ -28,10 +28,31 @@ USER_PERMS_FILE = "/data/sharing/user_permissions.json"
 AUDIT_LOG_FILE = "/data/sharing/access_audit.json"
 WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8096))
+# Guests have no Home Assistant account, so the guest portal is served on its own
+# port (mapped in config.json). Only guest.html and the token-checked guest API live there.
+GUEST_PORT = int(os.environ.get("GUEST_PORT", 8097))
+# The admin studio answers the Supervisor ingress proxy only.
+ALLOWED_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
+
+# Services a guest may call, per domain. Anything else is rejected.
+GUEST_SERVICES = {
+    "light": {"turn_on", "turn_off", "toggle"},
+    "switch": {"turn_on", "turn_off", "toggle"},
+    "fan": {"turn_on", "turn_off", "toggle", "set_percentage"},
+    "climate": {"set_temperature", "set_hvac_mode", "set_fan_mode", "turn_on", "turn_off"},
+    "cover": {"open_cover", "close_cover", "stop_cover", "set_cover_position"},
+    "media_player": {"media_play_pause", "media_play", "media_pause", "volume_set", "volume_up",
+                     "volume_down", "turn_on", "turn_off"},
+    "scene": {"turn_on"},
+    "lock": {"lock", "unlock"},
+}
+PIN_MAX_FAILS = 5
+PIN_LOCK_SECONDS = 900
+_pin_fails = {}  # token -> (count, locked_until)
 
 os.makedirs(DATA_DIR, exist_ok=True)
 
-_lock = Lock()
+_lock = threading.RLock()  # re-entrant: guest control updates passes while holding it
 _cache_lock = Lock()
 _ha_cache = {
     "areas": [],
@@ -57,6 +78,7 @@ def load_config() -> dict:
         "allow_guest_covers": os.environ.get("ALLOW_GUEST_COVERS", "true").lower() == "true",
         "allow_guest_locks": os.environ.get("ALLOW_GUEST_LOCKS", "false").lower() == "true",
         "auto_prune_expired": os.environ.get("AUTO_PRUNE", "true").lower() == "true",
+        "guest_base_url": os.environ.get("GUEST_BASE_URL", ""),
         "log_level": os.environ.get("LOG_LEVEL", "info"),
     }
     if os.path.exists(OPTIONS_FILE):
@@ -228,8 +250,10 @@ def refresh_ha_metadata(force: bool = False):
         # 3. Fetch Entities
         entities = ha_ws_call("config/entity_registry/list") or []
 
-        # 4. Fetch Users
-        users = ha_ws_call("config/auth/list") or []
+        # 4. Fetch Users (skip Supervisor / content users that HA creates itself)
+        users = [u for u in (ha_ws_call("config/auth/list") or []) if not u.get("system_generated")]
+        for u in users:
+            u["is_admin"] = bool(u.get("is_owner")) or "system-admin" in (u.get("group_ids") or [])
 
         # 5. Fetch States via REST
         states_list = ha_rest_call("states") or []
@@ -300,6 +324,52 @@ def execute_ha_service(domain: str, service: str, service_data: dict) -> bool:
     return res is not None
 
 
+def guest_domains_allowed(cfg: dict = None) -> set:
+    """Domains guests may ever control, capped by the add-on options."""
+    cfg = cfg or load_config()
+    allowed = {"switch", "fan", "media_player", "scene"}
+    if cfg.get("allow_guest_lights", True):
+        allowed.add("light")
+    if cfg.get("allow_guest_climate", True):
+        allowed.add("climate")
+    if cfg.get("allow_guest_covers", True):
+        allowed.add("cover")
+    if cfg.get("allow_guest_locks", False):
+        allowed.add("lock")
+    return allowed
+
+
+def guest_base_url() -> str:
+    """Base URL guests open. Option first, else the host's LAN IP + guest port."""
+    base = (load_config().get("guest_base_url") or "").strip().rstrip("/")
+    if base:
+        return base
+    info = supervisor_get("/network/info") or {}
+    for iface in info.get("interfaces", []):
+        if iface.get("primary") and (iface.get("ipv4") or {}).get("address"):
+            ip = iface["ipv4"]["address"][0].split("/")[0]
+            return f"http://{ip}:{GUEST_PORT}"
+    return ""
+
+
+def supervisor_get(path: str):
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return None
+    try:
+        req = urllib.request.Request(f"http://supervisor{path}", headers={"Authorization": f"Bearer {tok}"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return json.loads(r.read()).get("data")
+    except Exception as e:
+        log.debug("Supervisor GET %s failed: %s", path, e)
+        return None
+
+
+def guest_url_for(p: dict) -> str:
+    base = guest_base_url()
+    return f"{base}/guest.html?token={urllib.parse.quote(p.get('token', ''))}" if base else ""
+
+
 # ------------------------------------------------------------------ Guest Pass Logic
 def prune_expired_passes():
     """Remove passes that have passed their expiration timestamp."""
@@ -313,11 +383,24 @@ def prune_expired_passes():
     save_passes(updated)
 
 
-def find_pass_by_token(token: str) -> dict:
+def find_pass_by_token(token: str, pin: str = None) -> dict:
+    if not token:
+        return {"valid": False, "error": "Invalid or expired guest pass token."}
     prune_expired_passes()
     passes = load_passes()
     for p in passes:
-        if p.get("token") == token:
+        if secrets.compare_digest(str(p.get("token", "")), str(token)):
+            if p.get("pin"):
+                count, until = _pin_fails.get(token, (0, 0))
+                if until > time.time():
+                    return {"valid": False, "error": "Too many wrong PIN attempts. Try again in 15 minutes."}
+                if not pin:
+                    return {"valid": False, "pin_required": True, "error": "Enter the PIN from your host."}
+                if not secrets.compare_digest(str(p["pin"]), str(pin)):
+                    count += 1
+                    _pin_fails[token] = (0, time.time() + PIN_LOCK_SECONDS) if count >= PIN_MAX_FAILS else (count, 0)
+                    return {"valid": False, "pin_required": True, "error": "Wrong PIN."}
+                _pin_fails.pop(token, None)
             if p.get("revoked"):
                 return {"valid": False, "error": "This room pass was revoked by the homeowner."}
             if p.get("expires_at"):
@@ -326,6 +409,80 @@ def find_pass_by_token(token: str) -> dict:
                     return {"valid": False, "error": "This room pass has expired."}
             return {"valid": True, "pass": p}
     return {"valid": False, "error": "Invalid or expired guest pass token."}
+
+
+# ------------------------------------------------------------------ Dashboard visibility sync
+def _slug(text: str) -> str:
+    out = "".join(ch if ch.isalnum() else "-" for ch in (text or "").lower()).strip("-")
+    while "--" in out:
+        out = out.replace("--", "-")
+    return out
+
+
+def _view_area(view: dict, areas: dict):
+    """Match a view to an area by exact path/title (room-<area> is what Dashboard Suite generates)."""
+    path = (view.get("path") or "").lower()
+    title = (view.get("title") or "").strip().lower()
+    for area_id, name in areas.items():
+        slugs = {area_id.lower(), area_id.lower().replace("_", "-"), _slug(area_id), _slug(name)}
+        if path in slugs or path in {f"room-{x}" for x in slugs} or title == (name or "").strip().lower():
+            return area_id
+    return None
+
+
+def sync_dashboard_visibility() -> dict:
+    """
+    Restrict room views to the users allowed in the permission matrix.
+    Admins always keep every view, and views of rooms nobody is restricted to are left alone.
+    Every changed dashboard is backed up to /share/ajnetweb/sharing_backups first.
+    """
+    perms = load_user_permissions()
+    refresh_ha_metadata(force=True)
+    with _cache_lock:
+        areas = {a["area_id"]: a.get("name", "") for a in _ha_cache.get("areas", [])}
+        users = list(_ha_cache.get("users", []))
+    admin_ids = [u["id"] for u in users if not u.get("system_generated")
+                 and (u.get("is_owner") or "system-admin" in (u.get("group_ids") or []))]
+
+    dashboards = [None] + [d.get("url_path") for d in (ha_ws_call("lovelace/dashboards/list") or [])
+                           if d.get("mode") == "storage"]
+    changed_views, changed_dashboards, errors = 0, 0, []
+    for url_path in dashboards:
+        args = {"url_path": url_path} if url_path else {}
+        cfg = ha_ws_call("lovelace/config", **args)
+        if not cfg or "views" not in cfg:
+            continue
+        original = json.dumps(cfg, sort_keys=True)
+        for view in cfg["views"]:
+            area_id = _view_area(view, areas)
+            if not area_id:
+                continue
+            allowed = [uid for uid, d in perms.items() if area_id in (d.get("allowed_areas") or [])]
+            if not allowed:
+                continue
+            view["visible"] = [{"user": uid} for uid in dict.fromkeys(admin_ids + allowed)]
+            changed_views += 1
+        if json.dumps(cfg, sort_keys=True) == original:
+            continue
+        try:
+            bdir = "/share/ajnetweb/sharing_backups"
+            os.makedirs(bdir, exist_ok=True)
+            with open(os.path.join(bdir, f"{url_path or 'default'}-{time.strftime('%Y%m%d-%H%M%S')}.json"), "w") as f:
+                json.dump(json.loads(original), f)
+        except OSError as e:
+            log.warning("Backup before visibility sync failed: %s", e)
+        if ha_ws_call("lovelace/config/save", config=cfg, **args) is None and \
+                ha_ws_call("lovelace/config", **args) != cfg:
+            errors.append(url_path or "default")
+        else:
+            changed_dashboards += 1
+
+    log_audit_action("Admin", "sync_dashboards",
+                     details=f"Synced visibility on {changed_views} views in {changed_dashboards} dashboards")
+    if errors:
+        return {"ok": False, "error": f"Could not save: {', '.join(errors)}", "updated_views": changed_views}
+    return {"ok": True, "updated_views": changed_views, "updated_dashboards": changed_dashboards,
+            "message": f"Visibility synced on {changed_views} room view(s). Admins keep access to everything."}
 
 
 # ------------------------------------------------------------------ HTTP Handler
@@ -344,20 +501,38 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.end_headers()
+    guest_only = False
+
+    def _allowed(self) -> bool:
+        if self.guest_only or self.client_address[0] in ALLOWED_CLIENTS:
+            return True
+        self._send_json({"ok": False, "error": "Forbidden"}, status=403)
+        return False
+
+    def _guest_path_ok(self, path: str) -> bool:
+        """On the guest port only the guest page and guest API are reachable."""
+        if not self.guest_only:
+            return True
+        if path in ("/", "/guest.html", "/api/guest/portal", "/api/guest/control"):
+            return True
+        self.send_error(404, "Not found")
+        return False
+
+    def do_HEAD(self):
+        if self._allowed() and self._guest_path_ok(self._normalize_path()):
+            super().do_HEAD()
 
     def do_GET(self):
+        if not self._allowed():
+            return
+        if self.guest_only and self._normalize_path() == "/":
+            self.path = "/guest.html" + (("?" + urllib.parse.urlparse(self.path).query) if "?" in self.path else "")
+        if not self._guest_path_ok(self._normalize_path()):
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
@@ -407,6 +582,9 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         if path == "/api/passes":
             prune_expired_passes()
             passes = load_passes()
+            base = guest_base_url()
+            for p in passes:
+                p["guest_url"] = f"{base}/guest.html?token={urllib.parse.quote(p.get('token', ''))}" if base else ""
             self._send_json(passes)
             return
 
@@ -452,9 +630,10 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         # ---------------------------------------------------------------- Guest Portal (Scoped Access)
         if path == "/api/guest/portal":
             token = query.get("token", [""])[0]
-            val = find_pass_by_token(token)
+            val = find_pass_by_token(token, query.get("pin", [""])[0])
             if not val["valid"]:
-                self._send_json({"ok": False, "error": val["error"]}, status=403)
+                self._send_json({"ok": False, "error": val["error"], "pin_required": val.get("pin_required", False)},
+                                status=403)
                 return
 
             p = val["pass"]
@@ -463,7 +642,8 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
                 all_areas = {a["area_id"]: a["name"] for a in _ha_cache.get("areas", [])}
 
             allowed_areas = p.get("areas", [])
-            allowed_domains = p.get("allowed_domains", ["light", "climate", "cover", "switch"])
+            allowed_domains = [d for d in p.get("allowed_domains", ["light", "climate", "cover", "switch"])
+                               if d in guest_domains_allowed()]
 
             portal_data = []
             for a_id in allowed_areas:
@@ -487,7 +667,11 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self._allowed():
+            return
         path = self._normalize_path()
+        if not self._guest_path_ok(path):
+            return
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
         try:
@@ -501,8 +685,10 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
             guest_name = payload.get("guest_name", "").strip()
             areas = payload.get("areas", [])
             duration_hours = payload.get("duration_hours")
-            allowed_domains = payload.get("allowed_domains", ["light", "climate", "cover", "switch"])
-            pin = payload.get("pin", "").strip()
+            caps = guest_domains_allowed()
+            allowed_domains = [d for d in payload.get("allowed_domains", ["light", "climate", "cover", "switch"])
+                               if d in caps]
+            pin = str(payload.get("pin") or "").strip()
 
             if not areas:
                 self._send_json({"ok": False, "error": "Select at least one room to share."}, status=400)
@@ -537,7 +723,7 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
             save_passes(passes)
 
             log_audit_action("Admin", "create_pass", details=f"Created pass '{name}' for areas {areas}")
-            self._send_json({"ok": True, "pass": new_pass})
+            self._send_json({"ok": True, "pass": dict(new_pass, guest_url=guest_url_for(new_pass))})
             return
 
         # ---------------------------------------------------------------- Admin: Revoke / Delete Pass
@@ -581,68 +767,39 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
 
         # ---------------------------------------------------------------- Admin: 1-Click Lovelace Dashboard Sync
         if path == "/api/matrix/sync_dashboards":
-            # Syncs visible user IDs to Lovelace views automatically!
-            perms = load_user_permissions()
-            refresh_ha_metadata(force=True)
-
-            # Get current Lovelace config
-            ll_cfg = ha_ws_call("lovelace/config")
-            if not ll_cfg or "views" not in ll_cfg:
-                self._send_json({
-                    "ok": False,
-                    "error": "Could not read Lovelace dashboard configuration via Home Assistant WebSocket.",
-                }, status=500)
-                return
-
-            views = ll_cfg.get("views", [])
-            updated_count = 0
-
-            # Match view path or title to area_id
-            for view in views:
-                v_path = view.get("path", "").lower()
-                v_title = view.get("title", "").lower()
-
-                # Find which users are allowed for this view
-                allowed_users = []
-                for u_id, u_data in perms.items():
-                    user_areas = [a.lower() for a in u_data.get("allowed_areas", [])]
-                    for a in user_areas:
-                        if a in v_path or a in v_title or a.replace("_", "-") in v_path:
-                            allowed_users.append(u_id)
-                            break
-
-                if allowed_users:
-                    # Update visible key
-                    view["visible"] = [{"user": uid} for uid in allowed_users]
-                    updated_count += 1
-
-            # Save Lovelace config back
-            res = ha_ws_call("lovelace/config/save", config=ll_cfg)
-            log_audit_action("Admin", "sync_dashboards", details=f"Synced visibility rules across {updated_count} views")
-            self._send_json({
-                "ok": True,
-                "updated_views": updated_count,
-                "message": f"Successfully synced visibility rules for {updated_count} dashboard view(s)!",
-            })
+            res = sync_dashboard_visibility()
+            self._send_json(res, status=200 if res.get("ok") else 500)
             return
 
         # ---------------------------------------------------------------- Guest Control (Scoped Execution)
         if path == "/api/guest/control":
             token = payload.get("token")
-            val = find_pass_by_token(token)
+            val = find_pass_by_token(token, payload.get("pin"))
             if not val["valid"]:
                 self._send_json({"ok": False, "error": val["error"]}, status=403)
                 return
 
             p = val["pass"]
-            entity_id = payload.get("entity_id")
-            domain = payload.get("domain") or entity_id.split(".")[0]
-            service = payload.get("service")
-            service_data = payload.get("service_data", {})
+            entity_id = str(payload.get("entity_id") or "")
+            if "." not in entity_id:
+                self._send_json({"ok": False, "error": "entity_id required"}, status=400)
+                return
+            # The domain always comes from the entity itself, never from the request
+            domain = entity_id.split(".")[0]
+            service = str(payload.get("service") or "")
+            service_data = payload.get("service_data") if isinstance(payload.get("service_data"), dict) else {}
+            service_data = {k: v for k, v in service_data.items() if k not in ("entity_id", "device_id", "area_id")}
             service_data["entity_id"] = entity_id
 
-            # 1. Check domain authorization
-            allowed_domains = p.get("allowed_domains", ["light", "climate", "cover", "switch"])
+            if service not in GUEST_SERVICES.get(domain, set()):
+                log_audit_action(f"Guest: {p.get('name')}", "rejected_control", entity_id=entity_id,
+                                 details=f"Service {domain}.{service} not allowed")
+                self._send_json({"ok": False, "error": "This action is not available on a guest pass."}, status=403)
+                return
+
+            # 1. Check domain authorization (pass scope, capped by add-on options)
+            allowed_domains = [d for d in p.get("allowed_domains", ["light", "climate", "cover", "switch"])
+                               if d in guest_domains_allowed()]
             if domain not in allowed_domains:
                 log_audit_action(f"Guest: {p.get('name')}", "rejected_control", entity_id=entity_id, details=f"Domain {domain} not allowed")
                 self._send_json({"ok": False, "error": f"Device category '{domain}' is not permitted by your room pass."}, status=403)
@@ -681,8 +838,14 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         self.send_error(404, "Endpoint not found")
 
 
+class GuestRequestHandler(SharingRequestHandler):
+    guest_only = True
+
+
 def main():
-    log.info("Starting AJ Netweb Room & Guest Pass Studio on port %s...", PORT)
+    log.info("Starting AJ Netweb Room & Guest Pass Studio on port %s (guest portal on %s)...", PORT, GUEST_PORT)
+    guest = ThreadedHTTPServer(("0.0.0.0", GUEST_PORT), GuestRequestHandler)
+    threading.Thread(target=guest.serve_forever, daemon=True, name="guest-portal").start()
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SharingRequestHandler)
     try:
         server.serve_forever()

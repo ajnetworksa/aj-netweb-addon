@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Room & Guest Pass Studio",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "slug": "ajnetweb_sharing",
   "description": "Effortless Room & Area Sharing for Home Assistant. Visual user permission matrix, zero-app guest QR codes, temporary expiring room passes, and automated dashboard visibility.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
@@ -26,7 +26,8 @@
     "allow_guest_covers": true,
     "allow_guest_locks": false,
     "auto_prune_expired": true,
-    "log_level": "info"
+    "log_level": "info",
+    "guest_base_url": ""
   },
   "schema": {
     "default_pass_hours": "int?",
@@ -35,10 +36,17 @@
     "allow_guest_covers": "bool?",
     "allow_guest_locks": "bool?",
     "auto_prune_expired": "bool?",
-    "log_level": "list(debug|info|warning|error)"
+    "log_level": "list(debug|info|warning|error)",
+    "guest_base_url": "str?"
   },
   "ingress": true,
   "ingress_port": 8096,
   "panel_icon": "mdi:account-group-outline",
-  "panel_title": "Room Access"
+  "panel_title": "Room Access",
+  "ports": {
+    "8097/tcp": 8097
+  },
+  "ports_description": {
+    "8097/tcp": "Guest portal (QR links open this port; ingress is admin-only)"
+  }
 }

@@ -127,6 +127,7 @@ class DashboardEngine:
     def _context(self) -> Dict[str, Any]:
         ctx = {"studio_path": self.client.find_addon_panel("ajnetweb_dashboard"),
                "intercom_path": self.client.find_addon_panel("ajnetweb_intercom"),
+               "cctv_path": self.client.find_addon_panel("ajnetweb_cctv"),
                "admin_user_ids": []}
         try:
             with self.client.session() as s:

@@ -18,11 +18,16 @@ umask 077
 readonly DATA=/data/ajn
 readonly NGX_CONF=/tmp/ajn-nginx.conf
 readonly LOCAL_PORT=18123
-readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.3}"
+readonly AGENT_VERSION="${AJN_AGENT_VERSION:-1.2.4}"
 export AGENT_VERSION
 mkdir -p "${DATA}" && chmod 700 "${DATA}"
 # Never act on a stale cached copy of the options (e.g. right after the license key was changed)
 bashio::cache.flush_all 2>/dev/null || rm -rf /tmp/.bashio
+
+die_soft() {  # keep the add-on running (so the message stays visible) and retry later
+    bashio::log.error "$*"
+    sleep 300
+}
 
 LOG_LEVEL="$(bashio::config 'log_level' 'info')"
 bashio::log.level "${LOG_LEVEL}"
@@ -37,10 +42,6 @@ LICENSE="$(bashio::config 'license_key' '')"
 LICENSE="$(printf '%s' "${LICENSE}" | tr -d '[:space:]')"
 
 # -------------------------------------------------------------- helpers
-die_soft() {  # keep the add-on running (so the message stays visible) and retry later
-    bashio::log.error "$*"
-    sleep 300
-}
 
 license_fingerprint() {
     printf '%s' "${LICENSE}" | tr '[:lower:]' '[:upper:]' | tr -d '-' | sha256sum | cut -c1-64
@@ -487,7 +488,7 @@ except Exception:
     pass
 out = {
     'generated_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    'agent_version': os.environ.get('AGENT_VERSION', '1.2.3'),
+    'agent_version': os.environ.get('AGENT_VERSION', '1.2.4'),
     'instance_uid': st.get('instance_uid'),
     'site_name': st.get('site_name'),
     'public_url': st.get('public_url'),

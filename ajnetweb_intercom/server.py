@@ -7,6 +7,7 @@ Manages Hikvision/Dahua Door Stations, Real-Time Doorbell Chimes, Remote Unlocks
 import json
 import logging
 import os
+import secrets
 import sys
 import threading
 import time
@@ -36,16 +37,20 @@ DATA_DIR = "/data/intercom"
 VISITORS_DIR = "/data/intercom/visitors"
 HISTORY_FILE = "/data/intercom/visitor_history.json"
 CREDENTIALS_FILE = "/data/intercom/credentials.json"
-HA_WWW_DIR = "/config/www/ajnetweb_intercom"
+# `map: homeassistant_config` mounts the HA config at /homeassistant (legacy: /config)
+HA_CONFIG_DIR = next((d for d in ("/homeassistant", "/config") if os.path.exists(os.path.join(d, "configuration.yaml"))),
+                     "/homeassistant")
+HA_WWW_DIR = os.path.join(HA_CONFIG_DIR, "www", "ajnetweb_intercom")
 WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8091))
+UI_SETTINGS_FILE = "/data/ui_settings.json"
+PASSWORD_MASK = "••••••••"
+# host_network add-on: only the Supervisor ingress proxy may reach the studio,
+# otherwise anyone on the LAN could open doors through port 8091.
+ALLOWED_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
+KEEP_PUBLISHED_SNAPSHOTS = 20
 
 os.makedirs(VISITORS_DIR, exist_ok=True)
-try:
-    if os.path.exists("/config/www"):
-        os.makedirs(HA_WWW_DIR, exist_ok=True)
-except Exception as _e:
-    pass
 
 _state_lock = RLock()
 _active_client = None
@@ -153,20 +158,190 @@ def load_config() -> dict:
                         cfg[k] = v
         except Exception as e:
             log.warning("Could not read options.json: %s", e)
+    if os.path.exists(UI_SETTINGS_FILE):
+        try:
+            with open(UI_SETTINGS_FILE) as f:
+                cfg.update(json.load(f))
+        except Exception as e:
+            log.warning("Could not read ui_settings.json: %s", e)
     return cfg
 
 
+CONFIG_KEYS = {"brand", "host", "http_port", "rtsp_port", "username", "password", "door_1_name",
+               "door_2_name", "unlock_duration_sec", "auto_snapshot_on_ring", "ha_notify_on_ring",
+               "push_notify_mode", "critical_push_sound", "log_level", "doorbell_camera_entity",
+               "stun_server", "dashboard_path"}
+
+
 def save_config(new_cfg: dict):
-    """Save options and re-initialize client."""
-    cur = load_config()
-    cur.update(new_cfg)
+    """Persist UI settings. /data/options.json is owned by the Supervisor and rewritten on start."""
+    changes = {k: v for k, v in (new_cfg or {}).items() if k in CONFIG_KEYS}
+    if changes.get("password") == PASSWORD_MASK:
+        changes.pop("password")
+    cur = {}
+    if os.path.exists(UI_SETTINGS_FILE):
+        try:
+            with open(UI_SETTINGS_FILE) as f:
+                cur = json.load(f)
+        except Exception:
+            cur = {}
+    cur.update(changes)
     try:
-        os.makedirs(os.path.dirname(OPTIONS_FILE), exist_ok=True)
-        with open(OPTIONS_FILE, "w") as f:
+        tmp = UI_SETTINGS_FILE + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(cur, f, indent=2)
+        os.replace(tmp, UI_SETTINGS_FILE)
     except Exception as e:
-        log.error("Could not write options.json: %s", e)
-    init_client(cur)
+        log.error("Could not write ui_settings.json: %s", e)
+    init_client()
+
+
+def redact(dev: dict) -> dict:
+    c = dict(dev)
+    if c.get("password"):
+        c["password"] = PASSWORD_MASK
+    return c
+
+
+def _supervisor_json(path: str, timeout: int = 5):
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return None
+    import urllib.request
+    try:
+        req = urllib.request.Request(f"http://supervisor{path}", headers={"Authorization": f"Bearer {tok}"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            body = json.loads(r.read())
+            return body.get("data", body) if isinstance(body, dict) else body
+    except Exception as e:
+        log.debug("Supervisor GET %s failed: %s", path, e)
+        return None
+
+
+_panel_path_cache = None
+
+
+def panel_path() -> str:
+    """Sidebar path of this add-on (/<repo-hash>_ajnetweb_intercom), resolved at runtime."""
+    global _panel_path_cache
+    if _panel_path_cache is None:
+        info = _supervisor_json("/addons/self/info") or {}
+        _panel_path_cache = f"/{info['slug']}" if info.get("slug") else "/hassio/ingress/ajnetweb_intercom"
+    return _panel_path_cache
+
+
+def dashboard_path() -> str:
+    """Dashboard opened from notifications: option, else the AJ Netweb dashboard, else the default one."""
+    cfg_path = (_config_cache.get("dashboard_path") or "").strip()
+    if cfg_path:
+        return cfg_path if cfg_path.startswith("/") else "/" + cfg_path
+    dashboards = ha_ws_command("lovelace/dashboards/list") or []
+    for d in dashboards:
+        if "ajnetweb" in (d.get("url_path") or ""):
+            return f"/{d['url_path']}/home"
+    return "/lovelace/0"
+
+
+def ha_ws_command(command: str, **params):
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return None
+    try:
+        import websocket
+        ws = websocket.create_connection("ws://supervisor/core/websocket", timeout=8)
+        try:
+            if json.loads(ws.recv()).get("type") == "auth_required":
+                ws.send(json.dumps({"type": "auth", "access_token": tok}))
+                if json.loads(ws.recv()).get("type") != "auth_ok":
+                    return None
+            ws.send(json.dumps(dict(id=1, type=command, **params)))
+            while True:
+                r = json.loads(ws.recv())
+                if r.get("id") == 1 and r.get("type") == "result":
+                    return r.get("result") if r.get("success") else None
+        finally:
+            ws.close()
+    except Exception as e:
+        log.debug("HA WS %s failed: %s", command, e)
+        return None
+
+
+def doorbell_camera_candidates() -> list:
+    """Camera entities to fall back on for ring snapshots: the configured one, else door-like cameras."""
+    configured = (_config_cache.get("doorbell_camera_entity") or "").strip()
+    if configured:
+        return [configured]
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return []
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://supervisor/core/api/states", headers={"Authorization": f"Bearer {tok}"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            states = json.loads(r.read())
+    except Exception:
+        return []
+    words = ("doorbell", "door", "gate", "intercom", "entrance", "villa")
+    cams = [st["entity_id"] for st in states if st.get("entity_id", "").startswith("camera.")]
+    return [c for c in cams if any(w in c for w in words)][:3]
+
+
+def publish_snapshot(img: bytes, prefix: str = "ring") -> str:
+    """
+    Copy a snapshot to <config>/www so the Companion app can show it in the notification.
+    Files under /local are served without login, so names are random (not guessable)
+    and only the newest few are kept.
+    """
+    fn = f"{prefix}_{datetime.now().strftime('%Y%m%d')}_{secrets.token_hex(12)}.jpg"
+    try:
+        os.makedirs(HA_WWW_DIR, exist_ok=True)
+        path = os.path.join(HA_WWW_DIR, fn)
+        with open(path, "wb") as f:
+            f.write(img)
+        os.chmod(path, 0o644)
+        legacy = os.path.join(HA_WWW_DIR, "latest_ring.jpg")
+        if os.path.exists(legacy):
+            os.remove(legacy)
+        files = sorted((os.path.join(HA_WWW_DIR, x) for x in os.listdir(HA_WWW_DIR) if x.endswith(".jpg")),
+                       key=os.path.getmtime, reverse=True)
+        for old in files[KEEP_PUBLISHED_SNAPSHOTS:]:
+            os.remove(old)
+        return fn
+    except OSError as e:
+        log.warning("Could not publish snapshot to %s: %s", HA_WWW_DIR, e)
+        return None
+
+
+# ------------------------------------------------------------------ go2rtc (live view + talk)
+GO2RTC_PORTS = (1984, 11984)
+
+
+def go2rtc_base() -> str:
+    import urllib.request
+    for port in GO2RTC_PORTS:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/api", timeout=1.5):
+                return f"http://127.0.0.1:{port}"
+        except Exception:
+            continue
+    return None
+
+
+def ensure_go2rtc_stream(base: str, dev: dict, client, brand: str) -> str:
+    """Register (or refresh) a go2rtc stream for a door station; returns its name."""
+    import urllib.request
+    name = "ajn_" + "".join(ch if ch.isalnum() else "_" for ch in (dev.get("id") or "door"))
+    sources = [client.get_rtsp_url()]
+    if brand == "hikvision":
+        # ISAPI source adds the two-way audio backchannel on Hikvision intercoms
+        u = urllib.parse.quote(dev.get("username", "admin"), safe="")
+        pw = urllib.parse.quote(dev.get("password", ""), safe="")
+        sources.append(f"isapi://{u}:{pw}@{dev.get('host')}:{int(dev.get('http_port', 80) or 80)}/")
+    q = urllib.parse.urlencode([("name", name)] + [("src", src) for src in sources])
+    req = urllib.request.Request(f"{base}/api/streams?{q}", method="PUT")
+    with urllib.request.urlopen(req, timeout=5):
+        pass
+    return name
 
 
 def load_intercom_devices() -> dict:
@@ -441,7 +616,9 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
     notifiers = get_active_mobile_app_notifiers()
     log.info("Dynamically discovered %d active mobile app notify services: %s", len(notifiers), notifiers)
 
-    local_image_url = f"/local/ajnetweb_intercom/{snapshot_filename}" if snapshot_filename else "/local/ajnetweb_intercom/latest_ring.jpg"
+    local_image_url = f"/local/ajnetweb_intercom/{snapshot_filename}" if snapshot_filename else None
+    studio_url = panel_path()
+    dash_url = dashboard_path()
     door1 = _config_cache.get("door_1_name", "Main Gate")
     door2 = _config_cache.get("door_2_name", "Pedestrian Door")
     is_critical = _config_cache.get("critical_push_sound", True)
@@ -456,8 +633,8 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
                 "content-type": "jpeg",
                 "hide-thumbnail": False,
             },
-            "clickAction": "/67bcea52_ajnetweb_intercom",
-            "url": "/67bcea52_ajnetweb_intercom",
+            "clickAction": studio_url,
+            "url": studio_url,
             "ttl": 0,
             "priority": "high",
             "importance": "high",
@@ -492,16 +669,20 @@ def dispatch_dynamic_doorbell_push(door_id: int = 1, door_name: str = "Main Gate
                 {
                     "action": "URI",
                     "title": "📹 Answer / Live View",
-                    "uri": "/67bcea52_ajnetweb_intercom",
+                    "uri": studio_url,
                 },
                 {
                     "action": "URI",
                     "title": "📱 Open Dashboard",
-                    "uri": "/ajnetweb",
+                    "uri": dash_url,
                 },
             ],
         },
     }
+
+    if not local_image_url:
+        payload_data["data"].pop("image", None)
+        payload_data["data"].pop("attachment", None)
 
     import urllib.request
     successful_targets = []
@@ -710,6 +891,7 @@ def on_door_event(event_info: dict):
     log.info("Received Door Station Event: %s", event_info)
 
     snapshot_filename = None
+    history_fn = None
     if ev == "ring":
         now = time.time()
         # Debounce multiple ring triggers within 4 seconds
@@ -726,11 +908,11 @@ def on_door_event(event_info: dict):
                 except Exception as e:
                     log.warning("Active client snapshot failed: %s", e)
 
-            # Fallback to Home Assistant camera proxy (e.g. camera.192_168_8_2)
+            # Fallback: Home Assistant camera (option doorbell_camera_entity, else door-like cameras)
             sup_token = os.environ.get("SUPERVISOR_TOKEN")
             if not snap and sup_token:
                 import urllib.request
-                for cam_id in ["camera.192_168_8_2", "camera.doorbell", "camera.bullet_cam"]:
+                for cam_id in doorbell_camera_candidates():
                     try:
                         req = urllib.request.Request(
                             f"http://supervisor/core/api/camera_proxy/{cam_id}",
@@ -751,26 +933,16 @@ def on_door_event(event_info: dict):
                     fp = os.path.join(VISITORS_DIR, fn)
                     with open(fp, "wb") as f:
                         f.write(snap)
-                    snapshot_filename = fn
+                    history_fn = fn
                     event_info["snapshot_url"] = f"api/visitors/image/{fn}"
 
-                    # Mirror snapshot to both /config/www and /homeassistant/www so Companion App loads image
-                    for base_www in ["/config/www", "/homeassistant/www"]:
-                        try:
-                            target_dir = os.path.join(base_www, "ajnetweb_intercom")
-                            os.makedirs(target_dir, exist_ok=True)
-                            with open(os.path.join(target_dir, "latest_ring.jpg"), "wb") as f:
-                                f.write(snap)
-                            with open(os.path.join(target_dir, fn), "wb") as f:
-                                f.write(snap)
-                            os.chmod(os.path.join(target_dir, "latest_ring.jpg"), 0o644)
-                            os.chmod(os.path.join(target_dir, fn), 0o644)
-                        except Exception as err:
-                            log.debug("Could not mirror snapshot to %s: %s", base_www, err)
+                    published = publish_snapshot(snap, "ring")
+                    if published:
+                        snapshot_filename = published
                 except Exception as e:
                     log.error("Failed to persist visitor snapshot: %s", e)
 
-        record_visitor_event("doorbell_ring", "Doorbell button pressed", snapshot_filename)
+        record_visitor_event("doorbell_ring", "Doorbell button pressed", history_fn)
         notify_homeassistant_event("ajnetweb_doorbell_ring", event_info)
 
         # Dynamic Hik-Connect / DMSS Push Notification Broadcast
@@ -843,7 +1015,6 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
@@ -852,7 +1023,6 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "public, max-age=1")
         self.end_headers()
         self.wfile.write(data)
@@ -868,27 +1038,32 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 </svg>"""
         return svg.encode("utf-8")
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.end_headers()
+    def _allowed(self) -> bool:
+        if self.client_address[0] in ALLOWED_CLIENTS:
+            return True
+        self.send_error(403, "Open the Door Station studio from the Home Assistant sidebar")
+        return False
+
+    def log_message(self, fmt, *args):
+        log.debug("%s - %s", self.client_address[0], fmt % args)
 
     def do_HEAD(self):
-        return self.do_GET()
+        if self._allowed():
+            super().do_HEAD()
 
     def do_GET(self):
+        if not self._allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
 
         # ---------------------------------------------------------------- WebRTC Proxy & ICE
         if path == "/api/webrtc/ice":
-            ice_servers = [
-                {"urls": ["stun:stun.l.google.com:19302"]},
-                {"urls": ["stun:192.168.8.214:3478"]}
-            ]
+            ice_servers = [{"urls": ["stun:stun.l.google.com:19302"]}]
+            extra = (_config_cache.get("stun_server") or "").strip()
+            if extra:
+                ice_servers.append({"urls": [extra if extra.startswith(("stun:", "turn:")) else f"stun:{extra}"]})
             self._send_json({"ok": True, "iceServers": ice_servers})
             return
 
@@ -1017,7 +1192,6 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Cache-Control", "no-cache, private, no-store, must-revalidate")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
@@ -1067,7 +1241,6 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.send_header("Connection", "keep-alive")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
 
             import queue
@@ -1180,6 +1353,8 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self._allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
@@ -1189,9 +1364,16 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
 
         # ---------------------------------------------------------------- WebRTC Proxy (go2rtc bridge)
         if path == "/api/webrtc":
-            st_id = query.get("src", ["doorbell_live"])[0]
-            go2rtc_url = f"http://127.0.0.1:1984/api/webrtc?src={st_id}"
+            st_id = query.get("station_id", [None])[0]
+            client, brand, dev = resolve_door_station(st_id)
+            base = go2rtc_base()
+            if not client or not base:
+                self._send_json({"ok": False, "error": "Live view needs a connected door station and go2rtc "
+                                 "(built into Home Assistant 2024.11+, or the go2rtc add-on)."}, status=503)
+                return
             try:
+                stream = ensure_go2rtc_stream(base, dev, client, brand)
+                go2rtc_url = f"{base}/api/webrtc?src={urllib.parse.quote(stream)}"
                 sdp_bytes = body.encode("utf-8")
                 req = urllib.request.Request(go2rtc_url, data=sdp_bytes)
                 req.add_header("Content-Type", "application/sdp")
@@ -1199,7 +1381,6 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                     ans = resp.read()
                     self.send_response(200)
                     self.send_header("Content-Type", "application/sdp")
-                    self.send_header("Access-Control-Allow-Origin", "*")
                     self.end_headers()
                     self.wfile.write(ans)
             except Exception as e:
@@ -1247,15 +1428,7 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                         fp = os.path.join(VISITORS_DIR, test_snap_fn)
                         with open(fp, "wb") as f:
                             f.write(img)
-                        try:
-                            if os.path.exists("/config/www"):
-                                os.makedirs(HA_WWW_DIR, exist_ok=True)
-                                with open(os.path.join(HA_WWW_DIR, "latest_ring.jpg"), "wb") as f:
-                                    f.write(img)
-                                with open(os.path.join(HA_WWW_DIR, test_snap_fn), "wb") as f:
-                                    f.write(img)
-                        except Exception:
-                            pass
+                        test_snap_fn = publish_snapshot(img, "test")
                 except Exception as e:
                     log.debug("Test snapshot failed: %s", e)
 
@@ -1661,7 +1834,7 @@ class IntercomRequestHandler(SimpleHTTPRequestHandler):
                 target_list.append(updated)
 
             save_intercom_devices(data)
-            self._send_json({"ok": True, "message": f"Saved {cat} {updated['name']}", "device": updated})
+            self._send_json({"ok": True, "message": f"Saved {cat} {updated['name']}", "device": redact(updated)})
             return
 
         if path == "/api/devices/delete":
@@ -1821,21 +1994,10 @@ def main():
     start_ha_action_listener()
     start_credential_pruner()
 
-    candidate_ports = [PORT, 8092, 8093, 8094, 8087]
-    server = None
-    for p in candidate_ports:
-        try:
-            server = ThreadedHTTPServer(("0.0.0.0", p), IntercomRequestHandler)
-            log.info("Intercom HTTP Server listening successfully on port %s", p)
-            break
-        except OSError as e:
-            if e.errno == 98 or "in use" in str(e).lower():
-                log.warning("Port %s is currently in use, trying next candidate port...", p)
-                continue
-            raise
-
-    if not server:
-        raise OSError(f"Could not bind Intercom HTTP Server on any candidate port ({candidate_ports})")
+    # Ingress always connects to this exact port, so falling back to another port would only
+    # hide the problem. Fail loudly instead (another host-network add-on is using it).
+    server = ThreadedHTTPServer(("0.0.0.0", PORT), IntercomRequestHandler)
+    log.info("Intercom HTTP Server listening on port %s", PORT)
 
     try:
         server.serve_forever()

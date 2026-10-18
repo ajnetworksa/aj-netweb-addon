@@ -1,5 +1,10 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 2.0.1
+- Home and Wall Panel get "Door station" and "CCTV" shortcut buttons when the AJ Netweb Intercom / CCTV
+  add-ons are installed (paths detected automatically).
+- Room pages (`room-<area>`) are recognised by Room & Guest Pass Studio's visibility sync.
+
 ## 2.0.0
 Complete rebuild of the generator and studio.
 
