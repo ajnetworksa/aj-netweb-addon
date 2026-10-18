@@ -97,9 +97,21 @@ The dashboard updates itself when devices change. **Deploy again only after chan
 
 1. Settings → People: one user per family member. Only the owner (and you, during the project)
    are **administrators**.
-2. Staff / guests: non-admin users. Use **Room & Guest Pass Studio** to limit which room pages they
-   see, and guest passes (QR) for visitors.
-3. The Installer page is visible to admins only.
+2. Staff / children: non-admin users. **Room & Guest Pass Studio → User Room Matrix**: tick the rooms
+   each one may see and control, **Save**. Their dashboard then contains only those rooms (lights, AC,
+   shades, speakers, cameras, scenes of other rooms are simply not there). No ticks = the whole home.
+3. **Room devices (wall tablets, a room's own panel):** give each tablet its own HA user (e.g.
+   `panel-majlis`, non-admin), pick its **Device room** in the matrix and tick any extra rooms it may
+   control. It opens on its room's controls and can't see the rest. Lock it with kiosk mode (05).
+4. Visitors: guest passes (QR) — no account, and the server itself refuses anything outside their rooms.
+5. The Installer page is visible to admins only.
+
+> **How strict is it?** For family, staff and room tablets the dashboard only *contains* their rooms, and
+> non-admin users can't open HA's settings, so in practice they can only control their rooms. Home
+> Assistant itself has no per-device permissions for logged-in users, though: someone who knows the HA
+> API could still call other devices with that user's login. Where that matters (rented rooms, a hotel,
+> staff quarters), use a **permanent room pass** on that tablet instead of an HA login — passes are
+> enforced by the add-on's server (HTTP 403 for anything outside the room).
 
 ## Step 7 — Phones
 
@@ -140,6 +152,15 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] Remove your own admin user or downgrade it, per your support contract.
 
 ## Later: adding devices
+
+New devices appear on the dashboard by themselves — no deploy (Tuya / Smart Life, Zigbee, Matter, …):
+1. Add the device in its app / integration (Tuya cloud devices arrive in HA within a minute; otherwise
+   Settings → Devices & services → Tuya → ⋮ → *Reload*).
+2. Give it a **room** (area) when HA asks, or later in Settings → Devices. Without a room it shows under
+   *General* and in the Installer page's **Devices without a room** list.
+3. Name it the way the family says it ("Majlis spot lights"). Reload the dashboard: it's in the room
+   tile, the room sheet, the Lights / Climate pages and *Right now*.
+Only Studio choices (favourites, order, hidden devices) need a deploy.
 
 1. Pair the device, put it in the right **area**, give it a good **name**.
 2. That's it — it appears on the dashboard on the next page load. Pin it in the Studio if it should

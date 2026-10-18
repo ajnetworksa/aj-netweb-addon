@@ -108,6 +108,9 @@ strategy:
   wallpaper: false                    # true = default palette as page background
   appearance_themes: [AJ Netweb Liquid Glass, AJ Netweb Desert Dusk]   # optional: limit choices
   menu: true                          # ⋯ More button at the end of the bottom bar
+  room_access:                        # rooms per non-admin user (normally set in Room & Guest Pass
+    panel-majlis: { areas: [majlis], home: majlis }   #   Studio's matrix instead, which wins)
+    Mama: { areas: [kitchen, living_room] }
   kiosk:                              # wall tablets - see 05-wall-panels.md
     hide_header: non_admins           # all | admins | non_admins | none | [user names]
     hide_sidebar: non_admins

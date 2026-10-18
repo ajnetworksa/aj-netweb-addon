@@ -41,6 +41,10 @@ const at = (d, h, m = 0) => new Date(day0.getTime() + d * 86400000 + (h * 60 + m
 const wave = (id, base, amp, phase) => [...Array(97)].map((_, i) => ({ s: String(base + amp * Math.sin(i / 15 + phase) + (i % 7) * 0.05),
   lu: (Date.now() - (96 - i) * 15 * 60000) / 1000 }));
 
+// speakers that can be grouped (Music Assistant / Sonos style)
+Object.values(data.states).filter((st) => st.entity_id.startsWith("media_player.") && st.attributes.device_class !== "tv")
+  .forEach((st) => { st.attributes.supported_features = (st.attributes.supported_features || 0) | 524288; st.attributes.group_members = [st.entity_id]; });
+
 const lang = q("lang", "en");
 const hass = {
   ...data, language: lang, user: { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") },  // ?user=Mama&admin=0
@@ -93,6 +97,17 @@ const hass = {
   callService: async (domain, service, d) => {
     console.log("callService", domain, service, d);
     // simulate HA: flip states so the preview reacts
+    if (domain === "media_player" && (service === "join" || service === "unjoin")) {
+      const S = { ...hass.states };
+      const set = (id, members) => { S[id] = { ...S[id], attributes: { ...S[id].attributes, group_members: members } }; };
+      if (service === "join") { const lead = d.entity_id[0]; const m = [...new Set([...(S[lead].attributes.group_members || [lead]), ...d.group_members])];
+        m.forEach((id) => set(id, m)); }
+      else d.entity_id.forEach((id) => { Object.keys(S).filter((k) => (S[k].attributes.group_members || []).includes(id) && k !== id)
+        .forEach((k) => set(k, S[k].attributes.group_members.filter((x) => x !== id))); set(id, [id]); });
+      hass.states = S;
+      document.querySelectorAll("*").forEach((el) => { if (el.setConfig && el._hass) el.hass = { ...hass }; });
+      return;
+    }
     (d.entity_id || []).forEach((id) => {
       const st = hass.states[id];
       if (!st) return;

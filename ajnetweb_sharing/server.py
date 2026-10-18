@@ -489,6 +489,47 @@ def sync_dashboard_visibility() -> dict:
             "message": f"Visibility synced on {changed_views} room view(s). Admins keep access to everything."}
 
 
+ACCESS_SENSOR = "sensor.ajnetweb_room_access"
+
+
+def publish_room_access() -> dict:
+    """
+    Publish the room matrix for the AJ Netweb dashboard: sensor.ajnetweb_room_access, attribute
+    users = {user_id: {"areas": [...], "home": area_id}}. The dashboard strategy reads it in each
+    user's browser and builds a dashboard with only that user's rooms (a wall tablet's own room first).
+    Only restricted non-admin users are listed; everyone else sees the whole home.
+    States vanish when HA restarts, so this runs at start-up and every few minutes.
+    """
+    perms = load_user_permissions()
+    refresh_ha_metadata()
+    with _cache_lock:
+        users = {u["id"]: u for u in _ha_cache.get("users", [])}
+        area_ids = {a.get("area_id") for a in _ha_cache.get("areas", [])}
+    out = {}
+    for uid, d in perms.items():
+        u = users.get(uid)
+        if not u or u.get("is_admin"):
+            continue
+        areas = [a for a in (d.get("allowed_areas") or []) if a in area_ids]
+        home = d.get("home_area") if d.get("home_area") in area_ids else None
+        if home and home not in areas:
+            areas.insert(0, home)
+        if areas:
+            out[uid] = {"areas": areas, **({"home": home} if home else {})}
+    attrs = {"friendly_name": "AJ Netweb room access", "icon": "mdi:account-lock", "users": out}
+    ok = ha_rest_call(f"states/{ACCESS_SENSOR}", method="POST", data={"state": str(len(out)), "attributes": attrs}) is not None
+    return {"ok": ok, "restricted_users": len(out)}
+
+
+def _publish_loop():
+    while True:
+        try:
+            publish_room_access()
+        except Exception as e:  # never let the publisher die
+            log.warning("Publishing room access failed: %s", e)
+        time.sleep(300)
+
+
 # ------------------------------------------------------------------ HTTP Handler
 class SharingRequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -614,6 +655,7 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
                     "username": u.get("username"),
                     "is_admin": u.get("is_admin", False),
                     "allowed_areas": assigned,
+                    "home_area": saved_perms.get(u_id, {}).get("home_area", ""),
                 })
 
             self._send_json({
@@ -762,14 +804,23 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         # ---------------------------------------------------------------- Admin: Save Visual Permission Matrix
         if path == "/api/matrix/save":
             matrix = payload.get("matrix", {})  # { user_id: ["area_1", "area_2"] }
+            homes = payload.get("homes") if isinstance(payload.get("homes"), dict) else {}  # { user_id: area_id }
             perms = load_user_permissions()
             now_iso = datetime.now(timezone.utc).isoformat()
             for u_id, areas in matrix.items():
+                if not isinstance(areas, list):
+                    continue
                 if u_id not in perms:
                     perms[u_id] = {}
-                perms[u_id]["allowed_areas"] = areas
+                perms[u_id]["allowed_areas"] = [a for a in areas if isinstance(a, str)]
+                if u_id in homes:
+                    home = homes[u_id] if isinstance(homes[u_id], str) else ""
+                    perms[u_id]["home_area"] = home
+                    if home and home not in perms[u_id]["allowed_areas"]:
+                        perms[u_id]["allowed_areas"].insert(0, home)
                 perms[u_id]["last_updated"] = now_iso
             save_user_permissions(perms)
+            publish_room_access()
             log_audit_action("Admin", "update_matrix", details=f"Updated room permissions for {len(matrix)} users")
             self._send_json({"ok": True, "message": "Permissions saved."})
             return
@@ -777,6 +828,10 @@ class SharingRequestHandler(SimpleHTTPRequestHandler):
         # ---------------------------------------------------------------- Admin: 1-Click Lovelace Dashboard Sync
         if path == "/api/matrix/sync_dashboards":
             res = sync_dashboard_visibility()
+            pub = publish_room_access()
+            if res.get("ok"):
+                res["message"] = (res.get("message", "") + f" AJ Netweb dashboard: {pub['restricted_users']} restricted "
+                                  "user(s) updated live.").strip()
             self._send_json(res, status=200 if res.get("ok") else 500)
             return
 
@@ -855,6 +910,7 @@ def main():
     log.info("Starting AJ Netweb Room & Guest Pass Studio on port %s (guest portal on %s)...", PORT, GUEST_PORT)
     guest = ThreadedHTTPServer(("0.0.0.0", GUEST_PORT), GuestRequestHandler)
     threading.Thread(target=guest.serve_forever, daemon=True, name="guest-portal").start()
+    threading.Thread(target=_publish_loop, daemon=True, name="room-access").start()
     server = ThreadedHTTPServer(("0.0.0.0", PORT), SharingRequestHandler)
     try:
         server.serve_forever()

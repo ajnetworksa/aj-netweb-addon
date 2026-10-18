@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Room & Guest Pass Studio
 
+## 1.3.0
+- **The room matrix now drives the AJ Netweb dashboard live.** After *Save* the add-on publishes
+  `sensor.ajnetweb_room_access`; the dashboard builds each restricted user's view with only their rooms
+  (devices, speakers, cameras and scenes of other rooms are left out). Before, *Sync* could only change
+  hand-made dashboards, so the generated dashboard ignored the matrix.
+- **Device room** column: for a wall tablet / room panel user, the room the device belongs to. Its
+  dashboard opens on that room's controls; extra ticked rooms are allowed too.
+- The sensor is re-published every 5 minutes and at start-up (HA forgets states on restart).
+
 ## 1.2.1
 - Licence page: only asks for something when something is needed. With licensing not switched on, or when
   licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).

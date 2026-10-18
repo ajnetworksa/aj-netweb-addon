@@ -131,7 +131,9 @@
       <div class="matrix-header-card">
         <div>
           <h2>Home Assistant User Room Permission Matrix</h2>
-          <p class="hint">Easily check which family members, kids, or staff have access to each room. Click "Sync Dashboards" to automatically apply visibility rules to Home Assistant Lovelace views without writing YAML code.</p>
+          <p class="hint">Tick the rooms each person (or wall tablet) may see and control. A user with no ticks sees the whole home; admins always do.
+            For a wall tablet, give it its own Home Assistant user and pick its <b>Device room</b>: it opens on that room and controls only the ticked rooms.
+            The AJ Netweb dashboard follows these rules live after <b>Save</b>; "Sync" also applies them to hand-made dashboards.</p>
         </div>
         <div class="matrix-actions">
           <button id="btnSaveMatrix" class="secondary-btn">Save Permissions</button>

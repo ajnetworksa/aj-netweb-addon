@@ -22,6 +22,9 @@
 //   calendars: [calendar ids] (default: all)   energy: false   energy_power: sensor.house_power (live power)
 //   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
 //           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
+//   room_access: { <user id or name>: { areas: [area ids], home: area id } }   rooms a non-admin user (or a
+//           wall tablet's user) may see and control; home = the room the device belongs to (shown first).
+//           The Room & Guest Pass add-on publishes the same as sensor.ajnetweb_room_access (it wins).
 //   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
 //            menu: { pages, appearance, profile, reload, settings, studio, exit_kiosk } }  rules per item
 //     rule = all | admins | non_admins | none | [user names / ids]   (see core/access.js)
@@ -49,9 +52,14 @@ export async function generateDashboard(config, hass) {
   const on = (k) => (cfg.views || {})[k] !== false;
   const base = "/" + (window.location.pathname.split("/")[1] || "lovelace");
   const path = (p) => `${base}/${p}`;
-  const model = buildModel(hass, { exclude_entities: cfg.exclude_entities, hidden_areas: cfg.hidden_areas });
+  // room-scoped users (family members, staff, a room's wall tablet): only their rooms are built at all
+  const scope = roomAccess(cfg, hass);
+  const hiddenAreas = [...(cfg.hidden_areas || []),
+    ...(scope ? Object.keys(hass.areas || {}).filter((a) => !scope.areas.includes(a)) : [])];
+  const model = buildModel(hass, { exclude_entities: cfg.exclude_entities, hidden_areas: hiddenAreas,
+                                   ...(scope ? { include_unassigned: false } : {}) });
   // room order from the Studio (drag and drop); rooms not in the list keep their place after it
-  const roomOrder = Array.isArray(cfg.room_order) ? cfg.room_order : [];
+  const roomOrder = [...(scope && scope.home ? [scope.home] : []), ...(Array.isArray(cfg.room_order) ? cfg.room_order : [])];
   const rank = (r, i) => { const k = roomOrder.indexOf(r.id); return k >= 0 ? k : 1000 + i; };
   const rooms = roomOrder.length
     ? model.rooms.map((r, i) => [r, rank(r, i)]).sort((a, b) => a[1] - b[1]).map(([r]) => r) : model.rooms;
@@ -96,7 +104,9 @@ export async function generateDashboard(config, hass) {
   const canAppearance = personal && allowed(rules.appearance, hass, "all");
 
   const showPrayer = cfg.prayer !== false && hasPrayerTimes(hass);
-  const players = cfg.music === false ? [] : (cfg.music_players || musicPlayers(hass));
+  // a room-scoped user only gets the speakers of their rooms
+  const roomMedia = scope ? new Set(model.rooms.flatMap((r) => r.media.map((e) => e.entity_id))) : null;
+  const players = (cfg.music === false ? [] : (cfg.music_players || musicPlayers(hass))).filter((id) => !roomMedia || roomMedia.has(id));
   const musicCard = (extra) => withLang({
     type: "custom:ajnetweb-music-card", entities: players,
     ...(cfg.music_assistant_entry ? { music_assistant_entry: cfg.music_assistant_entry } : {}),
@@ -163,7 +173,7 @@ export async function generateDashboard(config, hass) {
     ] : [];
   };
   const weather = cfg.weather || (model.house.weather.includes("weather.forecast_home") ? "weather.forecast_home" : model.house.weather[0]);
-  const alarm = cfg.alarm || ids("alarms")[0];
+  const alarm = (scope ? null : cfg.alarm) || ids("alarms")[0];   // room-scoped users only get an alarm in their rooms
 
   const header = (variant, extra = {}) => {
     const chips = [];
@@ -348,6 +358,17 @@ export async function generateDashboard(config, hass) {
     built.climate = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
       ...climates.slice(0, 8).map((e) => device(e, { name: e.full_name, layout: "wide" }))]) : null;
     built.rooms = roomsBand();
+    // a room's own tablet: that room's controls right under the header
+    const homeRoom = scope && scope.home && rooms.find((r) => r.id === scope.home);
+    if (homeRoom) {
+      const ctl = ["lights", "climates", "covers", "fans", "media", "switches", "access"].flatMap((g) => homeRoom[g]);
+      const sc = homeRoom.scenes.concat(homeRoom.scripts);
+      built.top = [...[].concat(built.top || []), band([heading(homeRoom.name, homeRoom.icon, roomPath(homeRoom), "title"),
+        sc.length ? actions(sc.map((e) => ({ name: e.name, icon: (hass.states[e.entity_id].attributes.icon) || "mdi:palette",
+          action: `${e.domain}.turn_on`, target: { entity_id: e.entity_id } })), "chips") : null,
+        roomGraph(homeRoom, { grid_options: { columns: 24 } }),
+        ...ctl.map((e) => device(e, { layout: e.domain === "climate" ? "wide" : undefined }))])];
+    }
     // "Today at home": agenda, energy and room temperatures side by side (stacked on phones)
     const ins = insightCards();
     built.insights = ins.length ? band([heading(t("insights"), "mdi:home-analytics"),
@@ -471,6 +492,21 @@ export async function generateDashboard(config, hass) {
   }
 }
 
+/** This user's room rules, or null (admins and unrestricted users see the whole home). */
+function roomAccess(cfg, hass) {
+  const u = hass.user || {};
+  if (u.is_admin) return null;
+  const sensor = hass.states["sensor.ajnetweb_room_access"];
+  const users = Object.assign({}, cfg.room_access || {}, (sensor && sensor.attributes.users) || {});
+  const rule = users[u.id] || users[u.name] || Object.entries(users).find(([k]) => String(k).toLowerCase() === String(u.name || "").toLowerCase())?.[1];
+  if (!rule) return null;
+  const known = (a) => !hass.areas || hass.areas[a];
+  const areas = (Array.isArray(rule.areas) ? rule.areas : []).filter(known);
+  const home = rule.home && known(rule.home) ? rule.home : null;
+  if (home && !areas.includes(home)) areas.unshift(home);
+  return areas.length ? { areas, home } : null;
+}
+
 function roomView(r, { t, view, section, heading, device, camera, actions, roomGraph }) {
   const secs = [];
   const add = (title, icon, cards, span) => { if (cards.length) secs.push(section([heading(title, icon), ...cards], span)); };
@@ -523,6 +559,16 @@ async function installerView(cfg, hass, t, model, view, section, heading) {
   filter(t("unavailable"), "mdi:lan-disconnect", controls, [{ condition: "state", state: ["unavailable", "unknown"] }]);
   filter(t("low_battery"), "mdi:battery-alert", model.house.batteries, [{ condition: "numeric_state", below: 25 }]);
   filter(t("updates"), "mdi:update", model.house.updates, [{ condition: "state", state: "on" }]);
+  // new devices (e.g. just added in Tuya / Smart Life) show up by themselves; without a room they land in
+  // "General" - list them here so the installer can give them a room
+  const loose = (model.rooms.find((r) => r.id === "unassigned") || { controls: 0 });
+  const looseIds = ["lights", "climates", "covers", "access", "switches", "fans", "media", "cameras", "vacuums", "valves"]
+    .flatMap((g) => (loose[g] || []).map((e) => e.entity_id));
+  if (looseIds.length) {
+    secs.push(section([heading(t("new_devices"), "mdi:map-marker-question"),
+      { type: "markdown", content: t("new_devices_hint"), grid_options: { columns: 12 } },
+      { type: "entities", entities: looseIds.slice(0, 30), grid_options: { columns: 12 } }]));
+  }
 
   let admins = cfg.admins;
   if (!admins || !admins.length) {

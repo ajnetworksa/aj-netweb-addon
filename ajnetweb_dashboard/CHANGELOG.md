@@ -22,9 +22,14 @@
     live power, read from HA's Energy settings.
   - **Room temperatures**: every room in one graph.
   - Each card only shows when there is data for it; pick them in Studio → Layout.
+- **Music: play in more rooms.** *Also play in* links speakers and amp zones so the same music plays
+  everywhere in sync (*Everywhere*, *Ungroup*; `media_player.join`).
+- **Room-scoped users and room tablets:** with Room & Guest Pass Studio 1.3.0 (or the `room_access`
+  option) a non-admin user's dashboard holds only their rooms; a room tablet opens on its own room.
+- Installer page: **Devices without a room** (new devices, e.g. just added in Tuya, that still need a room).
 - Blocks added in a new version now appear next to their default neighbour in saved layouts.
 - New strategy options: `layout`, `top_cards`, `room_order`, `cameras`, `home_cameras`, `custom_dashboard`,
-  `insights`, `calendars`, `energy`, `energy_power`.
+  `insights`, `calendars`, `energy`, `energy_power`, `room_access`; music card `grouping`.
 - `AGENTS.md` / `CLAUDE.md` and `docs/ai-guide.md`: rules for AI assistants changing the code or a
   client's dashboard.
 

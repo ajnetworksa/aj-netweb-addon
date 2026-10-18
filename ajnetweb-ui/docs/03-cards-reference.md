@@ -163,7 +163,16 @@ search: true                          # search box (Music Assistant players only
 favorites: true                       # favourite playlists / radio / albums (Music Assistant)
 music_assistant_entry: 01J...         # optional: config entry id (needed for non-admin users;
                                       # the Studio fills it in automatically)
+grouping: true                        # "Also play in": link speakers / amp zones (default on)
 ```
+**Play in more rooms:** under the speaker chips, *Also play in* lists the other speakers that can be
+grouped. Tap one to link it (🔗), tap again to unlink; **Everywhere** links all, **Ungroup** splits the
+group. The same music then plays in sync in every linked room, and play/pause/next act on the whole group
+(`media_player.join` / `unjoin`; the first speaker leads). Works with every player that supports grouping:
+Music Assistant players (AirPlay, Chromecast, Sonos, Snapcast, DLNA, squeezelite amps…), Sonos, and others.
+Music Assistant syncs players of the **same type** together; to mix types (e.g. an AirPlay amp with a Cast
+speaker), create a *Sync group* / *Universal group* player once in Music Assistant — it then shows up as
+one more speaker. Multi-zone amplifiers appear as one player per zone, so each zone can be linked.
 Full variant: artwork, title/artist, live progress, shuffle / previous / play-pause / next / repeat,
 drag-to-set volume and mute, room chips to switch speakers, **Move music here** (Music Assistant
 `transfer_queue`), search across every provider you added to Music Assistant (YouTube Music,

@@ -97,8 +97,10 @@ the Studio also links it to the main dashboard.
   the Arabic name in HA (area / entity), the cards pick it up.
 - **Safety:** gates, doors and locks must keep a confirmation (our device card does it with
   `access: true`). Don't put alarm disarm or garage open on a page visible to children or guests.
-- **Permissions:** pages are visible to every user who can open the dashboard. Use a section's or
-  card's `visibility: [{ condition: user, users: [<user id>] }]` for owner-only things.
+- **Permissions:** which rooms a person or wall tablet gets is set in **Room & Guest Pass Studio → User
+  Room Matrix** (and *Device room*), never by hiding cards by hand. My cards are visible to everyone who
+  opens the dashboard: use a section's or card's `visibility: [{ condition: user, users: [<user id>] }]`
+  for owner-only things.
 
 ## Before you say "done"
 

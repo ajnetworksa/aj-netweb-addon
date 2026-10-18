@@ -15,7 +15,7 @@ Versions at the time of writing:
 | Prayer & Adhan | 1.1.0 |
 | Intercom & Door Station | 1.6.0 |
 | CCTV & NVR Studio | 1.3.0 |
-| Room & Guest Pass Studio | 1.2.0 |
+| Room & Guest Pass Studio | 1.3.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
@@ -36,6 +36,14 @@ Versions at the time of writing:
   - *Today at home* band: agenda, energy, all-room temperatures.
   - `AGENTS.md` (read by Codex, Cursor and others), `CLAUDE.md` (imports it), and `docs/ai-guide.md`
     (decision ladder for changing a client dashboard: HA settings → Studio → My cards, never take control).
+- Follow-up ("merge 2 or more amps; each room's device only controls its room unless given permission;
+  will new devices like Tuya show by themselves?"):
+  - Music card *Also play in*: link / unlink speakers and amp zones, *Everywhere*, *Ungroup*.
+  - Room & Guest Pass Studio 1.3.0 publishes the matrix (`sensor.ajnetweb_room_access`) with a new
+    *Device room* per user; the strategy builds restricted users' dashboards from their rooms only and
+    puts a room tablet's own room first.
+  - New devices: already automatic (the strategy reads the registries on every load); added an Installer
+    list of devices without a room and a playbook section.
 
 **Decisions:**
 - *HA's own visual editor for custom cards*, instead of building our own card editor. Every HA and HACS
@@ -46,6 +54,13 @@ Versions at the time of writing:
 - *Graphs drawn by us (SVG)*, not HA's history-graph or ApexCharts: one look in every theme, no HACS
   dependency, works for non-admin users (history API).
 - *Energy from HA's Energy settings and statistics*, so the numbers match HA's own Energy page.
+- *Room access through a published sensor*, not by editing dashboards: the strategy dashboard has no stored
+  views to edit, the rules apply live, and any number of users works. Honest limit: HA has no per-entity
+  permissions for logged-in users, so this is "only what you see"; where it must be enforced, room passes
+  (server-side 403) are the tool.
+- *Publishing continues when the add-on is unlicensed*: the sensor only ever restricts, so stopping it
+  would widen access.
+- *Grouping with `media_player.join`*, HA's standard action, so it works for MA, Sonos and others alike.
 - *AI rules in `AGENTS.md`*, the file most AI tools read; `CLAUDE.md` only imports it, so there is one copy.
 
 **Open:** test on a real HA that non-admin users see the merged cards; photo upload from the Companion
