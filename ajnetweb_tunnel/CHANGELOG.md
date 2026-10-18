@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.4
+- **Security:** the remote diagnostic console checked only the start of a command and ran it in a shell,
+  so `uptime; <anything>` was executed (e.g. reading the client private key). Commands are now parsed and run
+  without a shell, with per-command argument rules.
+- Fixed: with no server configured the add-on crashed at start (`die_soft` used before it was defined)
+  instead of showing the configuration message.
+
 ## 1.2.3
 - Live Battery Health and Signal Quality (LQI / RSSI) telemetry monitoring.
 - Interactive Remote Diagnostic Console with safety allowlist for installers.

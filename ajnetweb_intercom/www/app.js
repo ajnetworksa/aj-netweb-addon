@@ -812,9 +812,10 @@
     });
 
     const activeStation = state.doorStations.find((d) => d.id === state.activeDoorStationId);
-    const srcParam = activeStation && activeStation.stream_name ? activeStation.stream_name : "doorbell_live";
+    // The server registers the door station with go2rtc and returns the answer SDP
+    const stationParam = activeStation ? `?station_id=${encodeURIComponent(activeStation.id)}` : "";
 
-    const res = await fetch(`api/webrtc?src=${encodeURIComponent(srcParam)}`, {
+    const res = await fetch(`api/webrtc${stationParam}`, {
       method: "POST",
       headers: { "Content-Type": "application/sdp" },
       body: pc.localDescription.sdp,

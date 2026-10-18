@@ -35,6 +35,16 @@ WWW_DIR = os.path.join(os.path.dirname(__file__), "www")
 PORT = int(os.environ.get("INGRESS_PORT", 8098))
 
 DEVICES_FILE = "/data/devices.json"
+# Settings changed in the UI. /data/options.json belongs to the Supervisor and is
+# rewritten from the add-on options on every start, so UI changes live here instead.
+UI_SETTINGS_FILE = "/data/ui_settings.json"
+PASSWORD_MASK = "••••••••"
+# host_network add-on: without this check anyone on the LAN could open port 8098
+# and control the NVR. Ingress traffic always comes from the Supervisor.
+ALLOWED_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
+SNAPSHOT_TTL = 0.3  # seconds; viewers of the same channel share one NVR request
+_snapshot_cache = {}  # key -> (timestamp, bytes)
+_snapshot_locks = {}
 
 _state_lock = Lock()
 _devices_list = []
@@ -125,20 +135,60 @@ def load_config() -> dict:
                         cfg[k] = v
         except Exception as e:
             log.warning("Could not read options.json: %s", e)
+    if os.path.exists(UI_SETTINGS_FILE):
+        try:
+            with open(UI_SETTINGS_FILE) as f:
+                cfg.update(json.load(f))
+        except Exception as e:
+            log.warning("Could not read ui_settings.json: %s", e)
     return cfg
 
 
+CONFIG_KEYS = {"nvr_brand", "host", "http_port", "rtsp_port", "username", "password",
+               "stream_quality", "refresh_interval_sec", "log_level"}
+
+
 def save_config(new_cfg: dict):
-    """Save updated options to /data/options.json."""
-    cur = load_config()
-    cur.update(new_cfg)
+    """Persist UI settings (never the masked password placeholder)."""
+    changes = {k: v for k, v in (new_cfg or {}).items() if k in CONFIG_KEYS}
+    if changes.get("password") == PASSWORD_MASK:
+        changes.pop("password")
+    cur = {}
+    if os.path.exists(UI_SETTINGS_FILE):
+        try:
+            with open(UI_SETTINGS_FILE) as f:
+                cur = json.load(f)
+        except Exception:
+            cur = {}
+    cur.update(changes)
     try:
-        os.makedirs(os.path.dirname(OPTIONS_FILE), exist_ok=True)
-        with open(OPTIONS_FILE, "w") as f:
+        tmp = UI_SETTINGS_FILE + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(cur, f, indent=2)
+        os.replace(tmp, UI_SETTINGS_FILE)
     except Exception as e:
-        log.error("Could not write options.json: %s", e)
-    init_client(cur)
+        log.error("Could not write ui_settings.json: %s", e)
+    init_client()
+
+
+def redact(dev: dict) -> dict:
+    c = dict(dev)
+    if c.get("password"):
+        c["password"] = PASSWORD_MASK
+    return c
+
+
+def cached_snapshot(client, dev_cid, key: str):
+    """Fetch a snapshot, sharing one NVR request between concurrent viewers."""
+    lock = _snapshot_locks.setdefault(key, Lock())
+    with lock:
+        hit = _snapshot_cache.get(key)
+        if hit and time.time() - hit[0] < SNAPSHOT_TTL:
+            return hit[1]
+        img = client.get_snapshot(dev_cid)
+        if img:
+            _snapshot_cache[key] = (time.time(), img)
+        return img
 
 
 def load_devices() -> list:
@@ -233,82 +283,84 @@ def _connect_single_device(dev: dict):
 def init_all_devices(devs: list = None):
     """Initialize clients for all configured surveillance devices and build global channel map."""
     global _devices_list, _device_clients, _channel_map, _active_client, _client_brand
-    with _state_lock:
-        if devs is None:
-            devs = load_devices()
-        _devices_list = devs
+    # Connecting to devices can take seconds per unit, so it runs outside the lock;
+    # the finished maps are swapped in at the end and requests keep working meanwhile.
+    if devs is None:
+        devs = load_devices()
 
-        new_clients = {}
-        new_channel_map = {}
-        primary_client = None
-        primary_brand = None
-        global_cid_counter = 1
+    new_clients = {}
+    new_channel_map = {}
+    primary_client = None
+    primary_brand = None
+    global_cid_counter = 1
 
-        for dev in devs:
-            dev_id = dev.get("id") or f"dev_{int(time.time()*1000)}"
-            dev["id"] = dev_id
-            if not dev.get("enabled", True):
+    for dev in devs:
+        dev_id = dev.get("id") or f"dev_{int(time.time()*1000)}"
+        dev["id"] = dev_id
+        if not dev.get("enabled", True):
+            continue
+
+        try:
+            client, detected_brand = _connect_single_device(dev)
+            if not client:
                 continue
 
+            if primary_client is None:
+                primary_client = client
+                primary_brand = detected_brand
+
+            channels = []
             try:
-                client, detected_brand = _connect_single_device(dev)
-                if not client:
-                    continue
+                channels = client.get_channels()
+            except Exception as e:
+                log.warning("Could not query channels for %s (%s): %s", dev.get("name"), dev.get("host"), e)
+                channels = [{
+                    "id": 1,
+                    "name": dev.get("name") or "Main Camera",
+                    "online": True,
+                    "ptz_support": True,
+                    "rtsp_main": f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/h264/ch1/main/av_stream",
+                    "rtsp_sub": f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/h264/ch1/sub/av_stream",
+                }]
 
-                if primary_client is None:
-                    primary_client = client
-                    primary_brand = detected_brand
+            new_clients[dev_id] = {
+                "client": client,
+                "brand": detected_brand,
+                "device": dev,
+                "channels": channels,
+            }
 
-                channels = []
-                try:
-                    channels = client.get_channels()
-                except Exception as e:
-                    log.warning("Could not query channels for %s (%s): %s", dev.get("name"), dev.get("host"), e)
-                    channels = [{
-                        "id": 1,
-                        "name": dev.get("name") or "Main Camera",
-                        "online": True,
-                        "ptz_support": True,
-                        "rtsp_main": f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/h264/ch1/main/av_stream",
-                        "rtsp_sub": f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/h264/ch1/sub/av_stream",
-                    }]
+            for ch in channels:
+                orig_cid = ch.get("id", 1)
+                g_cid = global_cid_counter
+                global_cid_counter += 1
 
-                new_clients[dev_id] = {
+                mapping = {
+                    "global_id": g_cid,
+                    "unique_id": f"{dev_id}_{orig_cid}",
                     "client": client,
                     "brand": detected_brand,
-                    "device": dev,
-                    "channels": channels,
+                    "dev_cid": orig_cid,
+                    "device_id": dev_id,
+                    "device_name": dev.get("name", "Camera"),
+                    "device_ip": dev.get("host", ""),
+                    "channel_name": ch.get("name", f"Camera {orig_cid}"),
+                    "online": ch.get("online", True),
+                    "ptz_support": ch.get("ptz_support", False),
+                    "rtsp_main": ch.get("rtsp_main") or ch.get("stream_main") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}01",
+                    "rtsp_sub": ch.get("rtsp_sub") or ch.get("stream_sub") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}02",
                 }
 
-                for ch in channels:
-                    orig_cid = ch.get("id", 1)
-                    g_cid = global_cid_counter
-                    global_cid_counter += 1
+                new_channel_map[str(g_cid)] = mapping
+                new_channel_map[f"{dev_id}_{orig_cid}"] = mapping
+                if dev == devs[0]:
+                    new_channel_map[str(orig_cid)] = mapping
 
-                    mapping = {
-                        "global_id": g_cid,
-                        "unique_id": f"{dev_id}_{orig_cid}",
-                        "client": client,
-                        "brand": detected_brand,
-                        "dev_cid": orig_cid,
-                        "device_id": dev_id,
-                        "device_name": dev.get("name", "Camera"),
-                        "device_ip": dev.get("host", ""),
-                        "channel_name": ch.get("name", f"Camera {orig_cid}"),
-                        "online": ch.get("online", True),
-                        "ptz_support": ch.get("ptz_support", False),
-                        "rtsp_main": ch.get("rtsp_main") or ch.get("stream_main") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}01",
-                        "rtsp_sub": ch.get("rtsp_sub") or ch.get("stream_sub") or f"rtsp://{dev.get('host')}:{dev.get('rtsp_port', 554)}/Streaming/Channels/{orig_cid}02",
-                    }
+        except Exception as e:
+            log.error("Failed to connect device %s (%s): %s", dev.get("name"), dev.get("host"), e)
 
-                    new_channel_map[str(g_cid)] = mapping
-                    new_channel_map[f"{dev_id}_{orig_cid}"] = mapping
-                    if dev == devs[0]:
-                        new_channel_map[str(orig_cid)] = mapping
-
-            except Exception as e:
-                log.error("Failed to connect device %s (%s): %s", dev.get("name"), dev.get("host"), e)
-
+    with _state_lock:
+        _devices_list = devs
         _device_clients = new_clients
         _channel_map = new_channel_map
         _active_client = primary_client
@@ -360,7 +412,6 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.end_headers()
         self.wfile.write(body)
@@ -369,7 +420,6 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Access-Control-Allow-Origin", "*")
         if filename:
             self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         else:
@@ -381,7 +431,22 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         """Return valid JPEG binary frame so multipart MJPEG decoder never receives malformed text."""
         return FALLBACK_JPEG
 
+    def _allowed(self) -> bool:
+        if self.client_address[0] in ALLOWED_CLIENTS:
+            return True
+        self.send_error(403, "Open CCTV Studio from the Home Assistant sidebar")
+        return False
+
+    def log_message(self, fmt, *args):
+        log.debug("%s - %s", self.client_address[0], fmt % args)
+
+    def do_HEAD(self):
+        if self._allowed():
+            super().do_HEAD()
+
     def do_GET(self):
+        if not self._allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = self._normalize_path()
         query = urllib.parse.parse_qs(parsed.query)
@@ -492,7 +557,7 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
 
             if client:
                 try:
-                    img = client.get_snapshot(dev_cid)
+                    img = cached_snapshot(client, dev_cid, f"{info.get('unique_id', cid_raw)}")
                     if img:
                         self._send_image(img, "image/jpeg", filename=filename)
                         return
@@ -513,7 +578,6 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Cache-Control", "no-cache, private, no-store, must-revalidate")
             self.send_header("Pragma", "no-cache")
             self.send_header("Expires", "0")
@@ -523,8 +587,12 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
             label = info.get("channel_name", f"Camera {cid_raw}") if info else f"Camera {cid_raw}"
             ph = self._placeholder_jpeg(label)
             try:
+                key = f"{info.get('unique_id', cid_raw)}" if info else str(cid_raw)
                 while True:
-                    img = client.get_snapshot(dev_cid)
+                    try:
+                        img = cached_snapshot(client, dev_cid, key)
+                    except Exception:
+                        img = None
                     if not img:
                         img = ph
                     self.wfile.write(b"--frame\r\n")
@@ -568,6 +636,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self._allowed():
+            return
         path = self._normalize_path()
 
         length = int(self.headers.get("Content-Length", 0))
@@ -616,7 +686,7 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                 devs.append(updated_dev)
 
             save_devices(devs)
-            self._send_json({"ok": True, "message": f"Saved device {updated_dev['name']}", "device": updated_dev})
+            self._send_json({"ok": True, "message": f"Saved device {updated_dev['name']}", "device": redact(updated_dev)})
             return
 
         if path == "/api/devices/delete":
@@ -724,6 +794,8 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                     p_word = item.get("password") if item.get("password") is not None else default_pwd
 
                     existing = next((d for d in devs if d.get("host") == ip), None)
+                    if existing and p_word == PASSWORD_MASK:
+                        p_word = existing.get("password", "")
                     new_entry = {
                         "id": existing["id"] if existing else f"dev_{int(time.time()*1000)}_{adopted_count}",
                         "name": name,
@@ -781,7 +853,7 @@ class CCTVRequestHandler(SimpleHTTPRequestHandler):
                 "count": adopted_count,
                 "total_devices": len(devs),
                 "message": f"Successfully adopted {adopted_count} device(s) into CCTV Studio!",
-                "devices": devs,
+                "devices": [redact(d) for d in devs],
             })
             return
 

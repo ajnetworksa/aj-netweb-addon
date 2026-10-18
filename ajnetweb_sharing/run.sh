@@ -16,6 +16,8 @@ export ALLOW_GUEST_LOCKS="$(bashio::config 'allow_guest_locks' 'false')"
 export AUTO_PRUNE="$(bashio::config 'auto_prune_expired' 'true')"
 export LOG_LEVEL="$(bashio::config 'log_level' 'info')"
 export INGRESS_PORT="8096"
+export GUEST_PORT="8097"
+export GUEST_BASE_URL="$(bashio::config 'guest_base_url' '')"
 
 bashio::log.info "Starting Room & Guest Pass Studio on Ingress port 8096..."
 

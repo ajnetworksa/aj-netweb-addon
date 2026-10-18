@@ -1,58 +1,63 @@
 # AJ Netweb Dashboard Suite
 
-Professional, automated room-aware Lovelace dashboard generator for Home Assistant featuring Apple HomeKit Frosted Glass (iOS 18) and 5 curated aesthetics. Built natively with modern Sections architecture, dual **📱 Mobile Mode** and **📟 Tab Mode (Wall Panel)**, zero-HACS dependencies, and instant WebSocket deployment.
+## Requirements
 
----
+- Home Assistant **2024.11 or newer** (Sections view, heading card, `grid_options`, `perform-action`).
+- Lovelace resources in **storage mode** (the default). If you manage resources in YAML, add
+  `/local/ajnetweb/ajnetweb-card-suite.js?v=<version>` as a `module` yourself.
+- Themes folder loaded in `configuration.yaml`:
 
-## Dual Experience: Mobile Mode vs. Tablet Wall Panel Mode
+  ```yaml
+  frontend:
+    themes: !include_dir_merge_named themes
+  ```
 
-The generated dashboard includes two purpose-built, responsive primary experiences that share the same luxury Apple Frosted Glass design:
+The **Overview** tab checks all of this and tells you what to fix.
 
-### 📱 1. Mobile Mode (`path: "home"`)
-- **Designed For**: iPhone & Android Home Assistant Companion App.
-- **Layout Architecture**: 2-column compact Sections flow optimized for vertical swiping.
-- **Glance Header**: Live status pills displaying active lights count, smoke/safety alarms, air conditioning status, security cameras, video doorbell status, and server latency.
-- **Room Sections**: Clean 1-tap toggle tiles, brightness sliders, climate thermostat dials, and window blind open/close sliders.
+## Installer workflow
 
-### 📟 2. Tab Mode / Wall Panel Console (`path: "tablet"`)
-- **Designed For**: Wall-mounted touch screens (Hikvision `DS-KH9510`, Android smart kiosks, iPads, Galaxy Tabs).
-- **Layout Architecture**: 4-column ultra-wide horizontal matrix with large touch targets (min 48px) for effortless wall interaction.
-- **Master Command Bar**:
-  - `⚡ Quick Gate Unlock`: Instant 1-tap trigger for electric gate / door strikes.
-  - `💡 Master All Lights Off`: Turns off all villa lights upon leaving or bedtime.
-  - `Villa Console Banner`: Live time, date, and security status.
-- **Surveillance & Intercom Matrix**: Live CCTV camera feeds and doorbell snapshots side-by-side with immediate gate unlock buttons.
-- **Room Grid**: High-contrast touch tiles with embedded sliders for every room.
+1. **Prepare Home Assistant** – create *Floors* and *Areas* (Settings → Areas, labels & zones) and
+   assign every device to an area. This is what the generator reads; good area data = good dashboard.
+2. **Design** – title, URL (must contain a hyphen, e.g. `villa-home`), language, theme and views.
+3. **Rooms & Devices** – untick rooms or devices the client should not see; ★ pins a device to Home.
+4. **Support Info** – your company contact, shown on the *Installer* view (visible to admins only).
+5. **Deploy** – then open the links shown. On wall tablets use `/<url>/tablet`.
 
----
+Settings are stored in the add-on (`/data/project.json`), so after adding devices just press
+**Deploy** again. The add-on options (`dashboard_url`, `dashboard_title`, `default_theme`) are only
+used as defaults for the very first project.
 
-## Zero-Restart Dynamic WebSocket Deployment (No More 404s!)
+## What gets generated
 
-Previously, modifying Home Assistant Lovelace storage files on disk required restarting Home Assistant Core for the web server router to recognize the new URL route. 
+| View | Path | Purpose |
+|------|------|---------|
+| Home | `home` | Header (clock, weather, alarm, live status chips), access & gates, favourites, quick actions, scenes, rooms by floor, climate, cameras |
+| Wall Panel | `tablet` | Same as Home with large clock and live cameras – for wall-mounted tablets |
+| Lights / Climate / Security / Cameras / Media | | Whole-house views, grouped by room. Skipped when there are no matching devices |
+| Installer | `installer` | Admin-only: support details, offline devices, low batteries, available updates |
+| Room pages | `room-<area>` | One sub-page per room, opened from the room cards |
 
-**AJ Netweb Dashboard Suite v1.3.1 eliminates this entirely**:
-- Interacts with Home Assistant Core via authenticated **WebSocket APIs** (`lovelace/dashboards/create`, `lovelace/dashboards/update`, and `lovelace/config/save`).
-- Dynamically registers the `/{url_path}` route directly into Home Assistant's running `aiohttp` web server router in memory.
-- Clicking **🚀 Open Dashboard** immediately navigates to your live dashboard with **HTTP 200 OK** in less than 2 seconds — **zero core restarts required!**
+Gate relays, door strikes and locks always ask for confirmation before acting.
 
----
+## Stability rules (why it won't break on HA updates)
 
-## Auto-Device Discovery & Classification
+- Only documented WebSocket APIs are used (`lovelace/dashboards/*`, `lovelace/config/*`,
+  `lovelace/resources/*`). Nothing is written into `.storage` directly.
+- Native cards are preferred. HA migrates their config automatically between releases.
+- The bundled cards (`custom:ajnetweb-header-card`, `-area-card`, `-actions-card`) are plain Web
+  Components: no Lit, no imports from HA internals, only `hass.states`, `hass.callService` and the
+  standard `hass-more-info` / `location-changed` events.
+- Themes use native theme variables only (no card-mod).
+- The card suite is loaded with a versioned URL (`?v=<version>`), so browsers and the Companion
+  app pick up new versions after an add-on update without clearing caches.
 
-The engine dynamically inspects Home Assistant's Area, Device, and Entity Registries and automatically populates:
-- **💡 Lighting**: Tiles with brightness sliders and color temperature dials.
-- **❄️ Climate / HVAC**: Native thermostat cards with temperature targets, fan modes, and HVAC presets (Cool, Heat, Eco).
-- **🪟 Curtains & Shades**: Vertical/horizontal slider controls with open, close, and stop.
-- **🔒 Locks & Gates**: Secure release tiles with momentary strike actions.
-- **📹 CCTV & Cameras**: Live snapshot and real-time streaming tiles for all NVR channels and door stations.
-- **🎵 Media Players**: Audio playback controls and volume sliders.
-- **🛡️ Sensors & Safety**: Smoke detectors, motion sensors, temperature/humidity sensors, and tank level watchdogs.
+## Backups
 
----
+Before each deploy (and each restore) the current layout is saved to
+`/share/ajnetweb/dashboard_backups/` (last 30 kept). Restore from **Deploy & Backups**.
 
-## How to Deploy in 3 Clicks
+## Editing by hand
 
-1. Open **Dashboard Suite** from the Home Assistant sidebar.
-2. Select your desired theme (e.g. **Apple Frosted Glass**).
-3. Review your rooms and click **🚀 Deploy Dashboard to Home Assistant**.
-4. Click **🚀 Open Dashboard** to launch your new mobile and tablet wall panel interface!
+Manual edits made in the HA dashboard editor are overwritten by the next deploy (a backup is
+taken first). For one-off client changes, either make them in the Studio, or take the dashboard
+over manually and stop deploying to it.

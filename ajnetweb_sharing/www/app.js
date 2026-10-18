@@ -486,7 +486,8 @@
     let basePath = window.location.pathname;
     if (basePath.endsWith("/index.html")) basePath = basePath.replace("/index.html", "");
     basePath = basePath.replace(/\/$/, "");
-    const guestUrl = `${window.location.origin}${basePath}/guest.html?token=${encodeURIComponent(pass.token)}`;
+    // The server builds the link on the guest port (guests have no HA login, so ingress links can't work)
+    const guestUrl = pass.guest_url || `${window.location.origin}${basePath}/guest.html?token=${encodeURIComponent(pass.token)}`;
     el.passShareUrl.value = guestUrl;
 
     // Render QR Code

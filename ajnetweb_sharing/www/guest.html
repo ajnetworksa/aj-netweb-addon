@@ -91,6 +91,7 @@
     (function () {
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get("token") || "";
+      let pin = sessionStorage.getItem("ajn_pin_" + token) || "";
 
       let currentPass = null;
       let rooms = [];
@@ -119,9 +120,17 @@
         }
 
         try {
-          const res = await fetch(`api/guest/portal?token=${encodeURIComponent(token)}`);
+          const res = await fetch(`api/guest/portal?token=${encodeURIComponent(token)}&pin=${encodeURIComponent(pin)}`);
           const data = await res.json();
 
+          if (data.pin_required) {
+            const entered = window.prompt(data.error || "Enter the PIN from your host");
+            if (entered) {
+              pin = entered.trim();
+              try { sessionStorage.setItem("ajn_pin_" + token, pin); } catch (e) {}
+              return loadPortal();
+            }
+          }
           if (!res.ok || !data.ok) {
             showError("Pass Inactive", data.error || "This guest pass has expired or is invalid.");
             return;
@@ -338,6 +347,7 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               token: token,
+              pin: pin,
               entity_id: serviceData.entity_id,
               domain: domain,
               service: service,

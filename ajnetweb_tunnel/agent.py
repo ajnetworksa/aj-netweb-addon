@@ -16,6 +16,7 @@ import json
 import os
 import queue
 import ssl
+import shlex
 import subprocess
 import threading
 import time
@@ -30,7 +31,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.3")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.4")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -48,7 +49,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.2.3"
+        AGENT_VERSION = "1.2.4"
     return AGENT_VERSION
 
 LABELS = {
@@ -430,16 +431,35 @@ def execute(cmd: dict) -> tuple[str, str, str]:
         raw_cmd = (args.get("command") or "").strip()
         if not raw_cmd:
             return "error", "no command specified", ""
-        ALLOWED_PREFIXES = (
-            "ha ", "ping ", "traceroute ", "ip ", "uptime", "free", "df",
-            "cat /etc/resolv.conf", "top -b", "netstat", "curl -I", "curl -sI"
-        )
-        if not any(raw_cmd.startswith(p) for p in ALLOWED_PREFIXES):
+        # Parsed and run without a shell: a prefix check + shell=True let
+        # "uptime; cat /data/ajn/client.key" through.
+        if any(ch in raw_cmd for ch in ";&|`$<>(){}\n\\"):
+            return "rejected", "shell operators are not permitted in the diagnostic console", ""
+        try:
+            argv = shlex.split(raw_cmd)
+        except ValueError as ex:
+            return "rejected", f"could not parse command: {ex}", ""
+        allowed_args = {
+            "ha": None, "ping": None, "traceroute": None, "ip": None, "uptime": None, "free": None,
+            "df": None, "netstat": None,
+            "cat": {"/etc/resolv.conf"},
+            "top": {"-b", "-n", "1"},
+            "curl": None,
+        }
+        prog = argv[0] if argv else ""
+        if prog not in allowed_args:
             return "rejected", f"command '{raw_cmd[:40]}' is not permitted in the diagnostic console", ""
+        if allowed_args[prog] is not None and not set(argv[1:]) <= allowed_args[prog]:
+            return "rejected", f"arguments not permitted for '{prog}'", ""
+        if prog == "curl" and not ({"-I", "-sI", "--head"} & set(argv[1:])):
+            return "rejected", "only header requests (curl -I) are permitted", ""
+        if prog == "curl" and any(a.startswith(("-o", "--output", "-K", "--config", "-T", "--upload", "-d", "--data", "-F"))
+                                  for a in argv[1:]):
+            return "rejected", "curl output/upload options are not permitted", ""
         try:
             res = subprocess.run(
-                raw_cmd,
-                shell=True,
+                argv,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=min(int(args.get("timeout") or 25), 45)

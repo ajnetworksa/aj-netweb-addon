@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Intercom & Door Station Studio",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "slug": "ajnetweb_intercom",
   "description": "Professional Video Intercom & Access Control Terminal Studio for Hikvision & Dahua with Instant SADP & ONVIF Device Discovery. Room-to-Room Inter-Display Calling, Villa All-Call PA Broadcast, direct ISAPI QR code & PIN provisioning, and dynamic mobile push.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",
@@ -34,7 +34,10 @@
     "ha_notify_on_ring": true,
     "push_notify_mode": "all_mobile_devices",
     "critical_push_sound": true,
-    "log_level": "info"
+    "log_level": "info",
+    "doorbell_camera_entity": "",
+    "stun_server": "",
+    "dashboard_path": ""
   },
   "schema": {
     "brand": "list(auto|hikvision|dahua)",
@@ -50,7 +53,10 @@
     "ha_notify_on_ring": "bool?",
     "push_notify_mode": "list(all_mobile_devices|disabled)?",
     "critical_push_sound": "bool?",
-    "log_level": "list(debug|info|warning|error)"
+    "log_level": "list(debug|info|warning|error)",
+    "doorbell_camera_entity": "str?",
+    "stun_server": "str?",
+    "dashboard_path": "str?"
   },
   "ingress": true,
   "ingress_port": 8091,
