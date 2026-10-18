@@ -60,7 +60,7 @@ SHARED_STATE = os.path.join(SHARED_DIR, "license_state.json")
 REMOTE_SIGNAL = os.path.join(SHARED_DIR, "remote_access.json")
 
 MESSAGES = {
-    "unconfigured": "Developer build - licensing is not enforced.",
+    "unconfigured": "Licensing is not switched on yet - nothing to do, everything works normally.",
     "active": "Activated.",
     "grace": "Not activated yet. This add-on keeps working for {days} more day(s).",
     "locked": "Not activated. Activate AJ Netweb Remote Access on this Home Assistant, or send the Install ID "
@@ -283,7 +283,8 @@ class License:
 
     def _compute(self) -> Dict[str, Any]:
         iid = install_id()
-        base = {"product": self.product, "name": self.name, "install_id": iid, "grace_days": GRACE_DAYS}
+        base = {"product": self.product, "name": self.name, "install_id": iid, "grace_days": GRACE_DAYS,
+                "keys_enabled": bool(PUBLIC_KEY)}
         if not PUBLIC_KEY and not ROOT_CA_PEM.strip():
             return dict(base, state="unconfigured", allowed=True, message=MESSAGES["unconfigured"])
         # 1. AJ Netweb Remote Access says this Home Assistant is licensed
@@ -466,20 +467,31 @@ ACTIVATION_PAGE = """<!doctype html><html><head><meta charset="utf-8">
  <h1>__NAME__</h1><p class="s">AJ Netweb licence</p>
  <div id="st" class="st">…</div>
  <dl id="info"></dl>
+ <div id="how" hidden>
  <p class="s" style="margin:14px 0 0">Easiest: install and activate <b>AJ Netweb Remote Access</b> on this Home Assistant -
    every AJ Netweb add-on is then licensed automatically. Otherwise send the Install ID to AJ Netweb for a licence key.</p>
  <label>Install ID</label>
  <div class="id"><code id="iid">…</code><button class="g" id="copy">Copy</button></div>
+ <div id="keybox" hidden>
  <label>Licence key</label>
  <textarea id="key" placeholder="AJN1...." spellcheck="false"></textarea>
  <div class="row"><button id="act">Activate</button><span id="msg" class="err"></span></div>
+ </div>
  <p class="ar">هذه الإضافة تعمل بترخيص من AJ Netweb. أرسل رقم التثبيت (Install ID) إلى AJ Netweb لاستلام مفتاح الترخيص.</p>
+ </div>
+ <p class="s" id="iidrow" style="margin:16px 0 0;font-size:13px">Install ID: <code id="iid2" style="padding:2px 6px"></code></p>
 </div></div><script>
 const $ = (i) => document.getElementById(i);
 const base = location.pathname.replace(/\\/license\\/?$/, "/").replace(/\\/?$/, "/");
 function show(s) {
   $("st").className = "st " + (s.state === "expired" ? "locked" : s.state); $("st").textContent = s.message;
   $("iid").textContent = s.install_id || "(not found - is the Home Assistant config folder mapped?)";
+  // only ask for something when something is needed
+  const needed = s.state !== "active" && s.state !== "unconfigured";
+  $("how").hidden = !needed;
+  $("keybox").hidden = !(needed && s.keys_enabled);
+  $("iidrow").hidden = needed;
+  $("iid2").textContent = s.install_id || "-";
   const l = s.license || {}; const rows = [["Licensed by", s.source === "remote_access" ? "AJ Netweb Remote Access" : s.source === "key" ? "Licence key" : ""],
     ["Customer", l.customer], ["Licence", l.id], ["Products", (l.products || []).map((x) => x === "*" ? "All AJ Netweb add-ons" : x).join(", ")], [s.source === "remote_access" ? "Paid until" : "Expires", l.expires || (l.id && s.source === "key" ? "never" : "")]];
   $("info").innerHTML = rows.filter((r) => r[1]).map((r) => `<dt>${r[0]}</dt><dd style="margin:0">${String(r[1]).replace(/[<&]/g, "")}</dd>`).join("");

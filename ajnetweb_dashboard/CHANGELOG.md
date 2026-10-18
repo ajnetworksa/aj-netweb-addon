@@ -1,5 +1,9 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.2.1
+- Licence page: only asks for something when something is needed. With licensing not switched on, or when
+  licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).
+
 ## 3.2.0 - themes, personal appearance, kiosk menu, licensing
 - **AJ Netweb licence:** the add-ons and the dashboard now need this Home Assistant to be licensed by
   AJ Netweb, normally through **AJ Netweb Remote Access** (automatic, nothing to enter) or with an offline

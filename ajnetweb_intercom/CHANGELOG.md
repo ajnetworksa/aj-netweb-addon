@@ -1,5 +1,9 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.6.1
+- Licence page: only asks for something when something is needed. With licensing not switched on, or when
+  licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).
+
 ## 1.6.0
 - **AJ Netweb licence:** this add-on now needs this Home Assistant to be licensed by AJ Netweb, normally
   through **AJ Netweb Remote Access** (no key to enter), or with an offline licence key (see `licensing/README.md`). Existing installations keep
