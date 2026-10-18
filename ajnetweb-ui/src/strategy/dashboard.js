@@ -93,7 +93,15 @@ export async function generateDashboard(config, hass) {
   const camera = (e, live) => (live
     ? { type: "picture-entity", entity: e.entity_id, name: e.name, camera_view: "live", show_state: false,
         grid_options: { columns: 6 } }
-    : { type: "custom:ajnetweb-camera-card", entity: e.entity_id, name: e.name, grid_options: { columns: 6 } });
+    : { type: "custom:ajnetweb-camera-card", entity: e.entity_id, name: e.name, grid_options: { columns: 6 },
+        // the gate / garage / lock of the same area right on the picture
+        // (only on the first camera of each area, so several cameras of one area don't repeat them)
+        ...(() => {
+          const first = all("cameras").find((c) => c.area_id === e.area_id);
+          if (e.area_id === "unassigned" || !first || first.entity_id !== e.entity_id) return {};
+          const ctl = all("access").filter((a) => a.area_id === e.area_id).slice(0, 2).map((a) => a.entity_id);
+          return ctl.length ? { controls: ctl } : {};
+        })() });
   const actions = (items, style) => {
     const list = items.filter(Boolean);
     return list.length ? withLang({ type: "custom:ajnetweb-actions-card", actions: list, ...(style ? { style } : {}),
@@ -165,7 +173,8 @@ export async function generateDashboard(config, hass) {
   const onlyWide = { visibility: [{ condition: "screen", media_query: "(min-width: 768px)" }] };
   const onlyNarrow = { visibility: [{ condition: "screen", media_query: "(max-width: 767px)" }] };
 
-  const roomBands = () => {
+  // all rooms in one block: floor tabs + an even grid of room tiles with quick buttons (Flux UI style)
+  const roomsBand = () => {
     const floors = Object.fromEntries(model.floors.map((f) => [f.id, f]));
     const groups = new Map();
     rooms.forEach((r) => {
@@ -175,11 +184,27 @@ export async function generateDashboard(config, hass) {
       groups.get(key).push(r);
     });
     const order = [...model.floors.map((f) => f.id).filter((id) => groups.has(id)), ...(groups.has("_none") ? ["_none"] : [])];
-    return order.map((key) => {
-      const f = floors[key];
-      return band([heading(f ? f.name : t("rooms"), f ? f.icon : "mdi:floor-plan"), ...groups.get(key).map(areaCard)]);
-    });
+    if (!order.length) return null;
+    const style = cfg.room_style === "photo" ? "photo" : "tile";
+    return band([heading(t("rooms"), "mdi:floor-plan"), withLang({
+      type: "custom:ajnetweb-rooms-card", style, grid_options: { columns: "full" },
+      groups: order.map((key) => ({ name: floors[key] ? floors[key].name : t("rooms"), icon: floors[key] ? floors[key].icon : "mdi:floor-plan",
+                                    rooms: groups.get(key).map((r) => { const c = areaCard(r); delete c.type; delete c.grid_options; return c; }) })),
+    })]);
   };
+
+  // "Right now": what needs attention (open doors, alerts, timers, lights/AC on, low batteries, offline)
+  const statusCard = (extra = {}) => withLang({
+    type: "custom:ajnetweb-status-card",
+    openings: ids("openings"), safety: ids("safety"), lights: ids("lights"), climates: ids("climates"), media: ids("media"),
+    batteries: model.house.batteries || [],
+    ...(hass.user && hass.user.is_admin ? { devices: ["lights", "climates", "covers", "access", "switches", "fans"].flatMap((g) => ids(g)) } : {}),
+    navigation: { security: path("security"), lights: path("lights"), climate: path("climate"), media: path("media"),
+                  ...(hass.user && hass.user.is_admin ? { installer: path("installer") } : {}) },
+    ...extra,
+  });
+  // music while something plays, "Right now" otherwise (Flux UI's media-aware layout)
+  const playingCond = players.length ? [{ condition: "or", conditions: players.map((id) => ({ condition: "state", entity: id, state: "playing" })) }] : null;
 
   // ---------------------------------------------------------------- views
   const views = [];
@@ -188,16 +213,26 @@ export async function generateDashboard(config, hass) {
     // 1. top band: compact header, then one row of equal cards - weather, prayer, music. A native
     //    horizontal-stack keeps them in one row with equal widths and heights at any screen width;
     //    phones get the cards stacked instead (weather is in the header there).
+    const media = (variant) => {
+      const status = statusCard();
+      delete status.grid_options;
+      if (!playingCond) return [status];
+      const music = musicCard({ variant, search: false });
+      delete music.grid_options;
+      return [{ type: "conditional", conditions: playingCond, card: music },
+              { type: "conditional", conditions: [{ condition: "not", conditions: playingCond }], card: status }];
+    };
     const wideRow = [
       weather ? { type: "custom:ajnetweb-weather-card", entity: weather } : null,
       showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default" }) : null,
-      players.length ? musicCard({ variant: "full", search: false }) : null,
+      ...media("full"),
     ].filter(Boolean).map((c) => { delete c.grid_options; return c; });
     out.push(band([
       header(panel ? "panel" : "default", { weather_wide: weather ? false : undefined }),
       wideRow.length ? { type: "horizontal-stack", cards: wideRow, grid_options: { columns: "full" }, ...onlyWide } : null,
       showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
       players.length ? musicCard({ variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+      statusCard({ grid_options: { columns: "full" }, ...onlyNarrow }),
     ]));
     // 2. scenes, access, favourites
     const quick = [];
@@ -233,8 +268,8 @@ export async function generateDashboard(config, hass) {
     const climates = all("climates");
     const climateBand = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
       ...climates.slice(0, 8).map((e) => device(e, { name: e.full_name, layout: "wide" }))]) : null;
-    if (panel) out.push(camBand, quickBand, ...roomBands(), climateBand);
-    else out.push(quickBand, ...roomBands(), climateBand, camBand);
+    if (panel) out.push(camBand, roomsBand(), quickBand, climateBand);
+    else out.push(quickBand, roomsBand(), climateBand, camBand);
     return out.filter(Boolean);
   };
   const view = (title, p, icon, sections, extra = {}) => Object.assign({

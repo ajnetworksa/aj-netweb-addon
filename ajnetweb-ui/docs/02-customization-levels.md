@@ -50,6 +50,7 @@ strategy:
   theme: AJ Netweb Frosted Glass      # any installed HA theme name
   language: ar                        # en | ar  (omit = each user's HA language)
   room_tap: popup                     # popup = room sheet | navigate = room page
+  room_style: tile                    # tile = room tiles with quick buttons | photo = photo room cards
   header_image: /local/villa.jpg      # optional hero image behind the clock
   exclude_entities:                   # never shown anywhere
     - switch.pump_child_lock

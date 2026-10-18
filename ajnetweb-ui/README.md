@@ -27,6 +27,8 @@ any Home Assistant project.
 | `custom:ajnetweb-actions-card` | Big buttons or scene chips with tap-again confirmation |
 | `custom:ajnetweb-prayer-card` | Next prayer countdown, times, Hijri date, adhan controls |
 | `custom:ajnetweb-music-card` | Music player: Music Assistant search, favourites, rooms, volume |
+| `custom:ajnetweb-rooms-card` | All rooms with floor tabs; room tiles with quick buttons |
+| `custom:ajnetweb-status-card` | "Right now": open doors, alerts, timers, lights/AC on, low batteries |
 | `custom:ajnetweb-weather-card` | Current weather and a 5-day forecast with temperature bars |
 | `custom:ajnetweb-appearance-card` | Each person picks their own theme, colour gradient and wallpaper |
 | `custom:ajnetweb-nav-card` | Floating glass navigation bar |

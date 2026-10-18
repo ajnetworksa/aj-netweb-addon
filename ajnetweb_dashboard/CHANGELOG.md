@@ -21,6 +21,19 @@
 - The floating navigation bar hides on screens 1200 px and wider, where Home Assistant's own tabs are already
   at the top. Kiosk panels with the header hidden keep it at every width.
 - Raw entity names like `dome_cam` are shown as "Dome cam" everywhere.
+- **Ideas from Flux UI** (ElementZoom, MIT), rebuilt as our own self-generating cards with no extra HACS cards:
+  - **Room tiles with quick buttons** (`style: tile`): name, temperature and humidity, a big room icon that
+    lights up, and a column of buttons for lights, AC (with set temperature), shades and fan. Rooms are
+    controlled from Home without opening them.
+  - **Rooms card with floor tabs** (`custom:ajnetweb-rooms-card`): all rooms in one even grid. The chosen
+    floor is remembered per device.
+  - **"Right now" card** (`custom:ajnetweb-status-card`): only what needs attention - open doors and windows,
+    alarms, running timers (washer, sprinklers) with time left, lights and AC on, low batteries, and offline
+    devices for admins. "All good" when there is nothing.
+  - **Media-aware top row:** the music player takes its place while something plays; "Right now" otherwise.
+  - **Camera controls:** the gate, garage or lock of the same area appears on that area's first camera (tap
+    twice to act).
+- New strategy option `room_style: tile | photo` (default `tile`; `photo` keeps the photo room cards).
 
 ## 3.2.1
 - Licence page: only asks for something when something is needed. With licensing not switched on, or when

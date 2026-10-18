@@ -144,6 +144,12 @@ therefore:
    `horizontal-stack`, shown only on screens ≥ 768 px (`visibility: screen`). Phones get the stacked
    versions.
 
+Design ideas credited to **Flux UI** by ElementZoom (MIT,
+https://github.com/ElementZoom/Flux-UI-Home-Assistant-Dashboard): room tiles with quick buttons, room
+group tabs, the context-aware "Right now" panel, media-aware layout switching and cameras with controls.
+We re-implemented them as generated cards (no button-card, UIX or layout-card), so they need no
+per-site YAML and survive HA updates.
+
 `npm run preview` uses the same column rules as HA (min 320 px, max 500 px per column, 32 px gaps), so what
 you see there matches the real dashboard. `?house=sample-villa` loads a test villa with more cameras and
 people.

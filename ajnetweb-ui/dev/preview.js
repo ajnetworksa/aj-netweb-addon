@@ -121,7 +121,10 @@ for (const s of v.sections) {
     else if (c.type === "horizontal-stack") {
       // like HA's hui-horizontal-stack-card: one row, equal widths, equal heights
       el = document.createElement("div"); el.style.cssText = "display:flex;gap:8px;align-items:stretch;min-width:0";
+      const ok = (cond) => cond.condition === "or" ? cond.conditions.some(ok) : cond.condition === "not" ? !cond.conditions.some(ok)
+        : (hass.states[cond.entity] || {}).state === cond.state;
       c.cards.forEach((cc) => {
+        if (cc.type === "conditional") { if (!cc.conditions.every(ok)) return; cc = cc.card; }
         let x;
         if (cc.type.startsWith("custom:")) { x = document.createElement(cc.type.slice(7)); x.setConfig(cc); x.hass = hass; }
         else { x = document.createElement("div"); x.className = "ph"; x.textContent = `native ${cc.type}: ${cc.entity || ""}`; }

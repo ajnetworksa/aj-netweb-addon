@@ -461,6 +461,25 @@
    "attributes": {
     "friendly_name": "Door Bell Door 2 relay"
    }
+  },
+  "timer.washer": {
+   "entity_id": "timer.washer",
+   "state": "active",
+   "attributes": {
+    "friendly_name": "Washing machine",
+    "icon": "mdi:washing-machine",
+    "finishes_at": "2026-10-18T15:10:37.578140+00:00",
+    "remaining": "0:25:00"
+   }
+  },
+  "sensor.front_door_battery": {
+   "entity_id": "sensor.front_door_battery",
+   "state": "12",
+   "attributes": {
+    "friendly_name": "Front Door Lock Battery",
+    "device_class": "battery",
+    "unit_of_measurement": "%"
+   }
   }
  },
  "entities": {
@@ -708,6 +727,12 @@
    "entity_id": "switch.door_bell_door_2_relay",
    "area_id": "entrance",
    "entity_category": null,
+   "labels": []
+  },
+  "sensor.front_door_battery": {
+   "entity_id": "sensor.front_door_battery",
+   "area_id": "entrance",
+   "entity_category": "diagnostic",
    "labels": []
   }
  },

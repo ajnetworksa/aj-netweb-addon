@@ -1,5 +1,7 @@
 // custom:ajnetweb-camera-card - clean camera tile. Shows the camera's signed snapshot URL
 // (entity_picture) refreshed every few seconds; tap opens HA's live stream dialog.
+//   controls: [entity ids]  gate / garage / lock buttons on the picture (tap twice to act), e.g. the
+//                           access devices of the same area - open the gate while watching the camera
 import { AjnBase, OFFLINE, bindGestures, esc } from "../core/base.js";
 import { niceName } from "../core/model.js";
 import { COLORS } from "../core/styles.js";
@@ -14,7 +16,17 @@ export class AjnetwebCameraCard extends AjnBase {
   }
 
   watched() {
-    return [this._config.entity];
+    return [this._config.entity, ...(this._config.controls || [])];
+  }
+
+  _act(id) {
+    const st = this.st(id);
+    if (!st) return;
+    const d = id.split(".")[0];
+    if (d === "lock") return this.call(st.state === "locked" ? "lock.unlock" : "lock.lock", [id]);
+    if (d === "cover") return this.call("cover.toggle", [id]);
+    if (d === "button" || d === "input_button") return this.call(`${d}.press`, [id]);
+    return this.call(`${d}.turn_on`, [id]);   // gate / door strike relays pulse on
   }
 
   connectedCallback() {
@@ -70,6 +82,13 @@ export class AjnetwebCameraCard extends AjnBase {
       .empty ha-icon { --mdc-icon-size: 34px; }
       ha-card.broken img { display: none; }
       ha-card:not(.broken) .empty.fallback { display: none; }
+      .ctl { position: absolute; top: 10px; inset-inline-end: 10px; display: flex; gap: 6px; z-index: 1; }
+      .cb { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 9px; border-radius: 999px; border: none;
+            font: inherit; font-size: 12px; font-weight: 600; color: #fff; background: rgba(0,0,0,.45); cursor: pointer;
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+      .cb ha-icon { --mdc-icon-size: 16px; }
+      .cb.armed { background: rgb(${COLORS.orange}); }
+      .cb.on { background: rgba(${COLORS.green}, .85); }
       .state { margin-inline-start: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
                background: rgba(0,0,0,.45); letter-spacing: .02em; }
     `;
@@ -86,6 +105,14 @@ export class AjnetwebCameraCard extends AjnBase {
       <ha-card class="tap ${offline ? "offline" : ""}" tabindex="0" role="button" aria-label="${esc(name)}">
         ${url ? `<img class="cur" src="${esc(url)}" alt=""><img class="next" alt="">` : ""}${noPic}
         <div class="shade"></div>
+        ${(c.controls || []).length ? `<div class="ctl">${c.controls.map((id) => this.st(id)).filter(Boolean).slice(0, 2).map((s) => {
+          const d = s.entity_id.split(".")[0];
+          const on = ["open", "opening", "unlocked", "on"].includes(s.state);
+          const icon = d === "lock" ? (s.state === "locked" ? "mdi:lock" : "mdi:lock-open-variant") : d === "cover" ? (on ? "mdi:garage-open" : "mdi:garage") : "mdi:gate";
+          let nm = niceName(s.attributes.friendly_name || s.entity_id);
+          if (nm.toLowerCase().startsWith(name.toLowerCase() + " ")) nm = nm.slice(name.length + 1);
+          return `<button class="cb ${on ? "on" : ""}" data-ctl="${esc(s.entity_id)}"><ha-icon icon="${icon}"></ha-icon>${esc(nm)}</button>`;
+        }).join("")}</div>` : ""}
         <div class="label"><span class="dot"></span>${esc(name)}${offline ? `<span class="state">${esc(this.t("offline"))}</span>` : ""}</div>
       </ha-card>`);
     const card = this.shadowRoot.querySelector("ha-card");
@@ -96,6 +123,26 @@ export class AjnetwebCameraCard extends AjnBase {
       cur.onload = () => card.classList.remove("broken");
     }
     bindGestures(card, { onTap: () => this.moreInfo(c.entity) });
+    this.shadowRoot.querySelectorAll(".cb").forEach((b) => {
+      b.addEventListener("pointerdown", (e) => e.stopPropagation());
+      b.addEventListener("pointerup", (e) => e.stopPropagation());
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // tap twice within 3 s: gates and doors must never open from a stray touch
+        if (!b.classList.contains("armed")) {
+          b.classList.add("armed");
+          b.dataset.label = b.lastChild.textContent;
+          b.lastChild.textContent = this.t("confirm");
+          clearTimeout(this._armT);
+          this._armT = setTimeout(() => { b.classList.remove("armed"); b.lastChild.textContent = b.dataset.label; }, 3000);
+          return;
+        }
+        clearTimeout(this._armT);
+        b.classList.remove("armed");
+        b.lastChild.textContent = b.dataset.label;
+        this._act(b.dataset.ctl);
+      });
+    });
   }
 
   getCardSize() {
