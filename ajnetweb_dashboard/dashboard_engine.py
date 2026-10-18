@@ -529,6 +529,7 @@ class DashboardEngine:
     def list_blueprints(self) -> List[Dict[str, Any]]:
         target = os.path.join(self.config_dir, "blueprints", "automation", "ajnetweb")
         meta = {
+            "ac_precool_on_arrival.yaml": ("AC Pre-Cooling on Arrival", "Starts the AC when someone is on the way home, so the villa is cool when they arrive."),
             "adhan_smart_mute.yaml": ("Adhan & Smart Media Mute (legacy)", "Simple media pause at prayer times. For adhan playback use the Prayer & Adhan add-on."),
             "balcony_ac_protector.yaml": ("Balcony Door AC Protector", "Turns the AC off when a balcony door stays open."),
             "water_tank_watchdog.yaml": ("Water Tank & Pump Watchdog", "Low-tank alerts and pump dry-run protection."),

@@ -60,7 +60,10 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
 ```
 - The preview fakes `hass` in `dev/preview.js` (WebSocket replies, calendars, history, energy). When a card
   calls a new API, add a mock there so the preview keeps working.
-- Python: `python3 -m py_compile ajnetweb_dashboard/*.py`. Studio JS: `node --check ajnetweb_dashboard/www/app.js`.
+- Before every push, run what CI runs (`.github/workflows/checks.yml`):
+  `pip install ruff==0.16.8 -r tests/requirements.txt && ruff check . && pytest -q tests`, then
+  `npm run build` in `ajnetweb-ui` (the committed bundles must match the source) and
+  `node --check` / `bash -n` on the add-on `www/*.js` and `run.sh` files. Add tests in `tests/` for new logic.
 - Studio test locally: `INGRESS_PORT=8775 DASHBOARD_DEV=1 ADDON_DATA_DIR=/tmp/x AUTO_REGISTER_RESOURCES=false python3 ajnetweb_dashboard/server.py`.
 - Look at the result (screenshots at phone and tablet width, English and Arabic) before you say it works.
 

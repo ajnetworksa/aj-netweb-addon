@@ -66,6 +66,26 @@ Versions at the time of writing:
 **Open:** test on a real HA that non-admin users see the merged cards; photo upload from the Companion
 app on iOS; energy card with a real Energy setup (single-meter grid layout of newer HA versions).
 
+## AC pre-cooling — Dashboard Suite 3.3.1 (October 2026)
+
+**Asked for:** an AC pre-cooling feature that starts cooling before occupants arrive.
+
+**Done:**
+- New bundled blueprint `ajnetweb_dashboard/blueprints/ac_precool_on_arrival.yaml`, listed in the Studio's
+  Blueprints section and installed with the others.
+- Trigger: a chosen person enters an approach zone while coming from away. Cools only units that are off and
+  in a warm room; switches them off again if nobody gets home within the give-up time.
+
+**Decisions:**
+- Built as a blueprint, like the balcony AC protector, so installers set it up per villa in HA's own UI
+  with no new add-on options or dashboard changes.
+- Approach zone instead of the Proximity integration: it works with only the Companion app and a zone,
+  and the radius directly sets how early cooling starts (about 1 km per minute of driving).
+- The arrival check ignores leaving home (Home usually sits inside the approach zone).
+
+**Open:**
+- Schedule-based pre-cooling (e.g. before school pick-up) and a dashboard button/card for it.
+
 ## PR #6 — Organised layout, Flux-style rooms, Right now card (Dashboard Suite 3.3.0)
 
 See `ajnetweb_dashboard/CHANGELOG.md` 3.3.0.

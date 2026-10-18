@@ -33,6 +33,16 @@
 - `AGENTS.md` / `CLAUDE.md` and `docs/ai-guide.md`: rules for AI assistants changing the code or a
   client's dashboard.
 
+## 3.3.1 - AC pre-cooling
+- **New blueprint: AC Pre-Cooling on Arrival** (`ac_precool_on_arrival.yaml`). When someone enters an approach
+  zone around the house (e.g. a 5 km "Near home" zone) on the way home, the chosen AC units start cooling.
+  - Only units that are off and in a room warmer than the start temperature (default 26 °C) are switched on,
+    to the cooling temperature (default 23 °C). AC the family already set is left alone.
+  - By default it only runs when nobody is home yet.
+  - If nobody arrives within the give-up time (default 40 min, e.g. they only drove past), the units it
+    started are switched off again.
+  - Install with Studio → Blueprints → Install, then Settings → Automations → Blueprints.
+
 ## 3.3.0 - organised Home and Wall Panel layout
 - **Home and Wall Panel are now built from full-width bands**, so there are no more big empty areas.
   - Before, a short Cameras section could sit next to a tall Access section; Home Assistant's sections

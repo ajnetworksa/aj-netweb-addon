@@ -1,0 +1,8 @@
+# Lint for real bugs (syntax errors, undefined names, broken imports) across every add-on.
+# Unused imports/variables are left alone for now so this check can go in without touching add-on code.
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E9", "F"]
+ignore = ["F401", "F841"]

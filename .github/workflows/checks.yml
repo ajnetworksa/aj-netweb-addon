@@ -1,0 +1,50 @@
+# Lint and tests on every push and pull request.
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/requirements.txt
+      - run: pip install ruff==0.16.8 -r tests/requirements.txt
+      - name: Lint (ruff)
+        run: ruff check --output-format github .
+      - name: Tests (pytest)
+        run: pytest -q tests
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ajnetweb-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ajnetweb-ui/package-lock.json
+      - run: npm ci
+      - name: Build the cards
+        run: npm run build
+      - name: Committed bundle matches the source
+        run: git diff --exit-code -- dist ../ajnetweb_dashboard/www/ajnetweb-card-suite.js
+      - name: Add-on web pages parse
+        working-directory: .
+        run: for f in ajnetweb_*/www/*.js; do node --check "$f"; done
+      - name: Add-on start scripts parse
+        working-directory: .
+        run: for f in ajnetweb_*/run.sh; do bash -n "$f"; done

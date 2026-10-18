@@ -1,0 +1,136 @@
+blueprint:
+  name: "AJ Netweb · AC Pre-Cooling on Arrival"
+  description: "Cools the villa before the family walks in. When a person enters the approach zone around the house (for example a 5 km \"Near home\" zone) while coming from away, the chosen AC units are switched on to cool to the set temperature. Only units that are off and whose room is warmer than the start temperature are touched, so AC the family already set is left alone. If nobody arrives home within the give-up time (they only drove past), the units that were started are switched off again."
+  domain: automation
+  input:
+    people:
+      name: People
+      description: The people whose arrival should start the pre-cooling.
+      selector:
+        entity:
+          domain: person
+          multiple: true
+    approach_zone:
+      name: Approach Zone
+      description: >-
+        A zone around the house that people pass through on their way home, larger than the Home zone
+        (Settings → Areas, labels & zones → Zones). Its radius sets how early cooling starts: about
+        1 km per minute of driving.
+      selector:
+        entity:
+          domain: zone
+    climate_entities:
+      name: AC Units
+      description: The air conditioning units to pre-cool (majlis, living room, master bedroom, …).
+      selector:
+        entity:
+          domain: climate
+          multiple: true
+    target_temperature:
+      name: Cooling Temperature
+      description: The temperature the AC units are set to.
+      default: 23
+      selector:
+        number:
+          min: 16
+          max: 30
+          step: 0.5
+          unit_of_measurement: "°C"
+    start_above_temperature:
+      name: Only Start Above (Room Temperature)
+      description: A unit is only started when its room is warmer than this. Rooms without a reading are always cooled.
+      default: 26
+      selector:
+        number:
+          min: 18
+          max: 40
+          step: 0.5
+          unit_of_measurement: "°C"
+    only_when_empty:
+      name: Only When Nobody Is Home
+      description: Skip pre-cooling when one of the people is already home (the AC is then usually on already).
+      default: true
+      selector:
+        boolean:
+    give_up_minutes:
+      name: Give-Up Time (Minutes)
+      description: If nobody arrives home within this time, the units that were started are switched off again.
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 120
+          step: 5
+          unit_of_measurement: minutes
+
+mode: single
+max_exceeded: silent
+
+variables:
+  people: !input people
+  climate_entities: !input climate_entities
+  start_above: !input start_above_temperature
+  target_temperature: !input target_temperature
+  only_when_empty: !input only_when_empty
+  people_list: "{{ people if people is list else [people] }}"
+  # Units that are off and in a warm (or unknown-temperature) room.
+  to_cool: >-
+    {% set units = climate_entities if climate_entities is list else [climate_entities] %}
+    {% set ns = namespace(out=[]) %}
+    {% for e in units %}
+      {% set t = state_attr(e, 'current_temperature') %}
+      {% if is_state(e, 'off') and (t is none or (t | float(0)) > (start_above | float)) %}
+        {% set ns.out = ns.out + [e] %}
+      {% endif %}
+    {% endfor %}
+    {{ ns.out }}
+
+trigger:
+  - platform: zone
+    entity_id: !input people
+    zone: !input approach_zone
+    event: enter
+
+condition:
+  # Coming from away, not walking out of the house (the Home zone usually sits inside the approach zone).
+  - condition: template
+    value_template: "{{ trigger.from_state is not none and trigger.from_state.state != 'home' }}"
+  - condition: template
+    value_template: >-
+      {{ not only_when_empty or (people_list | select('is_state', 'home') | list | count) == 0 }}
+  - condition: template
+    value_template: "{{ to_cool | count > 0 }}"
+
+action:
+  - service: climate.set_temperature
+    target:
+      entity_id: "{{ to_cool }}"
+    data:
+      hvac_mode: cool
+      temperature: "{{ target_temperature }}"
+  - service: persistent_notification.create
+    data:
+      notification_id: "ajnetweb_precool"
+      title: "❄️ Pre-cooling started"
+      message: >-
+        {{ trigger.to_state.name }} is on the way home. Cooling
+        {{ to_cool | map('state_attr', 'friendly_name') | join(', ') }} to {{ target_temperature }}°.
+
+  # Wait for someone to get home; if nobody does, undo what was started.
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input people
+        to: "home"
+    timeout:
+      minutes: !input give_up_minutes
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ wait.trigger is none }}"
+    then:
+      - service: climate.turn_off
+        target:
+          entity_id: "{{ to_cool }}"
+  - service: persistent_notification.dismiss
+    data:
+      notification_id: "ajnetweb_precool"
