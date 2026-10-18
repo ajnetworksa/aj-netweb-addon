@@ -11,13 +11,52 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.4.0 |
+| Dashboard Suite + UI kit | 3.5.0 |
 | Prayer & Adhan | 1.1.0 |
 | Intercom & Door Station | 1.6.0 |
 | CCTV & NVR Studio | 1.3.0 |
 | Room & Guest Pass Studio | 1.3.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## House modes (Dashboard Suite 3.5.0)
+
+**Asked for:** house modes (home, away, night) in the installer dashboard, wired through the Alexa bridge
+(product plan item 8).
+
+**Done:**
+- Studio → **House modes**: Home / Away / Night / Guests with per-mode lights, AC, shades, music & TV, alarm
+  and a scene to run; a list of lights no mode turns off; Alexa on/off. Saved in `project.json` (`house_modes`).
+- Apply (and Deploy) writes `input_select.ajnetweb_house_mode`, `script.ajnetweb_mode_<mode>` and
+  `automation.ajnetweb_house_modes` through HA's own APIs (input_select collection, script/automation config
+  API, label and entity registries). Scripts of modes switched off are removed.
+- `custom:ajnetweb-modes-card` and a new `modes` band (Home and Wall Panel, after the header).
+- Unit tests: `python3 -m unittest discover -s ajnetweb_dashboard/tests`.
+
+**Decisions:**
+- *The helper is the single source of truth, one automation does the work.* The dashboard, Alexa (via the
+  scripts) and any automation only change the mode; the automation applies it. Nothing depends on the
+  add-on running.
+- *Scripts for Alexa*, not the input_select: Matterbridge exposes an input_select as a Matter mode-select,
+  which Alexa can't drive; scripts become on/off switches ("turn on Away mode").
+- *Entity lists from discovery at Apply time*, so gates and garage doors (the `access` group) are never closed
+  by a mode and the Studio's excluded devices and hidden rooms are respected. Cost: Apply again after
+  adding devices.
+- *Not on restart:* the automation ignores the change from `unavailable` when HA starts, so a restart never
+  re-arms the alarm or switches lights off.
+- *Never disarm by default:* a mode that disarms can be triggered by voice without Alexa's PIN.
+
+**Open:**
+- Not tested on a real HA yet (tested with a fake HA, the preview and the Studio locally).
+- Ramadan mode and adhan zones per mode (product plan item 8 mentions both).
+- Alarm panels that need a code to arm: the mode can't arm them (no code is stored).
+- `alexa_bridge`: `setup-matterbridge.sh` writes the plugin config to `/data/matterbridge/AlexaBridge/` with
+  keys matterbridge-hass doesn't know (`exposeLabel`, `excludedPrefixes`); Matterbridge reads
+  `/data/.matterbridge/matterbridge-hass.config.json` (`filterByLabel`, `entityBlackList`). So the label
+  filter only works where it was set in the Matterbridge UI. The bridge UI's label list and expose buttons use
+  REST endpoints HA doesn't have. Needs its own fix.
 
 ---
 

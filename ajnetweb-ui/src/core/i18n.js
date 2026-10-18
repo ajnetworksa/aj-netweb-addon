@@ -37,6 +37,7 @@ export const STRINGS = {
     yesterday: "Yesterday", power_now: "Now", solar: "Solar", exported: "Exported", cost_today: "Cost today",
     energy_setup: "Set up Settings → Dashboards → Energy to see usage here", insights: "Today at home",
     play_also_in: "Also play in", everywhere: "Everywhere", ungroup: "Ungroup", rooms_linked: ["+{n} room", "+{n} rooms"],
+    house_mode: "House mode", mode_home: "Home", mode_away: "Away", mode_night: "Night", mode_guests: "Guests",
     this_room: "This room", other_rooms: "Other rooms", new_devices: "Devices without a room", new_devices_hint: "These show under **General**. Give each one a room (Settings → Devices → the device → ✏️ Area) and it moves to that room on every screen by itself.",
   },
   ar: {
@@ -76,6 +77,7 @@ export const STRINGS = {
     yesterday: "أمس", power_now: "الآن", solar: "الطاقة الشمسية", exported: "مُصدَّر", cost_today: "تكلفة اليوم",
     energy_setup: "اضبط الإعدادات ← لوحات المعلومات ← الطاقة لعرض الاستهلاك هنا", insights: "اليوم في المنزل",
     play_also_in: "شغّل أيضاً في", everywhere: "في كل مكان", ungroup: "فك الربط", rooms_linked: ["+{n} غرفة", "+{n} غرف"],
+    house_mode: "وضع المنزل", mode_home: "في المنزل", mode_away: "خارج المنزل", mode_night: "الليل", mode_guests: "ضيوف",
     this_room: "هذه الغرفة", other_rooms: "غرف أخرى", new_devices: "أجهزة بدون غرفة", new_devices_hint: "تظهر هذه الأجهزة ضمن **عام**. حدّد غرفة لكل جهاز (الإعدادات ← الأجهزة ← الجهاز ← ✏️ المنطقة) وسينتقل إلى تلك الغرفة في كل الشاشات تلقائياً.",
   },
 };

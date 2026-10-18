@@ -88,6 +88,7 @@ Open **Dashboard Studio** from the sidebar:
 | Layout | Drag blocks into the order the client wants, top-row cards, room order and names, cameras. **Apply** and check the preview on phone and tablet width |
 | My cards (in Layout) | Anything special (irrigation, energy graph, gate buttons): add it with HA's visual editor — no YAML |
 | Rooms & Devices | Untick rooms/devices the client must not see; ★ pin the 4–8 things used daily |
+| House modes | Turn on, decide with the client what Away and Night do, tick the lights that must stay on, **Apply to Home Assistant** |
 | Support Info | Your company, phone, email — shown on the admin-only Installer page |
 | Deploy | **Deploy** → open Home and Wall Panel to check |
 
@@ -131,6 +132,8 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] AC: + / − changes the target, tap switches on/off.
 - [ ] Gate/lock: first tap shows "Tap again to confirm", second tap opens.
 - [ ] Scenes run. "All lights off" asks for confirmation.
+- [ ] House modes: Away asks to confirm, then lights/AC/shades/alarm do what was agreed; Home and Night too.
+      With Alexa: "Alexa, turn on Night mode" switches the chip on the dashboard.
 - [ ] Cameras show pictures; tap opens live video.
 - [ ] Arabic users see Arabic (if used).
 - [ ] Appearance (⋯ More → *My theme & colour*): pick a colour and theme on one phone, check that person's tablet.
