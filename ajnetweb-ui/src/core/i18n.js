@@ -32,6 +32,10 @@ export const STRINGS = {
     reload: "Reload", ha_settings: "Home Assistant settings", studio: "Dashboard Studio",
     exit_kiosk: "Exit kiosk mode", no_picture: "No picture", weather: "Weather", today: "Today",
     quick_actions: "Quick actions", edit_my_cards: "Edit my cards",
+    temperature: "Temperature", no_history: "No history yet", now: "Now", agenda: "Agenda", tomorrow: "Tomorrow",
+    all_day: "All day", more_events: "more events", nothing_planned: "Nothing planned", energy: "Energy",
+    yesterday: "Yesterday", power_now: "Now", solar: "Solar", exported: "Exported", cost_today: "Cost today",
+    energy_setup: "Set up Settings → Dashboards → Energy to see usage here", insights: "Today at home",
   },
   ar: {
     morning: "صباح الخير", afternoon: "مساء الخير", evening: "مساء الخير", night: "تصبح على خير",
@@ -65,6 +69,10 @@ export const STRINGS = {
     reload: "إعادة التحميل", ha_settings: "إعدادات Home Assistant", studio: "استوديو اللوحة",
     exit_kiosk: "الخروج من وضع الكشك", no_picture: "لا توجد صورة", weather: "الطقس", today: "اليوم",
     quick_actions: "إجراءات سريعة", edit_my_cards: "تعديل بطاقاتي",
+    temperature: "درجة الحرارة", no_history: "لا يوجد سجل بعد", now: "الآن", agenda: "المواعيد", tomorrow: "غداً",
+    all_day: "طوال اليوم", more_events: "مواعيد أخرى", nothing_planned: "لا توجد مواعيد", energy: "الطاقة",
+    yesterday: "أمس", power_now: "الآن", solar: "الطاقة الشمسية", exported: "مُصدَّر", cost_today: "تكلفة اليوم",
+    energy_setup: "اضبط الإعدادات ← لوحات المعلومات ← الطاقة لعرض الاستهلاك هنا", insights: "اليوم في المنزل",
   },
 };
 

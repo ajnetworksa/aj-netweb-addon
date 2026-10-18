@@ -383,13 +383,17 @@
     favorites: ["⭐", "Favourites", "Devices you starred in Rooms & Devices"],
     rooms: ["🏠", "Rooms", "Room tiles with floor tabs"],
     climate: ["❄️", "Climate", "AC controls"],
+    insights: ["📊", "Today at home", "Agenda, energy today, room temperatures (24 h graph)"],
     cameras: ["📹", "Cameras", "Large pictures; gate/garage buttons on the picture"],
     custom: ["🧩", "My cards", "Your own cards from the My cards dashboard"],
   };
   const DEFAULT_ORDER = {
-    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "cameras", "custom"],
-    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "custom"],
+    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
+    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
   };
+  const INSIGHTS = { calendar: ["📅", "Agenda", "Next events from the HA calendars"],
+    energy: ["⚡", "Energy", "Used today and the last 7 days (from HA's Energy settings)"],
+    temperature: ["🌡️", "Room temperatures", "Every room's temperature over 24 h"] };
   const TOP = { weather: ["🌤️", "Weather forecast"], prayer: ["🕌", "Prayer times"], media: ["🎵", "Music / Right now"] };
 
   // A list that can be reordered by drag and drop (mouse) or ▲▼ (touch), each row with an on/off box.
@@ -431,7 +435,12 @@
     p.layout = p.layout || {};
     ["home", "panel"].forEach((page) => {
       const conf = p.layout[page] || {};
-      const order = [...(conf.order || []).filter((b) => BANDS[b]), ...DEFAULT_ORDER[page].filter((b) => !(conf.order || []).includes(b))];
+      const order = (conf.order || []).filter((b) => BANDS[b]);
+      DEFAULT_ORDER[page].forEach((b, i) => {   // blocks added in a later version go after their default neighbour
+        if (order.includes(b)) return;
+        const prev = DEFAULT_ORDER[page].slice(0, i).reverse().find((x) => order.includes(x));
+        order.splice(prev ? order.indexOf(prev) + 1 : 0, 0, b);
+      });
       const hidden = new Set(conf.hidden || []);
       sortable($(page === "home" ? "lyHome" : "lyPanel"),
         order.map((b) => ({ id: b, icon: BANDS[b][0], title: BANDS[b][1], sub: BANDS[b][2], on: !hidden.has(b) })),
@@ -444,6 +453,11 @@
     const topOrder = [...topOn, ...Object.keys(TOP).filter((k) => !topOn.includes(k))];
     sortable($("lyTop"), topOrder.map((k) => ({ id: k, icon: TOP[k][0], title: TOP[k][1], on: topOn.includes(k) })), (list) => {
       p.top_cards = list.filter((r) => r.on).map((r) => r.id); saveSoon();
+    });
+    const insOn = Array.isArray(p.insights) ? p.insights : Object.keys(INSIGHTS);
+    const insOrder = [...insOn.filter((k) => INSIGHTS[k]), ...Object.keys(INSIGHTS).filter((k) => !insOn.includes(k))];
+    sortable($("lyInsights"), insOrder.map((k) => ({ id: k, icon: INSIGHTS[k][0], title: INSIGHTS[k][1], sub: INSIGHTS[k][2], on: insOn.includes(k) })), (list) => {
+      p.insights = list.filter((r) => r.on).map((r) => r.id); saveSoon();
     });
     if (!state.lyBound) {   // inputs read state.project when they change, so bind them once
       state.lyBound = true;

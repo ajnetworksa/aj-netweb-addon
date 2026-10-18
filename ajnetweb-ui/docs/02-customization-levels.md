@@ -37,7 +37,8 @@ All options live in the add-on (`/data/project.json`) and are re-applied on ever
   gradient, personal appearance on/off, gradient wallpaper.
 - **Layout** (no YAML, live preview next to it):
   - Drag the Home and Wall Panel blocks (top row, scenes, access, favourites, rooms, climate, cameras,
-    *My cards*) into any order, or untick one to hide it.
+    *Today at home*, *My cards*) into any order, or untick one to hide it.
+  - Choose the *Today at home* cards: agenda, energy today, room temperatures (24 h graph).
   - Choose which cards sit in the top row (weather, prayer, music).
   - Room order (drag), ✏️ rename a room, 📷 upload a room photo from the phone or PC (resized
     automatically, saved as the HA area picture), room style (tiles or photo cards).
@@ -70,11 +71,15 @@ strategy:
   layout:                             # block order / hidden blocks per page (Studio → Layout)
     home:  { order: [top, rooms, scenes, custom], hidden: [climate] }
     panel: { order: [top, cameras, rooms], hidden: [] }
-                                      # blocks: top scenes access favorites rooms climate cameras custom
+                                      # blocks: top scenes access favorites rooms climate insights cameras custom
   top_cards: [weather, prayer, media] # cards in the top row, in this order
   cameras: [camera.gate, camera.garden]   # which cameras, in this order (omit = all)
   home_cameras: 4                     # how many cameras on Home
   custom_dashboard: ajnetweb-cards    # "My cards" dashboard merged in (Studio creates it)
+  insights: [calendar, energy, temperature]   # cards in the "Today at home" block
+  calendars: [calendar.family]        # agenda calendars (omit = all)
+  energy: true                        # false = no energy card
+  energy_power: sensor.house_power    # live power on the energy card (found automatically if omitted)
   header_image: /local/villa.jpg      # optional hero image behind the clock
   exclude_entities:                   # never shown anywhere
     - switch.pump_child_lock

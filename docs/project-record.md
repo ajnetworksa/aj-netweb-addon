@@ -31,6 +31,11 @@ Versions at the time of writing:
 - **My cards**: a native HA dashboard (`ajnetweb-cards`) edited with HA's visual editor. Its first page is
   merged into Home/Wall Panel, its other pages become extra pages; *Edit my cards* in the ⋯ menu for admins.
 - Room tiles show the area photo.
+- Follow-up ("do all, add temperature graphs per room, and instructions for other AI"):
+  - Graph card (room temperature history) on the Climate page, room pages and the room sheet.
+  - *Today at home* band: agenda, energy, all-room temperatures.
+  - `AGENTS.md` (read by Codex, Cursor and others), `CLAUDE.md` (imports it), and `docs/ai-guide.md`
+    (decision ladder for changing a client dashboard: HA settings → Studio → My cards, never take control).
 
 **Decisions:**
 - *HA's own visual editor for custom cards*, instead of building our own card editor. Every HA and HACS
@@ -38,9 +43,13 @@ Versions at the time of writing:
 - *Merge, don't replace:* the generated dashboard keeps following the house; the custom cards are read
   with `lovelace/config` (no admin needed to read) each time the dashboard is built.
 - *Room names and photos go to the HA area registry*, so every other card and app sees the same names.
+- *Graphs drawn by us (SVG)*, not HA's history-graph or ApexCharts: one look in every theme, no HACS
+  dependency, works for non-admin users (history API).
+- *Energy from HA's Energy settings and statistics*, so the numbers match HA's own Energy page.
+- *AI rules in `AGENTS.md`*, the file most AI tools read; `CLAUDE.md` only imports it, so there is one copy.
 
 **Open:** test on a real HA that non-admin users see the merged cards; photo upload from the Companion
-app on iOS.
+app on iOS; energy card with a real Energy setup (single-meter grid layout of newer HA versions).
 
 ## PR #6 — Organised layout, Flux-style rooms, Right now card (Dashboard Suite 3.3.0)
 

@@ -218,6 +218,48 @@ Current temperature and condition, today's high/low, and one row per day with a 
 (blue → yellow → orange, scaled to the week). Uses the `weather.get_forecasts` action, refreshed every
 30 minutes. Tap opens HA's weather details.
 
+### `custom:ajnetweb-graph-card` — temperature graph (one room or all rooms)
+
+```yaml
+type: custom:ajnetweb-graph-card
+entity: sensor.majlis_temperature      # one line with a soft fill, min / max and the live value
+# or several lines with a legend:
+entities:
+  - entity: sensor.majlis_temperature
+    name: Majlis
+  - sensor.master_bedroom_temperature
+hours: 24                # history window (default 24)
+title: Temperature       # optional
+compact: false           # true = small chart without axis (used in the room sheet)
+```
+Works for any number sensor (humidity, CO₂, power). History from `history/history_during_period`,
+reloaded every 10 minutes; the last point follows the live state. Drag across the chart to read past
+values. The generated dashboard puts one per room on the Climate page, the room page and the room sheet,
+and all rooms together in *Today at home*.
+
+### `custom:ajnetweb-calendar-card` — agenda
+
+```yaml
+type: custom:ajnetweb-calendar-card
+entities: [calendar.family, calendar.school]
+days: 7                  # look ahead (default 7)
+max: 6                   # events shown (default 6)
+```
+Next events grouped by day (Today / Tomorrow / weekday), a colour per calendar, running events
+highlighted. Any HA calendar works (Google, CalDAV, Local calendar). Tap opens the calendar.
+
+### `custom:ajnetweb-energy-card` — energy today
+
+```yaml
+type: custom:ajnetweb-energy-card
+power: sensor.house_power        # optional: live power (W / kW)
+days: 7
+entities: [sensor.main_meter]    # only if HA's Energy dashboard is NOT set up: meters to add up
+```
+Reads HA's Energy settings (grid import/export, solar, cost) and the daily totals from long-term
+statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
+and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
+
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 
 ```yaml

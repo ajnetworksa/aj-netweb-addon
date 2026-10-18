@@ -12,7 +12,21 @@
   - Its other pages become extra pages in the bottom bar.
   - Admins get **Edit my cards** in the ⋯ menu.
 - Room tiles show the room photo when the area has one.
-- New strategy options: `layout`, `top_cards`, `room_order`, `cameras`, `home_cameras`, `custom_dashboard`.
+- **Temperature graphs per room** (`custom:ajnetweb-graph-card`): 24 h history with min/max and the live value;
+  drag across to read past values.
+  - Climate page: all rooms in one graph on top, then one graph per room.
+  - Room pages and the room sheet show that room's graph.
+- **New "Today at home" block** on Home and the Wall Panel (movable in Layout):
+  - **Agenda** (`custom:ajnetweb-calendar-card`): next events from HA calendars, by day.
+  - **Energy** (`custom:ajnetweb-energy-card`): used today vs yesterday, 7-day bars, solar, export, cost and
+    live power, read from HA's Energy settings.
+  - **Room temperatures**: every room in one graph.
+  - Each card only shows when there is data for it; pick them in Studio → Layout.
+- Blocks added in a new version now appear next to their default neighbour in saved layouts.
+- New strategy options: `layout`, `top_cards`, `room_order`, `cameras`, `home_cameras`, `custom_dashboard`,
+  `insights`, `calendars`, `energy`, `energy_power`.
+- `AGENTS.md` / `CLAUDE.md` and `docs/ai-guide.md`: rules for AI assistants changing the code or a
+  client's dashboard.
 
 ## 3.3.0 - organised Home and Wall Panel layout
 - **Home and Wall Panel are now built from full-width bands**, so there are no more big empty areas.

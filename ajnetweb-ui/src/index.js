@@ -12,6 +12,9 @@ import { AjnetwebAppearanceCard } from "./cards/appearance.js";
 import { AjnetwebWeatherCard } from "./cards/weather.js";
 import { AjnetwebRoomsCard } from "./cards/rooms.js";
 import { AjnetwebStatusCard } from "./cards/status.js";
+import { AjnetwebGraphCard } from "./cards/graph.js";
+import { AjnetwebCalendarCard } from "./cards/calendar.js";
+import { AjnetwebEnergyCard } from "./cards/energy.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
 import { generateDashboard } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
@@ -30,6 +33,9 @@ const CARDS = [
   ["ajnetweb-music-card", AjnetwebMusicCard, "AJ Netweb Music", "Music player with Music Assistant search, favourites and room switching."],
   ["ajnetweb-rooms-card", AjnetwebRoomsCard, "AJ Netweb Rooms", "All rooms with floor tabs; room tiles with quick buttons for lights, AC and shades."],
   ["ajnetweb-status-card", AjnetwebStatusCard, "AJ Netweb Right now", "Only what needs attention: open doors, alerts, timers, lights and AC on, low batteries."],
+  ["ajnetweb-graph-card", AjnetwebGraphCard, "AJ Netweb Graph", "Temperature (or any sensor) history as smooth lines; one room or all rooms."],
+  ["ajnetweb-calendar-card", AjnetwebCalendarCard, "AJ Netweb Agenda", "Next events from your calendars, by day."],
+  ["ajnetweb-energy-card", AjnetwebEnergyCard, "AJ Netweb Energy", "Electricity used today, last 7 days, solar, cost and power now."],
   ["ajnetweb-weather-card", AjnetwebWeatherCard, "AJ Netweb Weather", "Current weather and a 5-day forecast with temperature bars."],
   ["ajnetweb-appearance-card", AjnetwebAppearanceCard, "AJ Netweb Appearance", "Lets each person choose their own theme, colour gradient and wallpaper."],
   ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],

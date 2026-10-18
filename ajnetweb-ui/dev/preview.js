@@ -27,6 +27,20 @@ const userData = (() => {
   try { return JSON.parse(q("me", "") || localStorage.getItem("ajn-preview-me") || "{}"); } catch (e) { return {}; }
 })();
 
+// extra sample data for the graph / agenda / energy cards
+[["majlis", 23.1], ["master_bedroom", 21.6], ["kids_room", 22.4]].filter(([a]) => data.areas[a]).forEach(([area, v]) => {
+  const id = `sensor.${area}_temperature`;
+  data.states[id] = { entity_id: id, state: String(v), attributes: { friendly_name: `${data.areas[area].name} Temperature`, device_class: "temperature", unit_of_measurement: "°C" } };
+  data.entities[id] = { entity_id: id, area_id: area, entity_category: null, labels: [] };
+});
+data.states["sensor.house_power"] = { entity_id: "sensor.house_power", state: "3420", attributes: { friendly_name: "House power", device_class: "power", unit_of_measurement: "W" } };
+data.states["calendar.family"] = { entity_id: "calendar.family", state: "off", last_changed: "x", attributes: { friendly_name: "Family" } };
+data.states["calendar.school"] = { entity_id: "calendar.school", state: "off", last_changed: "x", attributes: { friendly_name: "School" } };
+const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+const at = (d, h, m = 0) => new Date(day0.getTime() + d * 86400000 + (h * 60 + m) * 60000).toISOString();
+const wave = (id, base, amp, phase) => [...Array(97)].map((_, i) => ({ s: String(base + amp * Math.sin(i / 15 + phase) + (i % 7) * 0.05),
+  lu: (Date.now() - (96 - i) * 15 * 60000) / 1000 }));
+
 const lang = q("lang", "en");
 const hass = {
   ...data, language: lang, user: { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") },  // ?user=Mama&admin=0
@@ -35,6 +49,16 @@ const hass = {
   themes: { themes: registry, darkMode: modeQ === "dark" },
   callWS: async (msg) => {
     if (msg.type === "frontend/get_user_data") return { value: userData };
+    if (msg.type === "history/history_during_period") return Object.fromEntries(msg.entity_ids.map((id, i) =>
+      [id, wave(id, parseFloat((hass.states[id] || {}).state) || 22, 1.4 + i * 0.3, i)]));
+    if (msg.type === "energy/get_prefs") return { energy_sources: [
+      { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_import", stat_cost: "sensor.grid_cost" }], flow_to: [{ stat_energy_to: "sensor.grid_export" }] },
+      { type: "solar", stat_energy_from: "sensor.solar_energy" }] };
+    if (msg.type === "recorder/statistics_during_period") {
+      const base = { "sensor.grid_import": 28, "sensor.grid_cost": 5.2, "sensor.grid_export": 3, "sensor.solar_energy": 14 };
+      return Object.fromEntries(msg.statistic_ids.map((id) => [id, [...Array(7)].map((_, d) => ({
+        start: Date.parse(msg.start_time) + d * 86400000, change: base[id] * (d === 6 ? 0.55 : 0.8 + ((d * 37) % 5) / 10) }))]));
+    }
     if (msg.type === "lovelace/config") return { views: [   // a sample "My cards" dashboard
       { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: [{ type: "heading", heading: "Pool & garden" },
         { type: "custom:ajnetweb-device-card", entity: "light.living_room_ceiling", name: "Pool lights", grid_options: { columns: 6 } },
@@ -61,6 +85,11 @@ const hass = {
     }
     return [{ id: "u1", is_owner: true, group_ids: ["system-admin"] }];
   },
+  callApi: async (method, url) => (url.startsWith("calendars/calendar.family") ? [
+    { summary: "Family lunch at grandma's", start: { dateTime: at(0, 13, 30) }, end: { dateTime: at(0, 15) }, location: "Al Olaya" },
+    { summary: "Pool service", start: { dateTime: at(1, 9) }, end: { dateTime: at(1, 10) } },
+    { summary: "Eid holiday", start: { date: at(3, 0).slice(0, 10) }, end: { date: at(4, 0).slice(0, 10) } }]
+    : url.startsWith("calendars/calendar.school") ? [{ summary: "Parents' evening", start: { dateTime: at(1, 18) }, end: { dateTime: at(1, 19, 30) }, location: "School" }] : []),
   callService: async (domain, service, d) => {
     console.log("callService", domain, service, d);
     // simulate HA: flip states so the preview reacts

@@ -67,9 +67,12 @@ Before each deploy (and each restore) the current layout is saved to
 
 ## Editing by hand
 
-Manual edits made in the HA dashboard editor are overwritten by the next deploy (a backup is
-taken first). For one-off client changes, either make them in the Studio, or take the dashboard
-over manually and stop deploying to it.
+You don't need to. Change the layout in Studio → **Layout** (drag and drop, live preview), and add
+client-specific cards in **My cards** (Studio → Layout), which you edit with Home Assistant's own visual
+editor and which are merged into Home and the Wall Panel. Edits made directly to the generated dashboard
+are overwritten by the next deploy (a backup is taken first).
+
+AI assistants changing a client dashboard must follow `docs/ai-guide.md` in the repository.
 
 ## Licence
 

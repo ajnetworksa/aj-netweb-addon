@@ -65,6 +65,7 @@ DEFAULT_PROJECT = {
     "menu": True,
     "layout": {},              # {"home": {"order": [...], "hidden": [...]}, "panel": {...}}  (Studio "Layout" tab)
     "top_cards": ["weather", "prayer", "media"],
+    "insights": ["calendar", "energy", "temperature"],   # "Today at home" band
     "room_order": [],
     "room_style": "tile",
     "cameras": [],             # chosen cameras in order (empty = all)
@@ -76,7 +77,8 @@ DEFAULT_PROJECT = {
 }
 
 
-LAYOUT_BANDS = ("top", "scenes", "access", "favorites", "rooms", "climate", "cameras", "custom")
+LAYOUT_BANDS = ("top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
+INSIGHTS = ("calendar", "energy", "temperature")
 
 
 def _clean_layout(layout) -> Optional[Dict[str, Any]]:
@@ -169,7 +171,7 @@ class DashboardEngine:
         project = _merge(self.load_project(), changes or {})
         project["url_path"] = normalize_url_path(project.get("url_path"))
         # lists are replaced, not merged
-        for key in ("excluded_entities", "favorites", "room_order", "cameras", "top_cards"):
+        for key in ("excluded_entities", "favorites", "room_order", "cameras", "top_cards", "insights"):
             if key in (changes or {}):
                 project[key] = list(dict.fromkeys(changes[key] or []))
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -246,6 +248,8 @@ class DashboardEngine:
             "layout": _clean_layout(project.get("layout")),
             "top_cards": project.get("top_cards") if isinstance(project.get("top_cards"), list)
                          and project.get("top_cards") != ["weather", "prayer", "media"] else None,
+            "insights": [k for k in project["insights"] if k in INSIGHTS]
+                        if isinstance(project.get("insights"), list) and project.get("insights") != list(INSIGHTS) else None,
             "room_order": [a for a in (project.get("room_order") or []) if isinstance(a, str)] or None,
             "room_style": "photo" if project.get("room_style") == "photo" else None,
             "cameras": [c for c in (project.get("cameras") or []) if isinstance(c, str) and c.startswith("camera.")] or None,
@@ -260,7 +264,9 @@ class DashboardEngine:
             "branding": project.get("branding") or {},
             "admins": ctx.get("admin_user_ids") or [],
         }
-        options = {k: v for k, v in options.items() if v not in (None, [], {}, "")}
+        # an empty top row / "Today at home" choice is a choice (show none), not "use the default"
+        options = {k: v for k, v in options.items()
+                   if v not in (None, [], {}, "") or (k in ("top_cards", "insights") and v == [])}
         return {"strategy": options}
 
     # ------------------------------------------------------------------ health

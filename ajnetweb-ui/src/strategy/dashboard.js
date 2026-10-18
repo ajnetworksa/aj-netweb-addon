@@ -16,8 +16,10 @@
 //   appearance_themes: [theme names] (limit what people can pick)
 //   menu: false (no ⋯ "More" button in the navigation bar), studio_path: <Dashboard Studio panel path>
 //   layout: { home: { order: [band ids], hidden: [band ids] }, panel: {...} }   bands: top scenes access
-//           favorites rooms climate cameras custom          (Studio "Layout" tab, drag and drop)
+//           favorites rooms climate insights cameras custom          (Studio "Layout" tab, drag and drop)
 //   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
+//   insights: [calendar, energy, temperature]   cards of the "Today at home" band (Home / Wall Panel)
+//   calendars: [calendar ids] (default: all)   energy: false   energy_power: sensor.house_power (live power)
 //   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
 //           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
 //   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
@@ -30,6 +32,7 @@ import { musicPlayers } from "../cards/music.js";
 import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.js";
 import { allowed } from "../core/access.js";
 import { licenseState } from "../core/license.js";
+import { energySources } from "../cards/energy.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
@@ -57,6 +60,14 @@ export async function generateDashboard(config, hass) {
   let custom = null;
   if (cfg.custom_dashboard && typeof hass.callWS === "function") {
     try { custom = await hass.callWS({ type: "lovelace/config", url_path: cfg.custom_dashboard }); } catch (e) { custom = null; }
+  }
+  // HA's Energy dashboard settings decide whether there is anything for the energy card to show
+  let energy = null;
+  if (cfg.energy !== false && typeof hass.callWS === "function") {
+    try {
+      const src = energySources(await hass.callWS({ type: "energy/get_prefs" }));
+      if (src.from.length || src.solar.length) energy = src;
+    } catch (e) { energy = null; }
   }
   const all = (g) => rooms.flatMap((r) => r[g]);
   const ids = (g, domain) => all(g).filter((e) => !domain || e.domain === domain).map((e) => e.entity_id);
@@ -218,6 +229,30 @@ export async function generateDashboard(config, hass) {
                   ...(hass.user && hass.user.is_admin ? { installer: path("installer") } : {}) },
     ...extra,
   });
+  // temperature history: one line per room (Climate page, "Today at home"), or one room's line
+  const tempRooms = rooms.filter((r) => r.temperature.length && r.id !== "unassigned");
+  const tempGraph = (list, extra = {}) => (list.length ? withLang({ type: "custom:ajnetweb-graph-card",
+    entities: list.slice(0, 8).map((r) => ({ entity: r.temperature[0].entity_id, name: r.name })), hours: 24,
+    grid_options: { columns: 12 }, ...extra }) : null);
+  const roomGraph = (r, extra = {}) => (r.temperature[0] ? withLang({ type: "custom:ajnetweb-graph-card",
+    entity: r.temperature[0].entity_id, title: t("temperature"), hours: 24, grid_options: { columns: 12 }, ...extra }) : null);
+  const calendars = Array.isArray(cfg.calendars) ? cfg.calendars.filter((id) => hass.states[id])
+    : Object.keys(hass.states).filter((id) => id.startsWith("calendar."));
+  const powerSensor = cfg.energy_power || (energy && energy.rate.find((id) => hass.states[id])) || ids("power").find((id) => {
+    const a = hass.states[id].attributes;
+    return a.device_class === "power" && /grid|main|total|house|home|consumption|import/.test(id);
+  });
+  const insightCards = () => {
+    const pick = Array.isArray(cfg.insights) ? cfg.insights : ["calendar", "energy", "temperature"];
+    const make = {
+      calendar: () => (calendars.length ? withLang({ type: "custom:ajnetweb-calendar-card", entities: calendars, days: 7, max: 5 }) : null),
+      energy: () => (energy || cfg.energy_entities ? withLang({ type: "custom:ajnetweb-energy-card",
+        ...(powerSensor ? { power: powerSensor } : {}), ...(cfg.energy_entities ? { entities: cfg.energy_entities } : {}) }) : null),
+      temperature: () => tempGraph(tempRooms),
+    };
+    return pick.map((k) => make[k] && make[k]()).filter(Boolean).map((c) => { delete c.grid_options; return c; });
+  };
+
   // music while something plays, "Right now" otherwise (Flux UI's media-aware layout)
   const playingCond = players.length ? [{ condition: "or", conditions: players.map((id) => ({ condition: "state", entity: id, state: "playing" })) }] : null;
 
@@ -226,15 +261,21 @@ export async function generateDashboard(config, hass) {
   // Studio "Layout": order of the Home / Wall Panel bands, and which are hidden. Bands added in later
   // versions appear at their default place unless hidden, so saved layouts never lose new features.
   const BANDS = {
-    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "cameras", "custom"],
-    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "custom"],
+    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
+    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
   };
   const layoutOf = (panel) => {
     const key = panel ? "panel" : "home";
     const conf = (cfg.layout || {})[key] || {};
     const order = (conf.order || []).filter((b) => BANDS[key].includes(b));
     const hidden = new Set(conf.hidden || []);
-    return [...order, ...BANDS[key].filter((b) => !order.includes(b))].filter((b) => !hidden.has(b));
+    const out = [...order];
+    BANDS[key].forEach((b, i) => {   // a band the saved layout doesn't know yet goes after its default neighbour
+      if (out.includes(b)) return;
+      const prev = BANDS[key].slice(0, i).reverse().find((p) => out.includes(p));
+      out.splice(prev ? out.indexOf(prev) + 1 : 0, 0, b);
+    });
+    return out.filter((b) => !hidden.has(b));
   };
   const TOP = ["weather", "prayer", "media"];
   const topCards = Array.isArray(cfg.top_cards) ? cfg.top_cards.filter((c) => TOP.includes(c)) : TOP;
@@ -307,6 +348,11 @@ export async function generateDashboard(config, hass) {
     built.climate = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
       ...climates.slice(0, 8).map((e) => device(e, { name: e.full_name, layout: "wide" }))]) : null;
     built.rooms = roomsBand();
+    // "Today at home": agenda, energy and room temperatures side by side (stacked on phones)
+    const ins = insightCards();
+    built.insights = ins.length ? band([heading(t("insights"), "mdi:home-analytics"),
+      { type: "horizontal-stack", cards: ins, grid_options: { columns: "full" }, ...onlyWide },
+      ...insightCards().map((c) => Object.assign(c, { grid_options: { columns: "full" } }, onlyNarrow))]) : null;
     built.custom = customBands();
     return layoutOf(panel).flatMap((k) => built[k] || []).filter(Boolean);
   };
@@ -331,9 +377,16 @@ export async function generateDashboard(config, hass) {
       [section([actions([lightsOff()])], 4), ...perRoom(["lights"])].filter((s) => s.cards[0])));
   }
   if (on("climate") && (all("climates").length || all("temperature").length)) {
+    // every room's temperature over 24 h on top, then the ACs, then each room's sensors with its own graph
+    const sensorRooms = rooms.map((r) => {
+      const ents = ["temperature", "humidity", "air"].flatMap((g) => r[g]);
+      if (!ents.length) return null;
+      const rest = ents.filter((e) => !r.temperature[0] || e.entity_id !== r.temperature[0].entity_id);   // the graph shows it
+      return section([heading(r.name, r.icon, roomPath(r)), roomGraph(r), ...rest.map((e) => device(e))].filter(Boolean));
+    }).filter(Boolean);
     views.push(view(t("climate"), "climate", "mdi:thermostat",
-      [section([actions([acOff()])].filter(Boolean), 4), ...perRoom(["climates", "fans"]),
-       ...perRoom(["temperature", "humidity", "air"])].filter((s) => s.cards.length)));
+      [section([actions([acOff()]), tempRooms.length > 1 ? tempGraph(tempRooms, { title: t("temperature") }) : null].filter(Boolean), 4),
+       ...perRoom(["climates", "fans"]), ...sensorRooms].filter((s) => s.cards.length)));
   }
   if (on("security") && ["access", "alarms", "openings", "motion", "safety"].some((g) => all(g).length)) {
     const sec = [];
@@ -371,7 +424,7 @@ export async function generateDashboard(config, hass) {
 
   // room pages (opened from room cards with a long-press, or with room_tap: navigate)
   views.push(...myPages);
-  rooms.forEach((r) => views.push(roomView(r, { t, view, section, heading, device, camera, actions, path })));
+  rooms.forEach((r) => views.push(roomView(r, { t, view, section, heading, device, camera, actions, path, roomGraph })));
 
   // floating navigation bar on the main views
   if (cfg.navbar !== false) {
@@ -418,7 +471,7 @@ export async function generateDashboard(config, hass) {
   }
 }
 
-function roomView(r, { t, view, section, heading, device, camera, actions }) {
+function roomView(r, { t, view, section, heading, device, camera, actions, roomGraph }) {
   const secs = [];
   const add = (title, icon, cards, span) => { if (cards.length) secs.push(section([heading(title, icon), ...cards], span)); };
   const lights = r.lights.map((e) => e.entity_id);
@@ -446,8 +499,8 @@ function roomView(r, { t, view, section, heading, device, camera, actions }) {
     variant: "full", search: true, grid_options: { columns: 12 } })));
   add(t("cameras"), "mdi:cctv", r.cameras.map((e) => camera(e, false)));
   add(t("switches"), "mdi:power-socket-uk", [...r.switches, ...r.vacuums, ...r.valves].map((e) => device(e)));
-  add(t("sensors"), "mdi:gauge", [...r.temperature, ...r.humidity, ...r.air, ...r.power, ...r.openings, ...r.motion, ...r.safety]
-    .map((e) => device(e)));
+  add(t("sensors"), "mdi:gauge", [roomGraph(r), ...[...r.temperature.slice(1), ...r.humidity, ...r.air, ...r.power, ...r.openings, ...r.motion, ...r.safety]
+    .map((e) => device(e))].filter(Boolean));
   return view(r.name, `room-${slug(r.id)}`, r.icon, secs, { subview: true, max_columns: 3,
     back_path: `/${window.location.pathname.split("/")[1] || "lovelace"}/home` });
 }
