@@ -46,7 +46,7 @@ Home Assistant runs the bundled AJ Netweb UI kit, which builds every view from t
 floors and devices each time the dashboard opens. Add a device to an area and it appears - no
 redeploy. Use HA's **Take control** if a client needs a hand-edited copy.
 
-The UI kit also works without this add-on in any project: see `ajnetweb-ui/README.md`.
+The UI kit also works without this add-on in any project: see `ajnetweb-ui/README.md`. The full installer playbook (process, customisation, cards, themes, wall panels, development) is in `ajnetweb-ui/docs/`.
 
 ## Stability rules (why it won't break on HA updates)
 

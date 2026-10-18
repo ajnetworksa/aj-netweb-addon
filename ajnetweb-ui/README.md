@@ -4,6 +4,17 @@ Premium cards and a self-building dashboard for Home Assistant. One JavaScript f
 dependencies, no card-mod. Used by the AJ Netweb Dashboard Suite add-on, and usable on its own in
 any Home Assistant project.
 
+## Documentation (team playbook)
+
+| # | Guide | For |
+|---|---|---|
+| 1 | [Project playbook](docs/01-project-playbook.md) — site survey → HA setup → areas, names, photos → deploy → test → handover | Every installer |
+| 2 | [Customisation levels](docs/02-customization-levels.md) — what to change where (HA, Studio, YAML, take control, code) | Every installer |
+| 3 | [Cards reference](docs/03-cards-reference.md) — every AJ Netweb card + native cards we use + community cards policy | Installers, developers |
+| 4 | [Themes & branding](docs/04-themes-branding.md) — built-in themes, `--ajn-*` variables, client brand theme | Installers |
+| 5 | [Wall panels](docs/05-wall-panels.md) — Companion app / Fully Kiosk, hardware, performance | Installers |
+| 6 | [Developer guide](docs/06-developer-guide.md) — architecture, preview tool, recipes, release process, troubleshooting | Developers |
+
 ## What's inside
 
 | Element | What it is |
@@ -79,9 +90,12 @@ Cards follow the active HA theme. Optional refinements: `ajn-accent`, `ajn-surfa
 
 ```bash
 npm install
+npm run preview   # http://localhost:5173 — real cards + strategy on a fake villa, live reload
 npm run build     # writes dist/ajnetweb-ui.js and copies it into ajnetweb_dashboard/www/
 npm run watch
 ```
+
+Details: [docs/06-developer-guide.md](docs/06-developer-guide.md).
 
 Source layout: `src/core` (base class, gestures, model, i18n, tokens), `src/cards` (one file per
 card), `src/strategy` (dashboard generator + options editor). Rules that keep it stable across HA
