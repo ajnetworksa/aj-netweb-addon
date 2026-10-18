@@ -21,6 +21,14 @@
   (`card-background-color`, `ha-dialog-surface-background`), so glass themes no longer make HA's
   more-info dialogs see-through.
 - New theme variables: `ajn-gradient`, `ajn-glass-saturate`, `ajn-highlight`.
+- **Kiosk & ⋯ menu** for locked wall tablets:
+  - A ⋯ *More* button ends the bottom bar. It holds pages that don't fit, *My theme & colour*, *My profile*,
+    *Reload*, *Home Assistant settings*, *Dashboard Studio* and *Exit kiosk mode*.
+  - Each item has a rule: everyone / admins / non-admins / nobody / specific people.
+  - The same rules can hide HA's header and sidebar. The dashboard writes the `kiosk_mode` config for the
+    kiosk-mode plugin per user, and sets `ignore_disable_km` for people who may not exit.
+  - Set it in Studio → Design → *Kiosk & menu* or with the `kiosk` / `menu` strategy options.
+  - With the menu on, the appearance picker moves from the header into it.
 
 ## 3.1.0 - music and prayer times
 - **New music card** (`custom:ajnetweb-music-card`): built on Music Assistant, the official Home Assistant

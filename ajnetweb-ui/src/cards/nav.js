@@ -1,8 +1,10 @@
 // custom:ajnetweb-nav-card - floating glass navigation bar (bottom of the screen).
 //   items: [{ icon, label, path }]
+//   menu: { label, items: [...], appearance: {...} }   optional ⋯ "More" button at the end (see cards/menu.js)
 // The active item follows the current URL. The card keeps an empty spacer in the layout so
 // the last cards are never hidden behind the bar.
 import { AjnBase, bindGestures, esc, haptic } from "../core/base.js";
+import { openMenu } from "./menu.js";
 
 export class AjnetwebNavCard extends AjnBase {
   static getStubConfig() {
@@ -52,11 +54,30 @@ export class AjnetwebNavCard extends AjnBase {
     if (active < 0) active = items.findIndex((i) => here.startsWith(i.path) && i.path.split("/").length > 2);
     this.html(`<div class="spacer"></div><nav>${items.map((it, i) => `
       <a href="${esc(it.path)}" data-path="${esc(it.path)}" class="tap ${i === active ? "active" : ""}">
-        <ha-icon icon="${esc(it.icon)}"></ha-icon><span>${esc(it.label)}</span></a>`).join("")}</nav>`);
+        <ha-icon icon="${esc(it.icon)}"></ha-icon><span>${esc(it.label)}</span></a>`).join("")}${this._hasMenu()
+      ? `<a href="#" data-more class="tap more" role="button" aria-haspopup="menu" aria-label="${esc(this._menuLabel())}">
+          <ha-icon icon="mdi:dots-horizontal"></ha-icon><span>${esc(this._menuLabel())}</span></a>` : ""}</nav>`);
     this.shadowRoot.querySelectorAll("a").forEach((a) => {
       a.addEventListener("click", (e) => e.preventDefault());
-      bindGestures(a, { onTap: () => { haptic("light"); this.navigate(a.dataset.path); } });
+      if ("more" in a.dataset) {
+        bindGestures(a, { onTap: () => {
+          haptic("light");
+          openMenu(this, this._hass, Object.assign({}, this._config.menu, this._config.language ? { language: this._config.language } : { language: this.lang() }),
+            this._menuLabel());
+        } });
+      } else {
+        bindGestures(a, { onTap: () => { haptic("light"); this.navigate(a.dataset.path); } });
+      }
     });
+  }
+
+  _hasMenu() {
+    const m = this._config.menu;
+    return !!(m && Array.isArray(m.items) && m.items.length);
+  }
+
+  _menuLabel() {
+    return (this._config.menu && this._config.menu.label) || this.t("menu");
   }
 
   getCardSize() {

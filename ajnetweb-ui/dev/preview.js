@@ -29,7 +29,7 @@ const userData = (() => {
 
 const lang = q("lang", "en");
 const hass = {
-  ...data, language: lang, user: { id: "u1", is_admin: true, name: "Owner" },
+  ...data, language: lang, user: { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") },  // ?user=Mama&admin=0
   locale: { language: lang, time_format: "12" },
   config: { location_name: "Villa Al Noor", unit_system: { temperature: "°C" } },
   themes: { themes: registry, darkMode: modeQ === "dark" },

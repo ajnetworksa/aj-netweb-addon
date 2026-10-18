@@ -179,8 +179,9 @@ wallpaper: false         # optional: default for the wallpaper switch
 themes: [...]            # optional: theme names people may pick (default: all, AJ Netweb first)
 ```
 Each person picks a theme, one of 10 colour gradients and a gradient wallpaper. The choice is saved for
-**their HA user** and follows them to every device. The generated dashboard opens it from the palette
-button in the header (`appearance: true` on the header card). Details: [04](04-themes-branding.md).
+**their HA user** and follows them to every device. The generated dashboard opens it from
+**⋯ More → My theme & colour** in the bottom bar, or from a palette button in the header when the bar is
+off (`appearance: true` on the header card). Details: [04](04-themes-branding.md).
 
 Every AJ Netweb card also accepts `palette: <key>` to force a colour gradient on that card.
 
@@ -195,6 +196,19 @@ items:
 ```
 Put it in the **last section** (full width). It reserves space so content isn't hidden behind it.
 Max ~5 items on phones.
+
+Optional ⋯ **More** button (the generated dashboard fills it per user, see [05](05-wall-panels.md)):
+```yaml
+menu:
+  label: More
+  appearance: { palette: desert }        # options for the Appearance picker
+  items:
+    - { group: Pages, icon: mdi:tablet-dashboard, label: Wall Panel, path: /villa-home/tablet }
+    - { group: For me, icon: mdi:palette, label: Appearance, action: appearance }
+    - { group: System, icon: mdi:refresh, label: Reload, action: reload }
+    - { group: System, icon: mdi:cog, label: Settings, path: /config }
+    - { group: System, icon: mdi:fullscreen-exit, label: Exit kiosk, action: exit_kiosk }
+```
 
 ### Legacy (v1 dashboards): `custom:ajnetweb-room-card`, `custom:ajnetweb-quick-scenes`
 Kept only so old dashboards don't break. Don't use in new work.
@@ -240,7 +254,7 @@ We researched the popular "premium" dashboards before building the kit. They mos
 | Bubble Card | Pop-ups, bottom nav bar, sliders | Room sheet, `ajnetweb-nav-card`, drag-to-dim tiles | Not needed |
 | button-card | Fully templated buttons | `ajnetweb-device-card` / actions card | Only on level-4 sites |
 | card-mod | CSS injection into any card | Theme variables `--ajn-*` | **Avoid** (breaks on HA updates) |
-| kiosk-mode | Hides HA header/sidebar | Companion app / Fully Kiosk settings ([05](05-wall-panels.md)) | Optional on wall panels |
+| kiosk-mode | Hides HA header/sidebar | Our strategy writes its config per user + ⋯ menu ([05](05-wall-panels.md)) | **Yes, for kiosk tablets** (HACS) |
 | layout-card | Masonry/grid layouts | Sections view | Not needed |
 | mini-graph-card / ApexCharts | Graphs | Native `history-graph`, `statistics-graph` | ApexCharts OK for energy pages |
 | auto-entities | Dynamic lists | Strategy + `entity-filter` | Not needed |

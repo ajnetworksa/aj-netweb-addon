@@ -77,6 +77,12 @@ strategy:
                                       #   royal rose arctic coral graphite)
   wallpaper: false                    # true = default palette as page background
   appearance_themes: [AJ Netweb Liquid Glass, AJ Netweb Desert Dusk]   # optional: limit choices
+  menu: true                          # ⋯ More button at the end of the bottom bar
+  kiosk:                              # wall tablets - see 05-wall-panels.md
+    hide_header: non_admins           # all | admins | non_admins | none | [user names]
+    hide_sidebar: non_admins
+    menu: { settings: admins, studio: admins, exit_kiosk: admins, appearance: all, pages: all,
+            profile: all, reload: all }
   panel_live_cameras: true            # live video on the Wall Panel page
   cameras_live: false                 # live video on the Cameras page (more bandwidth)
   shortcuts:                          # extra buttons on Home (e.g. add-on panels, other dashboards)
@@ -128,6 +134,7 @@ the add-on on sites — never patch the JS file on one client's server.
 | "Like the new iPhone" | 2 | Liquid Glass theme |
 | "My daughter wants pink" | — | She taps the palette button → Rose (only her account changes) |
 | "Nobody may change the look" | 2 | Studio → Design → untick *Each person can choose theme & colour* |
+| "Lock the majlis tablet, but Mama can change colours" | 2 | Studio → Kiosk & menu: hide header for `panel-majlis`, *My theme & colour* → Specific people `Mama` |
 | "Arabic for my mother, English for me" | 2 | Language: follow each user |
 | "Staff must not see the master bedroom" | — | Room & Guest Pass Studio → permission matrix → Sync |
 | "One page with only the garden irrigation" | 4 | Second dashboard, linked via `shortcuts` |

@@ -100,6 +100,18 @@
         </div>
 
         <div class="card">
+          <h2>Kiosk &amp; menu</h2>
+          <p class="desc">For wall tablets locked with a kiosk. A <b>⋯ More</b> button at the end of the bottom bar
+            gives people the pages that don't fit, their own theme &amp; colour, and (for those you allow) settings.
+            Each line decides <b>who</b> sees it. Use <i>Specific people</i> with Home Assistant user names
+            (the display name, e.g. <code>Mama, panel-majlis</code>).
+            Hiding Home Assistant's header / sidebar needs the <b>kiosk-mode</b> plugin (HACS) or
+            Fully Kiosk's full-screen mode.</p>
+          <div class="toggles"><label class="switch"><input type="checkbox" id="fMenu"><span></span>⋯ More button in the bottom bar</label></div>
+          <div class="kiosk-rules" id="kioskRules"></div>
+        </div>
+
+        <div class="card">
           <h2>Theme</h2>
           <p class="desc">Native Home Assistant themes – no card-mod or HACS needed. Two-mode themes follow the device light/dark setting.</p>
           <div class="theme-grid" id="themeGrid"></div>

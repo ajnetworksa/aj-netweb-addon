@@ -119,6 +119,8 @@
     bind("fPalette", (el) => (p.palette = el.value), (el) => (el.value = p.palette || ""), "change");
     bind("fPersonal", (el) => (p.personal = el.checked), (el) => (el.checked = p.personal !== false), "change");
     bind("fWallpaper", (el) => (p.wallpaper = el.checked), (el) => (el.checked = !!p.wallpaper), "change");
+    bind("fMenu", (el) => (p.menu = el.checked), (el) => (el.checked = p.menu !== false), "change");
+    renderKiosk();
     bind("fCamsLive", (el) => (p.cameras_view_live = el.checked), (el) => (el.checked = !!p.cameras_view_live), "change");
 
     const vt = $("viewToggles");
@@ -130,6 +132,53 @@
       saveSoon();
     }));
     renderThemes();
+  }
+
+  // ------------------------------------------------------------------ kiosk & ⋯ menu
+  const KIOSK_ROWS = [
+    ["hide_header", "Hide Home Assistant header (kiosk-mode)", "none"],
+    ["hide_sidebar", "Hide Home Assistant sidebar (kiosk-mode)", "none"],
+    ["menu.pages", "Menu: other pages (Wall Panel, Installer…)", "all"],
+    ["menu.appearance", "Menu: my theme & colour", "all"],
+    ["menu.profile", "Menu: my profile (language, dark mode)", "all"],
+    ["menu.reload", "Menu: reload", "all"],
+    ["menu.settings", "Menu: Home Assistant settings", "admins"],
+    ["menu.studio", "Menu: Dashboard Studio", "admins"],
+    ["menu.exit_kiosk", "Menu: exit kiosk mode", "admins"],
+  ];
+  const WHO = [["all", "Everyone"], ["admins", "Admins only"], ["non_admins", "Everyone except admins"],
+               ["none", "Nobody"], ["people", "Specific people…"]];
+
+  function renderKiosk() {
+    const p = state.project;
+    p.kiosk = p.kiosk || {};
+    const get = (path) => path.split(".").reduce((o, k) => (o || {})[k], p.kiosk);
+    const set = (path, v) => {
+      const keys = path.split(".");
+      let o = p.kiosk;
+      keys.slice(0, -1).forEach((k) => { o[k] = o[k] || {}; o = o[k]; });
+      o[keys[keys.length - 1]] = v;
+    };
+    const box = $("kioskRules");
+    box.innerHTML = KIOSK_ROWS.map(([key, label, dflt]) => {
+      const v = get(key) == null ? dflt : get(key);
+      const people = Array.isArray(v);
+      return `<div class="krow" data-k="${key}"><span>${esc(label)}</span>
+        <select>${WHO.map(([w, l]) => `<option value="${w}" ${(people ? "people" : v) === w ? "selected" : ""}>${l}</option>`).join("")}</select>
+        <input type="text" placeholder="Mama, Ahmed, panel-majlis" value="${people ? esc(v.join(", ")) : ""}" ${people ? "" : "hidden"}></div>`;
+    }).join("");
+    box.querySelectorAll(".krow").forEach((row) => {
+      const sel = row.querySelector("select");
+      const inp = row.querySelector("input");
+      const apply = () => {
+        inp.hidden = sel.value !== "people";
+        set(row.dataset.k, sel.value === "people"
+          ? inp.value.split(",").map((x) => x.trim()).filter(Boolean) : sel.value);
+        saveSoon();
+      };
+      sel.addEventListener("change", () => { apply(); if (!inp.hidden) inp.focus(); });
+      inp.addEventListener("input", apply);
+    });
   }
 
   function renderThemes() {

@@ -60,8 +60,9 @@ We looked at the most-used community themes and dashboards. Most of them need ca
 
 ## Personal appearance (each person chooses)
 
-On by default. A round **palette button** appears in the header, after the people avatars. Tapping it
-opens the *Appearance* sheet:
+On by default. Open it from the bottom bar: **⋯ More → My theme & colour**. On dashboards without the
+bottom bar, a round palette button appears in the header instead. Who may use it is set in
+Studio → Design → *Kiosk & menu* ([05](05-wall-panels.md)). It opens the *Appearance* sheet:
 
 - **Theme**: any installed theme. AJ Netweb themes are listed first, and *Dashboard default* is
   the theme set in the Studio.

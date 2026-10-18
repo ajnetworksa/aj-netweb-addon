@@ -118,7 +118,9 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] Scenes run. "All lights off" asks for confirmation.
 - [ ] Cameras show pictures; tap opens live video.
 - [ ] Arabic users see Arabic (if used).
-- [ ] Palette button: pick a colour and a theme on one phone, check it on that person's tablet too.
+- [ ] Appearance (⋯ More → *My theme & colour*): pick a colour and theme on one phone, check that person's tablet.
+- [ ] Kiosk tablets: header/sidebar hidden for the panel user, ⋯ menu shows only the allowed items,
+      admin can still exit kiosk mode.
 - [ ] Phone (Companion app) and every wall panel tested.
 - [ ] Doorbell press → notification on phones → unlock from the notification works.
 - [ ] Music: search a song, play it in two rooms, move it between rooms, volume by drag.
@@ -131,7 +133,7 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] Remote Access add-on activated (if sold) so you can support the client.
 - [ ] Give the client: admin login (owner), how to add a scene, your support contact (it is also on
       the Installer page).
-- [ ] Show every family member the palette button (own theme, colour, wallpaper).
+- [ ] Show every family member the ⋯ More menu (own theme, colour, wallpaper, profile).
 - [ ] Remove your own admin user or downgrade it, per your support contract.
 
 ## Later: adding devices

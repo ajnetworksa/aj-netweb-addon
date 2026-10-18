@@ -45,6 +45,13 @@ records of everything.
   - Every add-on is on the latest HA base image (3.24).
   - Alexa Bridge is pinned to the latest stable Matterbridge 3.10.14 and matterbridge-hass 1.5.0, so no
     change was needed.
+- **Kiosk & ⋯ menu** (follow-up request: "I will lock it with kiosk"):
+  - A ⋯ *More* button in the bottom bar holds the pages that don't fit, the appearance picker, profile,
+    reload, HA settings, Studio and exit kiosk.
+  - Each item, plus hiding HA's header and sidebar, has a per-user rule (everyone, admins, non-admins,
+    nobody or named people), set in Studio → Design → *Kiosk & menu*.
+  - The strategy writes `kiosk_mode` for the kiosk-mode plugin. kiosk-mode reads the generated dashboard
+    config (`lovelace.config`); I checked its source.
 - Docs: `04-themes-branding.md` rewritten (themes, market comparison, personal appearance, variables, the
   glass rule), options in `02`, card in `03`, playbook checks, `recommended-services.md`, this record.
 
@@ -57,7 +64,12 @@ records of everything.
 - *No card-mod and no copied community theme.* We matched the popular looks (iOS/Liquid Glass, Graphite,
   Material, mesh gradients) with our own variables.
 
+- *Kiosk rules resolved in the strategy*, not in the cards. The dashboard is generated per user, so a
+  user's generated config only contains what they may see.
+
 **Open / to verify on real hardware:**
+- kiosk-mode with a strategy dashboard on a real HA (expected to work: kiosk-mode reads the generated
+  config). Exiting kiosk as installer: log in as admin, or use the Fully Kiosk PIN.
 - Blur cost on cheap Android tablets with Liquid Glass and Aurora (Material, Bento and OLED are the fallbacks).
 - The wallpaper follows the device light/dark mode only after a reload.
 
