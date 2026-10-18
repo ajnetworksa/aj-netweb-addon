@@ -7,19 +7,39 @@ const params = new URLSearchParams(location.search);
 const q = (k, d) => params.get(k) || d;
 const data = await (await fetch("sample-house.json")).json();
 const themes = await (await fetch("themes.json")).json();
-const theme = themes[q("theme", "apple_frosted_glass")] || Object.values(themes)[0];
-const mode = theme[q("mode", "dark")] || Object.values(theme)[0];
-const dark = !("light" in theme) || q("mode", "dark") === "dark";
-document.getElementById("theme").textContent = ":root{" + Object.entries(mode).map(([k, v]) => `--${k}:${v};`).join("")
-  + `--rgb-primary-text-color:${dark ? "238,241,246" : "21,24,35"}}`;
+const modeQ = q("mode", "dark");
+// HA-style theme registry (name -> {modes}) so the strategy and the appearance picker see real themes
+const registry = Object.fromEntries(Object.values(themes).map((t) => {
+  const { __name, ...modes } = t;
+  return [__name, { modes }];
+}));
+function applyTheme(key) {
+  const theme = themes[key] || Object.values(themes)[0];
+  const { __name, ...modes } = theme;
+  const mode = modes[modeQ] || Object.values(modes)[0];
+  const dark = !("light" in modes) || modeQ === "dark";
+  document.getElementById("theme").textContent = ":root{" + Object.entries(mode).map(([k, v]) => `--${k}:${v};`).join("")
+    + `--rgb-primary-text-color:${dark ? "238,241,246" : "21,24,35"}}`;
+}
+applyTheme(q("theme", "apple_frosted_glass"));
+// per-user data (frontend/get_user_data) kept in localStorage; ?me={"palette":"sunset",...} sets it for screenshots
+const userData = (() => {
+  try { return JSON.parse(q("me", "") || localStorage.getItem("ajn-preview-me") || "{}"); } catch (e) { return {}; }
+})();
 
 const lang = q("lang", "en");
 const hass = {
   ...data, language: lang, user: { id: "u1", is_admin: true, name: "Owner" },
   locale: { language: lang, time_format: "12" },
   config: { location_name: "Villa Al Noor", unit_system: { temperature: "°C" } },
-  themes: { themes: {} },
+  themes: { themes: registry, darkMode: modeQ === "dark" },
   callWS: async (msg) => {
+    if (msg.type === "frontend/get_user_data") return { value: userData };
+    if (msg.type === "frontend/set_user_data") {
+      try { localStorage.setItem("ajn-preview-me", JSON.stringify(msg.value)); } catch (e) { /* private mode */ }
+      params.delete("me");
+      return null;
+    }
     if (msg.type === "config_entries/get") return [{ entry_id: "ma1", state: "loaded" }];
     if (msg.type === "call_service" && msg.domain === "music_assistant") {
       console.log("music_assistant", msg.service, msg.service_data);
@@ -63,6 +83,10 @@ nav.innerHTML = cfg.views.map((v) => `<option value="${v.path}" ${v.path === vie
 nav.onchange = () => { params.set("view", nav.value); location.search = params.toString(); };
 
 const v = cfg.views.find((x) => x.path === viewPath) || cfg.views[0];
+// the view's theme (dashboard or personal) and wallpaper, like HA applies them
+const viewThemeKey = Object.keys(themes).find((k) => themes[k].__name === v.theme);
+if (viewThemeKey && !params.get("theme")) applyTheme(viewThemeKey);
+if (v.background) document.body.style.background = v.background;
 const cols = Math.min(v.max_columns || 4, innerWidth < 600 ? 1 : innerWidth < 1000 ? 2 : innerWidth < 1400 ? 3 : 4);
 const view = document.getElementById("view");
 view.style.setProperty("--cols", cols);

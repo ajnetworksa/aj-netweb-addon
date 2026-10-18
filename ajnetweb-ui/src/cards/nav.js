@@ -32,14 +32,14 @@ export class AjnetwebNavCard extends AjnBase {
             bottom: calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 2px; padding: 6px;
             border-radius: 26px; max-width: calc(100vw - 24px); overflow-x: auto; scrollbar-width: none;
             background: var(--ajn-nav-bg, rgba(28, 30, 38, .72)); border: 1px solid rgba(255,255,255,.1);
-            box-shadow: 0 10px 30px rgba(0,0,0,.35);
-            -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6); }
+            box-shadow: inset 0 1px 0 var(--ajn-highlight, rgba(255,255,255,.08)), 0 10px 30px rgba(0,0,0,.35);
+            -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8); }
       nav::-webkit-scrollbar { display: none; }
       a { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
           min-width: 62px; height: 52px; padding: 0 8px; border-radius: 20px; color: rgba(255,255,255,.62);
           font-size: 11px; font-weight: 600; text-decoration: none; transition: background .2s, color .2s; }
       a ha-icon { --mdc-icon-size: 22px; }
-      a.active { color: #fff; background: rgba(255,255,255,.14); }
+      a.active { color: #fff; background: rgba(255,255,255,.14); box-shadow: inset 0 -2px 0 var(--_accent); }
       a.active ha-icon { color: var(--_accent); }
       @media (min-width: 900px) { a { flex-direction: row; gap: 8px; font-size: 13px; padding: 0 16px; min-width: 0; } }
     `;

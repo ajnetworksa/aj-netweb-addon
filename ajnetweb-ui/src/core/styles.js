@@ -4,6 +4,7 @@
 export const TOKENS = `
   :host {
     --_accent: var(--ajn-accent, var(--primary-color, #2f7dd1));
+    --_grad: var(--ajn-gradient, linear-gradient(135deg, var(--_accent), var(--_accent)));
     --_surface: var(--ajn-surface, var(--ha-card-background, var(--card-background-color, #fff)));
     --_surface-on: var(--ajn-surface-on, rgba(255, 255, 255, 0.94));
     --_text-on: var(--ajn-text-on, #15171c);
@@ -27,8 +28,8 @@ export const TOKENS = `
     border: 1px solid var(--_border);
     border-radius: var(--_radius);
     box-shadow: var(--_shadow);
-    -webkit-backdrop-filter: blur(var(--_blur)) saturate(1.4);
-    backdrop-filter: blur(var(--_blur)) saturate(1.4);
+    -webkit-backdrop-filter: blur(var(--_blur)) saturate(var(--ajn-glass-saturate, 1.4));
+    backdrop-filter: blur(var(--_blur)) saturate(var(--ajn-glass-saturate, 1.4));
     container-type: inline-size;
   }
   .tap { cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }

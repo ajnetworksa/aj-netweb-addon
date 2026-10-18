@@ -116,6 +116,9 @@
     bind("fRoomTap", (el) => (p.room_tap = el.value), (el) => (el.value = p.room_tap || "popup"), "change");
     bind("fHeaderImage", (el) => (p.header_image = el.value.trim()), (el) => (el.value = p.header_image || ""));
     bind("fNavbar", (el) => (p.navbar = el.checked), (el) => (el.checked = p.navbar !== false), "change");
+    bind("fPalette", (el) => (p.palette = el.value), (el) => (el.value = p.palette || ""), "change");
+    bind("fPersonal", (el) => (p.personal = el.checked), (el) => (el.checked = p.personal !== false), "change");
+    bind("fWallpaper", (el) => (p.wallpaper = el.checked), (el) => (el.checked = !!p.wallpaper), "change");
     bind("fCamsLive", (el) => (p.cameras_view_live = el.checked), (el) => (el.checked = !!p.cameras_view_live), "change");
 
     const vt = $("viewToggles");

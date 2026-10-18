@@ -25,6 +25,9 @@ export const STRINGS = {
     nothing_playing: "Nothing playing", favorites_music: "Favourites", move_here: "Move music here",
     tracks: "Songs", albums: "Albums", artists: "Artists", playlists: "Playlists", radio: "Radio",
     no_results: "No results",
+    appearance: "Appearance", only_you: "Only for you, on all your devices", theme: "Theme",
+    dashboard_default: "Dashboard default", colour: "Colour", theme_colour: "Theme colour",
+    wallpaper: "Use my colour as wallpaper", reset: "Reset", applying: "Applying…", close: "Close",
   },
   ar: {
     morning: "صباح الخير", afternoon: "مساء الخير", evening: "مساء الخير", night: "تصبح على خير",
@@ -51,6 +54,9 @@ export const STRINGS = {
     nothing_playing: "لا يوجد تشغيل", favorites_music: "المفضلة", move_here: "نقل الموسيقى هنا",
     tracks: "أغانٍ", albums: "ألبومات", artists: "فنانون", playlists: "قوائم تشغيل", radio: "إذاعة",
     no_results: "لا توجد نتائج",
+    appearance: "المظهر", only_you: "لك وحدك، على جميع أجهزتك", theme: "السمة",
+    dashboard_default: "الافتراضي للوحة", colour: "اللون", theme_colour: "لون السمة",
+    wallpaper: "استخدم لوني كخلفية", reset: "إعادة ضبط", applying: "جارٍ التطبيق…", close: "إغلاق",
   },
 };
 

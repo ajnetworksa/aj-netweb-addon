@@ -18,13 +18,14 @@ const SECTIONS = [
   ["cameras", "cameras", "mdi:cctv", "camera"],
   ["sensors", "sensors", "mdi:gauge", "square"],
 ];
-const THEME_VARS = [
+export const THEME_VARS = [
   "--primary-color", "--accent-color", "--primary-background-color", "--secondary-background-color",
   "--primary-text-color", "--secondary-text-color", "--rgb-primary-text-color", "--divider-color",
   "--card-background-color", "--ha-card-background", "--ha-card-border-color", "--ha-card-border-radius",
   "--ha-card-box-shadow", "--state-icon-color", "--ajn-accent", "--ajn-surface", "--ajn-surface-on",
   "--ajn-text-on", "--ajn-border", "--ajn-radius", "--ajn-glass-blur", "--ajn-shadow", "--ajn-glow",
-  "--ajn-sheet-bg", "--ajn-font", "--ajn-tile-height",
+  "--ajn-sheet-bg", "--ajn-font", "--ajn-tile-height", "--ajn-gradient", "--ajn-glass-saturate",
+  "--ajn-highlight", "--ajn-accent-rgb", "--ajn-nav-bg", "--ha-dialog-surface-background",
 ];
 const SENSOR_GROUPS = ["temperature", "humidity", "air", "power", "openings", "motion", "safety"];
 

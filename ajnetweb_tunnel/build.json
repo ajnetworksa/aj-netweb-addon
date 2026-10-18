@@ -4,8 +4,8 @@
     "amd64": "ghcr.io/home-assistant/amd64-base:3.24"
   },
   "args": {
-    "FRP_VERSION": "0.71.0",
+    "FRP_VERSION": "0.71.1",
     "AJN_SERVER": "",
-    "AJN_AGENT_VERSION": "1.2.4"
+    "AJN_AGENT_VERSION": "1.2.5"
   }
 }

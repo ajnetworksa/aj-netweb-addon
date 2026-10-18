@@ -150,17 +150,18 @@ export class AjnetwebMusicCard extends AjnBase {
       .title { font-size: 19px; font-weight: 700; color: var(--_text); letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .artist { font-size: 14px; color: var(--_text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .prog { height: 4px; border-radius: 2px; background: var(--_muted); margin-top: 10px; overflow: hidden; }
-      .prog i { display: block; height: 100%; width: 0; background: var(--_accent); border-radius: 2px; transition: width 1s linear; }
+      .prog i { display: block; height: 100%; width: 0; background: var(--_grad); border-radius: 2px; transition: width 1s linear; }
       .ctl { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
       .b { width: 40px; height: 40px; border-radius: 50%; border: none; background: transparent; color: var(--_text);
            display: grid; place-items: center; cursor: pointer; padding: 0; }
       .b ha-icon { --mdc-icon-size: 24px; }
-      .b.main { width: 50px; height: 50px; background: var(--_text); color: var(--primary-background-color, #000); }
+      .b.main { width: 50px; height: 50px; background: var(--_grad); color: #fff;
+               box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 6px 18px var(--ajn-glow, rgba(0,0,0,.2)); }
       .b.main ha-icon { --mdc-icon-size: 28px; }
       .b.dim { color: var(--_text2); } .b.act { color: var(--_accent); }
       .vol { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
       .vbar { position: relative; height: 34px; border-radius: 17px; background: var(--_muted); overflow: hidden; cursor: pointer; }
-      .vbar i { position: absolute; inset: 0 auto 0 0; background: rgba(var(--rgb-primary-text-color, 128,128,128), .22); }
+      .vbar i { position: absolute; inset: 0 auto 0 0; background: var(--_grad); opacity: .45; }
       .vbar span { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-size: 12px; font-weight: 600; color: var(--_text2); }
       .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
       .chips::-webkit-scrollbar { display: none; }

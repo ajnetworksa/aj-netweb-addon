@@ -29,13 +29,13 @@ for doing that quickly and to the same standard on every project.
 
 | Product | Type | Version | Status |
 |---|---|---|---|
-| Dashboard Suite + UI kit | Add-on + Lovelace strategy/cards | 3.1.0 | Production |
+| Dashboard Suite + UI kit | Add-on + Lovelace strategy/cards | 3.2.0 | Production (11 themes, personal appearance) |
 | Prayer & Adhan | Add-on | 1.0.0 | **New — field trial** |
 | Music (Music Assistant + our music card) | Official add-on + our card | MA 2.x / kit 3.1 | **New — field trial** |
 | Intercom & Door Station | Add-on | 1.5.0 | Production |
 | CCTV & NVR Studio | Add-on | 1.2.0 | Production |
 | Room & Guest Pass Studio | Add-on | 1.1.0 | Production |
-| Remote Access | Add-on | 1.2.4 | Production |
+| Remote Access | Add-on | 1.2.5 | Production |
 | Alexa Matter Bridge | Add-on (own repo) | 1.1.0 | Production |
 | Wall panel kit (tablet + mount + kiosk profile) | Hardware bundle | — | Planned (Q1 2027) |
 | Installer portal / fleet monitoring | Cloud service | — | Planned (Q2 2027) |

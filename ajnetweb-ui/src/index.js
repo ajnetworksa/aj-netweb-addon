@@ -8,6 +8,7 @@ import { AjnetwebActionsCard } from "./cards/actions.js";
 import { AjnetwebNavCard } from "./cards/nav.js";
 import { AjnetwebPrayerCard } from "./cards/prayer.js";
 import { AjnetwebMusicCard } from "./cards/music.js";
+import { AjnetwebAppearanceCard } from "./cards/appearance.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
 import { generateDashboard } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
@@ -24,6 +25,7 @@ const CARDS = [
   ["ajnetweb-actions-card", AjnetwebActionsCard, "AJ Netweb Actions", "Large buttons or scene chips with tap-again confirmation."],
   ["ajnetweb-prayer-card", AjnetwebPrayerCard, "AJ Netweb Prayer Times", "Next prayer countdown, today's times, Hijri date and adhan controls."],
   ["ajnetweb-music-card", AjnetwebMusicCard, "AJ Netweb Music", "Music player with Music Assistant search, favourites and room switching."],
+  ["ajnetweb-appearance-card", AjnetwebAppearanceCard, "AJ Netweb Appearance", "Lets each person choose their own theme, colour gradient and wallpaper."],
   ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],
   ["ajnetweb-room-card", AjnetwebRoomCard, "AJ Netweb Hero (legacy)", "Kept for dashboards created by v1."],
   ["ajnetweb-quick-scenes", AjnetwebQuickScenes, "AJ Netweb Scenes (legacy)", "Kept for dashboards created by v1."],

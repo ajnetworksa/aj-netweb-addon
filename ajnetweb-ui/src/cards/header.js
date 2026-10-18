@@ -2,7 +2,10 @@
 //   chips: [{ icon, entities, active | inactive, label, ok_label, ok_icon, color, navigation_path }]
 //   variant: default | panel (large clock for wall tablets)
 //   image: optional background image URL for a hero header
+//   appearance: true -> palette button that opens the personal appearance picker
+//   (palette / appearance_themes are passed on to it)
 import { AjnBase, bindGestures, cssUrl, esc, formatState } from "../core/base.js";
+import { openAppearance } from "./appearance.js";
 import { COLORS } from "../core/styles.js";
 
 const WEATHER_ICONS = {
@@ -135,6 +138,12 @@ export class AjnetwebHeaderCard extends AjnBase {
                 color: var(--_text2); filter: grayscale(1); opacity: .6; }
       .person.home { filter: none; opacity: 1; box-shadow: 0 0 0 2px rgb(${COLORS.green}); }
       .person img { width: 100%; height: 100%; object-fit: cover; }
+      .me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; margin-inline-start: auto;
+            background: var(--_grad); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 4px 14px var(--ajn-glow, rgba(0,0,0,.2)); }
+      .persons + .me { margin-inline-start: 6px; }
+      .me ha-icon { --mdc-icon-size: 20px; }
+      .eyebrow { background: var(--_grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+      .hero .eyebrow { -webkit-text-fill-color: #fff; }
       @container (max-width: 440px) { .time { font-size: ${panel ? "60px" : "44px"}; } }
     `;
   }
@@ -173,10 +182,16 @@ export class AjnetwebHeaderCard extends AjnBase {
             </div>
             ${weather}
           </div>
-          ${chips || persons ? `<div class="row">${chips}${persons ? `<div class="persons">${persons}</div>` : ""}</div>` : ""}
+          ${chips || persons || c.appearance ? `<div class="row">${chips}${persons ? `<div class="persons">${persons}</div>` : ""}${c.appearance
+            ? `<div class="me tap" data-appearance tabindex="0" role="button" aria-label="${esc(this.t("appearance"))}" title="${esc(this.t("appearance"))}"><ha-icon icon="mdi:palette"></ha-icon></div>` : ""}</div>` : ""}
         </div>
       </ha-card>`);
     this._tick();
+    const me = this.shadowRoot.querySelector("[data-appearance]");
+    if (me) {
+      bindGestures(me, { onTap: () => openAppearance(this, this._hass,
+        { palette: c.palette, wallpaper: c.wallpaper, themes: c.appearance_themes, ...(c.language ? { language: c.language } : {}) }) });
+    }
     this.shadowRoot.querySelectorAll("[data-nav],[data-entity]").forEach((el) => {
       bindGestures(el, { onTap: () => (el.dataset.nav ? this.navigate(el.dataset.nav) : this.moreInfo(el.dataset.entity)) });
     });

@@ -23,6 +23,11 @@ Home Assistant project. **Team playbook:** start with
 Music uses **Music Assistant** (official HA add-on, installed from the default store) together with our
 music card. No custom music server is needed.
 
-## Product plan
+## Product plan and records
 
-Packages, roadmap and the improvement backlog: [docs/product-plan.md](docs/product-plan.md).
+- [docs/product-plan.md](docs/product-plan.md): packages, roadmap and the improvement backlog
+- [docs/project-record.md](docs/project-record.md): every release, what changed and why, decisions, open items
+- [docs/recommended-services.md](docs/recommended-services.md): which official HA add-ons and integrations
+  to install alongside ours (music, Zigbee, Matter, voice, NVR)
+- [ajnetweb-ui/docs/04-themes-branding.md](ajnetweb-ui/docs/04-themes-branding.md): themes, colours,
+  per-person appearance

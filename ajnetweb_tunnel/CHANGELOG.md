@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.5
+- frp client updated 0.71.0 → 0.71.1 (upstream patch release; checksums verified at build time as before).
+
 ## 1.2.4
 - **Security:** the remote diagnostic console checked only the start of a command and ran it in a shell,
   so `uptime; <anything>` was executed (e.g. reading the client private key). Commands are now parsed and run

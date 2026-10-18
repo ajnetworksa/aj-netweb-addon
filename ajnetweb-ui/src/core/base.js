@@ -4,6 +4,15 @@
 // `hass-more-info`, `location-changed` and `hass-notification`.
 import { langOf, translate } from "./i18n.js";
 import { TOKENS } from "./styles.js";
+import { applyPalette, loadAppearance } from "./appearance.js";
+
+// Live cards, so a personal colour change repaints them all at once
+const LIVE = new Set();
+window.addEventListener("ajn-appearance", () => {
+  LIVE.forEach((card) => card._config && applyPalette(card, card._config.palette));
+  // cards of rebuilt views are gone for good; keep the set small
+  if (LIVE.size > 400) LIVE.forEach((card) => !card.isConnected && LIVE.delete(card));
+});
 
 export const OFFLINE = ["unavailable", "unknown"];
 
@@ -149,12 +158,17 @@ export class AjnBase extends HTMLElement {
     this.validate(config);
     this._config = config;
     this._snapshot = null;
+    applyPalette(this, config.palette);
     if (this._hass) this._update(true);
   }
 
   validate() {}
 
   set hass(hass) {
+    if (!this._hass) {
+      LIVE.add(this);
+      loadAppearance(hass); // cached per user; repaints via the ajn-appearance event
+    }
     this._hass = hass;
     this._update(false);
   }

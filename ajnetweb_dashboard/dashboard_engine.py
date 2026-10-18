@@ -29,7 +29,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.1.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.2.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -59,6 +59,9 @@ DEFAULT_PROJECT = {
     "room_tap": "popup",
     "header_image": "",
     "navbar": True,
+    "personal": True,
+    "palette": "",
+    "wallpaper": False,
 }
 
 
@@ -179,6 +182,9 @@ class DashboardEngine:
             "prayer": False if (project.get("views") or {}).get("prayer") is False else None,
             "music_assistant_entry": self._music_assistant_entry(),
             "navbar": project.get("navbar", True),
+            "personal": False if project.get("personal") is False else None,
+            "palette": project.get("palette") or None,
+            "wallpaper": True if project.get("wallpaper") else None,
             "panel_live_cameras": project.get("panel_live_cameras", True),
             "cameras_live": project.get("cameras_view_live") or None,
             "shortcuts": shortcuts,

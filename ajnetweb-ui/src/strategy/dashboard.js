@@ -11,10 +11,14 @@
 //   branding: { company, phone, email, website, notes }, admins: [user ids]
 //   prayer: true (prayer card when prayer times exist), music: true, music_players: [...],
 //   music_assistant_entry: <config entry id> (enables search/favourites for non-admin users)
+//   personal: true (each person may pick theme / colour / wallpaper, palette button in the header)
+//   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
+//   appearance_themes: [theme names] (limit what people can pick)
 import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
 import { hasPrayerTimes } from "../cards/prayer.js";
 import { musicPlayers } from "../cards/music.js";
+import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
@@ -31,6 +35,17 @@ export async function generateDashboard(config, hass) {
   const ids = (g, domain) => all(g).filter((e) => !domain || e.domain === domain).map((e) => e.entity_id);
   const roomPath = (r) => path(`room-${slug(r.id)}`);
   const withLang = (c) => (cfg.language ? Object.assign(c, { language: cfg.language }) : c);
+
+  // personal appearance (per HA user): theme and wallpaper are part of the generated views
+  const personal = cfg.personal !== false;
+  const me = personal ? await loadAppearance(hass) : {};
+  const themeNames = Object.keys((hass.themes && hass.themes.themes) || {});
+  const myTheme = me.theme && themeNames.includes(me.theme) &&
+    (!cfg.appearance_themes || cfg.appearance_themes.includes(me.theme)) ? me.theme : null;
+  const theme = myTheme || cfg.theme;
+  const wallPalette = PALETTES[(personal && me.palette) || cfg.palette] || PALETTES.ocean;
+  const wallOn = personal && me.wallpaper !== undefined ? me.wallpaper : cfg.wallpaper;
+  const background = wallOn && wallPalette ? paletteWallpaper(wallPalette, !!(hass.themes && hass.themes.darkMode)) : null;
 
   const showPrayer = cfg.prayer !== false && hasPrayerTimes(hass);
   const players = cfg.music === false ? [] : (cfg.music_players || musicPlayers(hass));
@@ -112,6 +127,8 @@ export async function generateDashboard(config, hass) {
       ...(weather ? { weather } : {}), ...(alarm ? { alarm, alarm_navigation_path: path("security") } : {}),
       ...(model.house.persons.length ? { persons: model.house.persons.slice(0, 6) } : {}),
       ...(cfg.header_image ? { image: cfg.header_image } : {}),
+      ...(personal ? { appearance: true } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
+      ...(cfg.appearance_themes ? { appearance_themes: cfg.appearance_themes } : {}),
     });
   };
 
@@ -178,7 +195,7 @@ export async function generateDashboard(config, hass) {
   };
   const view = (title, p, icon, sections, extra = {}) => Object.assign({
     title, path: p, icon, type: "sections", max_columns: extra.max_columns || 4, dense_section_placement: true,
-    sections, ...(cfg.theme ? { theme: cfg.theme } : {}),
+    sections, ...(theme ? { theme } : {}), ...(background ? { background } : {}),
   }, extra, { max_columns: extra.max_columns || 4 });
 
   const perRoom = (groups, layout) => rooms.map((r) => {
@@ -240,6 +257,12 @@ export async function generateDashboard(config, hass) {
     const items = views.filter((v) => !v.subview && v.path !== "tablet" && v.path !== "installer").slice(0, 5).map((v) => ({ icon: v.icon, label: v.title, path: path(v.path) }));
     views.filter((v) => !v.subview).forEach((v) => v.sections.push(
       section([{ type: "custom:ajnetweb-nav-card", items, grid_options: { columns: "full" } }], 4)));
+  }
+  // dashboard-wide default colour for every AJ Netweb card (a person's own choice still wins)
+  if (cfg.palette && PALETTES[cfg.palette]) {
+    views.forEach((v) => v.sections.forEach((sec) => sec.cards.forEach((c) => {
+      if (String(c.type).startsWith("custom:ajnetweb-")) c.palette = cfg.palette;
+    })));
   }
   return { title: cfg.title || hass.config.location_name || "Home", views };
 }

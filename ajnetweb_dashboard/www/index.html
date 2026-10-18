@@ -82,11 +82,20 @@
                 <option value="navigate">Opens the room page</option></select>
             </label>
             <label>Header image URL (optional)<input id="fHeaderImage" type="text" placeholder="/local/villa.jpg"></label>
+            <label>Colour gradient (default for everyone)
+              <select id="fPalette"><option value="">Theme colour</option>
+                <option value="ocean">Ocean</option><option value="aurora">Aurora</option><option value="sunset">Sunset</option>
+                <option value="desert">Desert gold</option><option value="emerald">Emerald</option><option value="royal">Royal</option>
+                <option value="rose">Rose</option><option value="arctic">Arctic</option><option value="coral">Coral</option>
+                <option value="graphite">Graphite</option></select>
+            </label>
           </div>
           <div class="toggles">
             <label class="switch"><input type="checkbox" id="fSidebar"><span></span>Show in sidebar</label>
             <label class="switch"><input type="checkbox" id="fAdmin"><span></span>Admins only</label>
             <label class="switch"><input type="checkbox" id="fNavbar"><span></span>Bottom navigation bar</label>
+            <label class="switch"><input type="checkbox" id="fPersonal"><span></span>Each person can choose theme &amp; colour</label>
+            <label class="switch"><input type="checkbox" id="fWallpaper"><span></span>Colour gradient as wallpaper</label>
           </div>
         </div>
 

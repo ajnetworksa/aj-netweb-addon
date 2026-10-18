@@ -170,6 +170,20 @@ Spotify, Apple Music, Tidal, Deezer, SoundCloud, TuneIn, radio…) and favourite
 plays it on the selected speaker. Plain media players (Cast, Sonos, AirPlay, Spotify Connect) get
 all playback controls; search needs Music Assistant.
 
+### `custom:ajnetweb-appearance-card` — personal theme & colour
+
+```yaml
+type: custom:ajnetweb-appearance-card
+palette: desert          # optional: default colour ("Theme colour" falls back to it)
+wallpaper: false         # optional: default for the wallpaper switch
+themes: [...]            # optional: theme names people may pick (default: all, AJ Netweb first)
+```
+Each person picks a theme, one of 10 colour gradients and a gradient wallpaper. The choice is saved for
+**their HA user** and follows them to every device. The generated dashboard opens it from the palette
+button in the header (`appearance: true` on the header card). Details: [04](04-themes-branding.md).
+
+Every AJ Netweb card also accepts `palette: <key>` to force a colour gradient on that card.
+
 ### `custom:ajnetweb-nav-card` — floating navigation bar
 
 ```yaml

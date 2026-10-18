@@ -31,7 +31,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.4")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.2.5")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -49,7 +49,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.2.4"
+        AGENT_VERSION = "1.2.5"
     return AGENT_VERSION
 
 LABELS = {
