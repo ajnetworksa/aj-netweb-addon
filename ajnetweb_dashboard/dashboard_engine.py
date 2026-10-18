@@ -29,7 +29,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.3.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.3.1")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -422,6 +422,7 @@ class DashboardEngine:
     def list_blueprints(self) -> List[Dict[str, Any]]:
         target = os.path.join(self.config_dir, "blueprints", "automation", "ajnetweb")
         meta = {
+            "ac_precool_on_arrival.yaml": ("AC Pre-Cooling on Arrival", "Starts the AC when someone is on the way home, so the villa is cool when they arrive."),
             "adhan_smart_mute.yaml": ("Adhan & Smart Media Mute (legacy)", "Simple media pause at prayer times. For adhan playback use the Prayer & Adhan add-on."),
             "balcony_ac_protector.yaml": ("Balcony Door AC Protector", "Turns the AC off when a balcony door stays open."),
             "water_tank_watchdog.yaml": ("Water Tank & Pump Watchdog", "Low-tank alerts and pump dry-run protection."),

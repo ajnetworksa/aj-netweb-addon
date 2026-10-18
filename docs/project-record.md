@@ -21,6 +21,26 @@ Versions at the time of writing:
 
 ---
 
+## AC pre-cooling — Dashboard Suite 3.3.1 (October 2026)
+
+**Asked for:** an AC pre-cooling feature that starts cooling before occupants arrive.
+
+**Done:**
+- New bundled blueprint `ajnetweb_dashboard/blueprints/ac_precool_on_arrival.yaml`, listed in the Studio's
+  Blueprints section and installed with the others.
+- Trigger: a chosen person enters an approach zone while coming from away. Cools only units that are off and
+  in a warm room; switches them off again if nobody gets home within the give-up time.
+
+**Decisions:**
+- Built as a blueprint, like the balcony AC protector, so installers set it up per villa in HA's own UI
+  with no new add-on options or dashboard changes.
+- Approach zone instead of the Proximity integration: it works with only the Companion app and a zone,
+  and the radius directly sets how early cooling starts (about 1 km per minute of driving).
+- The arrival check ignores leaving home (Home usually sits inside the approach zone).
+
+**Open:**
+- Schedule-based pre-cooling (e.g. before school pick-up) and a dashboard button/card for it.
+
 ## PR #5 — Themes, personal appearance, kiosk menu, licensing, add-on updates (October 2026)
 
 **Asked for:** better themes (native blur, liquid glass, popular market styles), gradient colours, colours
