@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>Prayer & Adhan</title>
+<style>
+  :root { --bg:#f4f5f8; --card:#fff; --card2:#f0f2f6; --border:#e2e5ec; --text:#151823; --muted:#5f6577; --accent:#1f8f6a; --bad:#d64545; --warn:#c98a0b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0e1015; --card:#171a21; --card2:#1f232c; --border:#2a2f3a; --text:#eef1f6; --muted:#9aa3b5; --accent:#3ccf9a; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans Arabic",sans-serif; }
+  .wrap { max-width:1000px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+  header { display:flex; align-items:center; gap:12px; }
+  .logo { width:40px; height:40px; border-radius:12px; background:var(--accent); color:#fff; display:grid; place-items:center; font-size:20px; }
+  h1 { font-size:17px; margin:0; } h2 { font-size:16px; margin:0 0 4px; } .muted { color:var(--muted); } .small { font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; }
+  .tabs { display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--border); }
+  .tab { background:none; border:none; padding:10px 14px; color:var(--muted); font:inherit; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; flex:none; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .panel { display:none; gap:16px; } .panel.active { display:grid; }
+  .times { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; margin-top:12px; }
+  .t { padding:12px; border-radius:12px; background:var(--card2); text-align:center; }
+  .t b { display:block; font-size:20px; font-variant-numeric:tabular-nums; } .t.next { background:var(--accent); color:#fff; } .t.next .muted { color:#e6fff5; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .btn { font:inherit; font-weight:600; padding:9px 16px; min-height:40px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); cursor:pointer; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; } .btn.small { padding:5px 10px; min-height:30px; font-size:12px; }
+  table { width:100%; border-collapse:collapse; } td, th { padding:8px 6px; border-bottom:1px solid var(--border); text-align:start; }
+  input[type=number], select, input[type=text] { font:inherit; padding:8px 10px; border-radius:8px; border:1px solid var(--border); background:var(--card2); color:var(--text); }
+  input[type=number] { width:80px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+  label.f { display:grid; gap:6px; font-weight:600; font-size:13px; }
+  .list { display:grid; gap:6px; max-height:360px; overflow:auto; }
+  .sp { display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; align-items:center; padding:8px; border-radius:8px; background:var(--card2); }
+  .tag { font-size:11px; padding:1px 7px; border-radius:999px; background:var(--card); color:var(--muted); }
+  .status { padding:10px 12px; border-radius:10px; background:var(--card2); }
+  .status.bad { border:1px solid var(--bad); } .status.ok { border:1px solid var(--accent); }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 18px; border-radius:10px; font-weight:600; display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="logo">🕌</div><div><h1>Prayer &amp; Adhan</h1><div class="muted small" id="hijri">—</div></div></header>
+  <nav class="tabs">
+    <button class="tab active" data-tab="today">Today</button><button class="tab" data-tab="speakers">Speakers</button>
+    <button class="tab" data-tab="prayers">Prayers</button><button class="tab" data-tab="audio">Audio</button>
+    <button class="tab" data-tab="setup">Setup</button><button class="tab" data-tab="history">History</button>
+  </nav>
+
+  <section class="panel active" id="tab-today">
+    <div class="card">
+      <div class="row"><div><h2>Today</h2><div class="muted" id="countdown"></div></div>
+        <div><button class="btn" id="btnTest">▶ Test adhan</button> <button class="btn" id="btnStop">■ Stop</button></div></div>
+      <div class="times" id="times"></div>
+    </div>
+    <div class="card" id="setupHint" hidden><div class="status bad">Prayer times are not set up yet. Open the <b>Setup</b> tab.</div></div>
+  </section>
+
+  <section class="panel" id="tab-speakers">
+    <div class="card">
+      <h2>Speakers</h2>
+      <p class="muted small">Adhan plays on the ticked speakers. Music Assistant speakers pause the music and resume it automatically;
+        Sonos/Cast use their announce mode. Tick “Pause” for TVs that should pause during the adhan.</p>
+      <label class="f">Default volume <input type="range" min="5" max="100" id="volume"></label>
+      <div class="list" id="speakers"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-prayers">
+    <div class="card">
+      <h2>Prayers</h2>
+      <table><thead><tr><th>Prayer</th><th>Adhan</th><th>Offset (min)</th><th>Volume %</th></tr></thead><tbody id="prayers"></tbody></table>
+    </div>
+    <div class="card grid">
+      <label class="f">Reminder before adhan (minutes, 0 = off)<input type="number" min="0" max="60" id="reminder"></label>
+      <label class="f">Ramadan: suhoor reminder before Fajr (minutes)<input type="number" min="0" max="120" id="suhoor"></label>
+      <label class="f">Hijri date adjustment (days)<input type="number" min="-2" max="2" id="hijriAdj"></label>
+      <label class="f">Language<select id="lang"><option value="ar">العربية</option><option value="en">English</option></select></label>
+      <label class="f"><span><input type="checkbox" id="notifyAt"> Phone notification at adhan time</span></label>
+      <label class="f"><span><input type="checkbox" id="onlyHome"> Only when someone is home</span></label>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-audio">
+    <div class="card">
+      <h2>Audio files</h2>
+      <p class="muted small">Upload the adhan recordings you have the right to use (mp3/m4a/ogg/wav, up to 20 MB).
+        Files are stored in <code>www/ajnetweb_adhan/</code> so speakers can fetch them.</p>
+      <div class="row"><input type="file" id="file" accept="audio/*"><button class="btn primary" id="btnUpload">Upload</button></div>
+      <div class="grid" style="margin-top:14px">
+        <label class="f">Adhan (Dhuhr, Asr, Maghrib, Isha)<select id="defaultFile"></select></label>
+        <label class="f">Fajr adhan (optional)<select id="fajrFile"></select></label>
+        <label class="f">Dua after adhan (optional)<select id="duaFile"></select></label>
+      </div>
+      <div class="list" id="files" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-setup">
+    <div class="card">
+      <h2>Prayer times source</h2>
+      <p class="muted small">Uses Home Assistant's built-in <b>Islamic Prayer Times</b> integration at the home location
+        (Settings → General). Times are calculated offline.</p>
+      <div class="status" id="intStatus">Checking…</div>
+      <div class="grid" style="margin-top:14px">
+        <label class="f">Calculation method<select id="method"></select></label>
+        <label class="f">Asr (school)<select id="school"><option value="shafi">Shafi (standard)</option><option value="hanafi">Hanafi</option></select></label>
+      </div>
+      <div style="margin-top:14px"><button class="btn primary" id="btnSetup">Set up / update prayer times</button></div>
+    </div>
+    <div class="card">
+      <h2>Dashboard controls</h2>
+      <p class="muted small">Created automatically for the AJ Netweb dashboard and automations:</p>
+      <div id="helpers" class="small"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="tab-history"><div class="card"><h2>Recent adhans</h2><div class="list" id="history"></div></div></section>
+</div>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

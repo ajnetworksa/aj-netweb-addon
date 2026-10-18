@@ -11,7 +11,7 @@
 
   const VIEW_LABELS = {
     panel: "Wall Panel (tablets)", lights: "Lights", climate: "Climate", security: "Security",
-    cameras: "Cameras", media: "Media", installer: "Installer (admins only)",
+    cameras: "Cameras", media: "Music", installer: "Installer (admins only)", prayer: "Prayer times card",
   };
   const GROUP_LABELS = {
     access: "Access & gates", lights: "Lights", climates: "Climate", fans: "Fans", covers: "Shades",

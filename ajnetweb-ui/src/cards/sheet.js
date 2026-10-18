@@ -1,7 +1,7 @@
 // Room sheet: a bottom sheet (phones) / centred panel (tablets) with every device of a room.
 // It is appended to <body>, so events that HA must handle (more-info, notifications) are
 // re-dispatched from the card that opened it, which lives inside HA's DOM tree.
-import { esc, fire, haptic, callService } from "../core/base.js";
+import { cssUrl, esc, fire, haptic, callService } from "../core/base.js";
 import { translate, langOf } from "../core/i18n.js";
 import { TOKENS, roomGradient } from "../core/styles.js";
 
@@ -112,7 +112,7 @@ class AjnetwebRoomSheet extends HTMLElement {
       return { key, label, icon, layout, ids };
     }).filter((g) => g.ids.length);
     const scenes = [...(ents.scenes || []), ...(ents.scripts || [])];
-    const bg = r.picture ? `url("${r.picture}") center/cover` : roomGradient(`${r.name} ${r.icon}`);
+    const bg = r.picture ? `${cssUrl(r.picture)} center/cover` : roomGradient(`${r.name} ${r.icon}`);
 
     this.shadowRoot.innerHTML = `
       <style>

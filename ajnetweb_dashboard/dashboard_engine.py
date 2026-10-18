@@ -29,7 +29,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.0.1")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.1.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -47,7 +47,7 @@ DEFAULT_PROJECT = {
     "language": "",
     "branding": {"company": "AJ Netweb", "phone": "", "email": "", "website": "", "notes": ""},
     "views": {"panel": True, "lights": True, "climate": True, "security": True,
-              "cameras": True, "media": True, "installer": True},
+              "cameras": True, "media": True, "installer": True, "prayer": True},
     "areas": {},
     "excluded_entities": [],
     "favorites": [],
@@ -143,6 +143,13 @@ class DashboardEngine:
             log.debug("Could not list users: %s", e)
         return ctx
 
+    def _music_assistant_entry(self) -> Optional[str]:
+        """Music Assistant config entry id, so non-admin users can search/browse too."""
+        entries = self.client.rest_get("/core/api/config/config_entries/entry", []) or []
+        ma = [e for e in entries if e.get("domain") == "music_assistant"]
+        loaded = [e for e in ma if e.get("state") == "loaded"] or ma
+        return loaded[0]["entry_id"] if loaded else None
+
     def generate(self, project: Dict[str, Any] = None, model: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         The dashboard is a *strategy*: Home Assistant runs the AJ Netweb UI kit in the browser and
@@ -168,7 +175,9 @@ class DashboardEngine:
             "hidden_areas": hidden,
             "favorites": project.get("favorites") or [],
             "weather": project.get("weather_entity") or None,
-            "views": {k: v for k, v in (project.get("views") or {}).items() if v is False},
+            "views": {k: v for k, v in (project.get("views") or {}).items() if v is False and k != "prayer"},
+            "prayer": False if (project.get("views") or {}).get("prayer") is False else None,
+            "music_assistant_entry": self._music_assistant_entry(),
             "navbar": project.get("navbar", True),
             "panel_live_cameras": project.get("panel_live_cameras", True),
             "cameras_live": project.get("cameras_view_live") or None,
@@ -371,7 +380,7 @@ class DashboardEngine:
     def list_blueprints(self) -> List[Dict[str, Any]]:
         target = os.path.join(self.config_dir, "blueprints", "automation", "ajnetweb")
         meta = {
-            "adhan_smart_mute.yaml": ("Adhan & Smart Media Mute", "Pauses media at prayer times and resumes afterwards."),
+            "adhan_smart_mute.yaml": ("Adhan & Smart Media Mute (legacy)", "Simple media pause at prayer times. For adhan playback use the Prayer & Adhan add-on."),
             "balcony_ac_protector.yaml": ("Balcony Door AC Protector", "Turns the AC off when a balcony door stays open."),
             "water_tank_watchdog.yaml": ("Water Tank & Pump Watchdog", "Low-tank alerts and pump dry-run protection."),
         }

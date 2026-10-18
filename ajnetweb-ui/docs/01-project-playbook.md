@@ -58,6 +58,16 @@ The dashboard is built **from Areas**. Good areas = good dashboard.
 6. Create **scenes** for the moments the client cares about (Welcome, Cinema, Goodnight, Guests…)
    and assign each scene to an area — room scenes show in that room, house scenes on Home.
 
+## Step 3b — Music and prayer times (GCC standard)
+
+1. **Music:** install **Music Assistant** (Settings → Add-ons → Music Assistant, then the Music
+   Assistant integration). In Music Assistant add the client's services — YouTube Music, Spotify,
+   Apple Music, Tidal, radio — and their speakers (Sonos, Cast, AirPlay/HomePod, DLNA, HA players).
+   Give each speaker the right **area** in HA. The dashboard's music card picks them up automatically.
+2. **Prayer & Adhan:** install **AJ Netweb Prayer & Adhan** → Setup → *Umm Al-Qura* (or the
+   client's method) → upload the adhan audio the client chose (and a Fajr adhan) → tick speakers →
+   tick TVs to pause → **Test adhan** with the family present. Agree offsets with the local mosque.
+
 ## Step 4 — Room photos (what makes it look premium)
 
 1. Take a **landscape** photo of each main room in good light (no people, lights on, curtains open).
@@ -110,6 +120,8 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] Arabic users see Arabic (if used).
 - [ ] Phone (Companion app) and every wall panel tested.
 - [ ] Doorbell press → notification on phones → unlock from the notification works.
+- [ ] Music: search a song, play it in two rooms, move it between rooms, volume by drag.
+- [ ] Adhan: test plays on every chosen speaker, TVs pause and resume, music resumes after.
 
 ## Step 10 — Handover
 

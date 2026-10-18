@@ -1,5 +1,20 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.1.0 - music and prayer times
+- **New music card** (`custom:ajnetweb-music-card`): built on Music Assistant, the official Home Assistant
+  music server. Search YouTube Music, Spotify, Apple Music, Tidal, Deezer, SoundCloud and radio from the
+  dashboard, play favourites, pick a speaker by room, move music between rooms, drag to set the volume.
+  Plain speakers (Cast, Sonos, AirPlay, Spotify Connect) get full playback controls.
+- The *Media* page is now **Music**: a large player plus a compact player per room. Room pages and Home
+  (compact) and the Wall Panel (full) show the music card when there are speakers.
+- **New prayer card** (`custom:ajnetweb-prayer-card`): next prayer with a countdown, today's times and
+  the Hijri date. It works with the new **Prayer & Adhan** add-on (adhan on/off, mute next, play now) or
+  with HA's built-in Islamic Prayer Times integration alone. It sits under the header on Home and the
+  Wall Panel.
+- Studio: *Prayer times card* switch in Design; the Music Assistant config entry is passed to the
+  dashboard automatically, so non-admin users can search too.
+- The `adhan_smart_mute` blueprint is now marked legacy. Use the Prayer & Adhan add-on instead.
+
 ## 3.0.1
 - Fixed: in the Companion app (and other touch browsers) the room sheet opened and closed immediately.
   Taps fire on finger-up, and the phone's follow-up synthetic click landed on the new backdrop and closed

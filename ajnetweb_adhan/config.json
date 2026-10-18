@@ -1,0 +1,21 @@
+{
+  "name": "AJ Netweb Prayer & Adhan",
+  "version": "1.0.0",
+  "slug": "ajnetweb_adhan",
+  "description": "Adhan on your home speakers at every prayer time (Umm Al-Qura and 20+ methods), using Home Assistant's built-in Islamic Prayer Times. Pauses TVs, resumes music, Ramadan suhoor reminders, Hijri date, dashboard controls.",
+  "url": "https://github.com/ajnetworksa/aj-netweb-addon",
+  "arch": ["aarch64", "amd64"],
+  "startup": "application",
+  "boot": "auto",
+  "init": false,
+  "stage": "stable",
+  "ingress": true,
+  "ingress_port": 8093,
+  "panel_icon": "mdi:mosque",
+  "panel_title": "Prayer & Adhan",
+  "hassio_api": true,
+  "homeassistant_api": true,
+  "map": ["homeassistant_config:rw"],
+  "options": {},
+  "schema": {}
+}

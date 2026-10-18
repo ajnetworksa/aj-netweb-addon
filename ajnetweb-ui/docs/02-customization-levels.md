@@ -67,6 +67,10 @@ strategy:
     media: false
     installer: true
   navbar: true                        # floating bottom navigation bar
+  prayer: true                        # prayer card under the header (when prayer times exist)
+  music: true                         # music card on Home + Music page
+  music_players: []                   # limit which speakers the music card offers
+  music_assistant_entry: 01J...       # lets non-admin users search Music Assistant (Studio sets it)
   panel_live_cameras: true            # live video on the Wall Panel page
   cameras_live: false                 # live video on the Cameras page (more bandwidth)
   shortcuts:                          # extra buttons on Home (e.g. add-on panels, other dashboards)

@@ -9,8 +9,12 @@
 //   navbar: true, room_tap: popup|navigate, panel_live_cameras: true, cameras_live: false
 //   shortcuts: [{ name, icon, navigation_path }]   e.g. intercom / CCTV add-on panels
 //   branding: { company, phone, email, website, notes }, admins: [user ids]
+//   prayer: true (prayer card when prayer times exist), music: true, music_players: [...],
+//   music_assistant_entry: <config entry id> (enables search/favourites for non-admin users)
 import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
+import { hasPrayerTimes } from "../cards/prayer.js";
+import { musicPlayers } from "../cards/music.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
@@ -27,6 +31,14 @@ export async function generateDashboard(config, hass) {
   const ids = (g, domain) => all(g).filter((e) => !domain || e.domain === domain).map((e) => e.entity_id);
   const roomPath = (r) => path(`room-${slug(r.id)}`);
   const withLang = (c) => (cfg.language ? Object.assign(c, { language: cfg.language }) : c);
+
+  const showPrayer = cfg.prayer !== false && hasPrayerTimes(hass);
+  const players = cfg.music === false ? [] : (cfg.music_players || musicPlayers(hass));
+  const musicCard = (extra) => withLang({
+    type: "custom:ajnetweb-music-card", entities: players,
+    ...(cfg.music_assistant_entry ? { music_assistant_entry: cfg.music_assistant_entry } : {}),
+    grid_options: { columns: 12 }, ...extra,
+  });
 
   // ---------------------------------------------------------------- card factories
   const heading = (text, icon, nav, style = "subtitle") => {
@@ -124,7 +136,10 @@ export async function generateDashboard(config, hass) {
   // ---------------------------------------------------------------- views
   const views = [];
   const homeSections = (panel) => {
-    const out = [section([header(panel ? "panel" : "default")], 4)];
+    const top = [header(panel ? "panel" : "default")];
+    if (showPrayer) top.push(withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default",
+                                        grid_options: { columns: 12 } }));
+    const out = [section(top, 4)];
     const quick = [];
     const scenes = all("scenes");
     if (scenes.length) {
@@ -146,6 +161,10 @@ export async function generateDashboard(config, hass) {
         ...cams.slice(0, 4).map((c) => camera(c, cfg.panel_live_cameras !== false))], 2));
     }
     if (quick.length) out.splice(panel ? out.length : 1, 0, section(quick));
+    if (players.length) {
+      out.push(section([heading(t("music"), "mdi:music", path("media")),
+        musicCard({ variant: panel ? "full" : "compact", search: panel })]));
+    }
     out.push(...roomSections());
     const climates = all("climates");
     if (climates.length) {
@@ -202,10 +221,14 @@ export async function generateDashboard(config, hass) {
   if (on("cameras") && all("cameras").length) {
     views.push(view(t("cameras"), "cameras", "mdi:cctv", [section(all("cameras").map((c) => camera(c, !!cfg.cameras_live)), 4)]));
   }
-  if (on("media") && all("media").length) {
-    views.push(view(t("media"), "media", "mdi:speaker-multiple", rooms.filter((r) => r.media.length).map((r) =>
-      section([heading(r.name, r.icon, roomPath(r)),
-        ...r.media.map((e) => ({ type: "media-control", entity: e.entity_id, grid_options: { columns: 12 } }))]))));
+  if (on("media") && (players.length || all("media").length)) {
+    // Music page: full player (search, favourites, rooms) + every speaker grouped by room
+    const secs = [];
+    if (players.length) secs.push(section([musicCard({ variant: "full" })], 2));
+    rooms.filter((r) => r.media.length).forEach((r) => secs.push(section([heading(r.name, r.icon, roomPath(r)),
+      ...r.media.map((e) => withLang({ type: "custom:ajnetweb-music-card", entities: [e.entity_id], variant: "compact",
+                                       grid_options: { columns: 12 } }))])));
+    views.push(view(t("music"), "media", "mdi:music", secs));
   }
   if (on("installer") && hass.user && hass.user.is_admin) views.push(await installerView(cfg, hass, t, model, view, section, heading));
 
@@ -245,7 +268,8 @@ function roomView(r, { t, view, section, heading, device, camera, actions }) {
     ...r.fans.map((e) => device(e)),
   ]);
   add(t("covers"), "mdi:curtains", r.covers.map((e) => device(e)));
-  add(t("media"), "mdi:speaker", r.media.map((e) => ({ type: "media-control", entity: e.entity_id, grid_options: { columns: 12 } })));
+  add(t("media"), "mdi:speaker", r.media.map((e) => ({ type: "custom:ajnetweb-music-card", entities: [e.entity_id],
+    variant: "full", search: true, grid_options: { columns: 12 } })));
   add(t("cameras"), "mdi:cctv", r.cameras.map((e) => camera(e, false)));
   add(t("switches"), "mdi:power-socket-uk", [...r.switches, ...r.vacuums, ...r.valves].map((e) => device(e)));
   add(t("sensors"), "mdi:gauge", [...r.temperature, ...r.humidity, ...r.air, ...r.power, ...r.openings, ...r.motion, ...r.safety]
