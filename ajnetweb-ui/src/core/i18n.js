@@ -30,7 +30,8 @@ export const STRINGS = {
     wallpaper: "Use my colour as wallpaper", reset: "Reset", applying: "Applying…", close: "Close",
     pages: "Pages", for_me: "For me", system: "System", my_profile: "My profile (language, dark mode)",
     reload: "Reload", ha_settings: "Home Assistant settings", studio: "Dashboard Studio",
-    exit_kiosk: "Exit kiosk mode",
+    exit_kiosk: "Exit kiosk mode", no_picture: "No picture", weather: "Weather", today: "Today",
+    quick_actions: "Quick actions",
   },
   ar: {
     morning: "صباح الخير", afternoon: "مساء الخير", evening: "مساء الخير", night: "تصبح على خير",
@@ -62,7 +63,8 @@ export const STRINGS = {
     wallpaper: "استخدم لوني كخلفية", reset: "إعادة ضبط", applying: "جارٍ التطبيق…", close: "إغلاق",
     pages: "الصفحات", for_me: "لي", system: "النظام", my_profile: "ملفي الشخصي (اللغة، الوضع الداكن)",
     reload: "إعادة التحميل", ha_settings: "إعدادات Home Assistant", studio: "استوديو اللوحة",
-    exit_kiosk: "الخروج من وضع الكشك",
+    exit_kiosk: "الخروج من وضع الكشك", no_picture: "لا توجد صورة", weather: "الطقس", today: "اليوم",
+    quick_actions: "إجراءات سريعة",
   },
 };
 

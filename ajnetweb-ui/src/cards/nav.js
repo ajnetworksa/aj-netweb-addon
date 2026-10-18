@@ -1,6 +1,7 @@
 // custom:ajnetweb-nav-card - floating glass navigation bar (bottom of the screen).
 //   items: [{ icon, label, path }]
 //   menu: { label, items: [...], appearance: {...} }   optional ⋯ "More" button at the end (see cards/menu.js)
+//   hide_wide: true    hidden on screens 1200 px and wider (HA's own view tabs are visible there)
 // The active item follows the current URL. The card keeps an empty spacer in the layout so
 // the last cards are never hidden behind the bar.
 import { AjnBase, bindGestures, esc, haptic } from "../core/base.js";
@@ -44,12 +45,14 @@ export class AjnetwebNavCard extends AjnBase {
       a.active { color: #fff; background: rgba(255,255,255,.14); box-shadow: inset 0 -2px 0 var(--_accent); }
       a.active ha-icon { color: var(--_accent); }
       @media (min-width: 900px) { a { flex-direction: row; gap: 8px; font-size: 13px; padding: 0 16px; min-width: 0; } }
+      @media (min-width: 1200px) { :host([hide-wide]) nav, :host([hide-wide]) .spacer { display: none; } }
     `;
   }
 
   render() {
     const items = this._config.items || [];
     const here = location.pathname;
+    this.toggleAttribute("hide-wide", !!this._config.hide_wide);
     let active = items.findIndex((i) => i.path === here);
     if (active < 0) active = items.findIndex((i) => here.startsWith(i.path) && i.path.split("/").length > 2);
     this.html(`<div class="spacer"></div><nav>${items.map((it, i) => `

@@ -93,7 +93,15 @@ export async function generateDashboard(config, hass) {
   const camera = (e, live) => (live
     ? { type: "picture-entity", entity: e.entity_id, name: e.name, camera_view: "live", show_state: false,
         grid_options: { columns: 6 } }
-    : { type: "custom:ajnetweb-camera-card", entity: e.entity_id, name: e.name, grid_options: { columns: 6 } });
+    : { type: "custom:ajnetweb-camera-card", entity: e.entity_id, name: e.name, grid_options: { columns: 6 },
+        // the gate / garage / lock of the same area right on the picture
+        // (only on the first camera of each area, so several cameras of one area don't repeat them)
+        ...(() => {
+          const first = all("cameras").find((c) => c.area_id === e.area_id);
+          if (e.area_id === "unassigned" || !first || first.entity_id !== e.entity_id) return {};
+          const ctl = all("access").filter((a) => a.area_id === e.area_id).slice(0, 2).map((a) => a.entity_id);
+          return ctl.length ? { controls: ctl } : {};
+        })() });
   const actions = (items, style) => {
     const list = items.filter(Boolean);
     return list.length ? withLang({ type: "custom:ajnetweb-actions-card", actions: list, ...(style ? { style } : {}),
@@ -131,7 +139,7 @@ export async function generateDashboard(config, hass) {
   const weather = cfg.weather || (model.house.weather.includes("weather.forecast_home") ? "weather.forecast_home" : model.house.weather[0]);
   const alarm = cfg.alarm || ids("alarms")[0];
 
-  const header = (variant) => {
+  const header = (variant, extra = {}) => {
     const chips = [];
     if (ids("lights").length) chips.push({ icon: "mdi:lightbulb-on", entities: ids("lights"), active: ["on"],
       label: "lights_on", navigation_path: path("lights"), color: "amber" });
@@ -152,10 +160,21 @@ export async function generateDashboard(config, hass) {
       // with the ⋯ menu the picker lives there; the header button is for dashboards without the bar
       ...(canAppearance && !menuOn ? { appearance: true } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
       ...(cfg.appearance_themes ? { appearance_themes: cfg.appearance_themes } : {}),
+      ...Object.fromEntries(Object.entries(extra).filter(([, v]) => v !== undefined)),
     });
   };
 
-  const roomSections = () => {
+  // ---------------------------------------------------------------- Home / Wall Panel layout
+  // Every band is one full-width section, so sections of different heights never sit side by side
+  // (HA's sections grid aligns rows to the tallest section - that left big holes). Inside a band, cards
+  // are sized in whole view columns (12 units = 1 column), so they wrap cleanly on any screen: 4 per row
+  // on a large screen, 3 on a laptop, 2 on a tablet, 1 on a phone.
+  const band = (cards) => ({ type: "grid", column_span: 4, cards: cards.filter(Boolean) });
+  const onlyWide = { visibility: [{ condition: "screen", media_query: "(min-width: 768px)" }] };
+  const onlyNarrow = { visibility: [{ condition: "screen", media_query: "(max-width: 767px)" }] };
+
+  // all rooms in one block: floor tabs + an even grid of room tiles with quick buttons (Flux UI style)
+  const roomsBand = () => {
     const floors = Object.fromEntries(model.floors.map((f) => [f.id, f]));
     const groups = new Map();
     rooms.forEach((r) => {
@@ -165,21 +184,57 @@ export async function generateDashboard(config, hass) {
       groups.get(key).push(r);
     });
     const order = [...model.floors.map((f) => f.id).filter((id) => groups.has(id)), ...(groups.has("_none") ? ["_none"] : [])];
-    return order.map((key) => {
-      const list = groups.get(key);
-      const f = floors[key];
-      return section([heading(f ? f.name : t("rooms"), f ? f.icon : "mdi:floor-plan"), ...list.map(areaCard)],
-                     list.length > 2 ? 2 : undefined);
-    });
+    if (!order.length) return null;
+    const style = cfg.room_style === "photo" ? "photo" : "tile";
+    return band([heading(t("rooms"), "mdi:floor-plan"), withLang({
+      type: "custom:ajnetweb-rooms-card", style, grid_options: { columns: "full" },
+      groups: order.map((key) => ({ name: floors[key] ? floors[key].name : t("rooms"), icon: floors[key] ? floors[key].icon : "mdi:floor-plan",
+                                    rooms: groups.get(key).map((r) => { const c = areaCard(r); delete c.type; delete c.grid_options; return c; }) })),
+    })]);
   };
+
+  // "Right now": what needs attention (open doors, alerts, timers, lights/AC on, low batteries, offline)
+  const statusCard = (extra = {}) => withLang({
+    type: "custom:ajnetweb-status-card",
+    openings: ids("openings"), safety: ids("safety"), lights: ids("lights"), climates: ids("climates"), media: ids("media"),
+    batteries: model.house.batteries || [],
+    ...(hass.user && hass.user.is_admin ? { devices: ["lights", "climates", "covers", "access", "switches", "fans"].flatMap((g) => ids(g)) } : {}),
+    navigation: { security: path("security"), lights: path("lights"), climate: path("climate"), media: path("media"),
+                  ...(hass.user && hass.user.is_admin ? { installer: path("installer") } : {}) },
+    ...extra,
+  });
+  // music while something plays, "Right now" otherwise (Flux UI's media-aware layout)
+  const playingCond = players.length ? [{ condition: "or", conditions: players.map((id) => ({ condition: "state", entity: id, state: "playing" })) }] : null;
 
   // ---------------------------------------------------------------- views
   const views = [];
   const homeSections = (panel) => {
-    const top = [header(panel ? "panel" : "default")];
-    if (showPrayer) top.push(withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default",
-                                        grid_options: { columns: 12 } }));
-    const out = [section(top, 4)];
+    const out = [];
+    // 1. top band: compact header, then one row of equal cards - weather, prayer, music. A native
+    //    horizontal-stack keeps them in one row with equal widths and heights at any screen width;
+    //    phones get the cards stacked instead (weather is in the header there).
+    const media = (variant) => {
+      const status = statusCard();
+      delete status.grid_options;
+      if (!playingCond) return [status];
+      const music = musicCard({ variant, search: false });
+      delete music.grid_options;
+      return [{ type: "conditional", conditions: playingCond, card: music },
+              { type: "conditional", conditions: [{ condition: "not", conditions: playingCond }], card: status }];
+    };
+    const wideRow = [
+      weather ? { type: "custom:ajnetweb-weather-card", entity: weather } : null,
+      showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: panel ? "panel" : "default" }) : null,
+      ...media("full"),
+    ].filter(Boolean).map((c) => { delete c.grid_options; return c; });
+    out.push(band([
+      header(panel ? "panel" : "default", { weather_wide: weather ? false : undefined }),
+      wideRow.length ? { type: "horizontal-stack", cards: wideRow, grid_options: { columns: "full" }, ...onlyWide } : null,
+      showPrayer ? withLang({ type: "custom:ajnetweb-prayer-card", variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+      players.length ? musicCard({ variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
+      statusCard({ grid_options: { columns: "full" }, ...onlyNarrow }),
+    ]));
+    // 2. scenes, access, favourites
     const quick = [];
     const scenes = all("scenes");
     if (scenes.length) {
@@ -187,34 +242,35 @@ export async function generateDashboard(config, hass) {
         actions(scenes.slice(0, 12).map((e) => ({ name: e.full_name, icon: (hass.states[e.entity_id].attributes.icon) || "mdi:palette",
                                                     action: "scene.turn_on", target: { entity_id: e.entity_id } })), "chips"));
     }
+    // house-wide buttons (all lights off, AC off, shades, add-on shortcuts) as one chip row
+    const acts = actions([...(cfg.shortcuts || []), lightsOff(), acOff(), ...shades()], "chips");
+    if (acts) quick.push(...(scenes.length ? [] : [heading(t("quick_actions"), "mdi:gesture-tap-button")]), acts);
     const access = all("access");
     if (access.length) quick.push(heading(t("access"), "mdi:shield-key", path("security")),
-      ...access.slice(0, 6).map((e) => device(e, { name: e.full_name })));
+      ...access.slice(0, 8).map((e) => device(e, { name: e.full_name })));
     const favIds = new Set(cfg.favorites || []);
     const favs = rooms.flatMap((r) => Object.values(r).filter(Array.isArray).flat()).filter((e) => e && favIds.has(e.entity_id));
-    if (favs.length) quick.push(heading(t("favorites"), "mdi:star"), ...favs.slice(0, 12).map((e) => device(e, { name: e.full_name })));
-    const acts = actions([...(cfg.shortcuts || []), lightsOff(), acOff(), ...shades()]);
-    if (acts) quick.push(acts);
+    if (favs.length) quick.push(heading(t("favorites"), "mdi:star"), ...favs.slice(0, 16).map((e) => device(e, { name: e.full_name })));
+    const quickBand = quick.length ? band(quick) : null;
+    // 3. cameras: a row of large pictures (Wall Panel: right after the top band, live if enabled)
     const cams = all("cameras");
-    if (panel && cams.length) {
-      out.push(section([heading(t("cameras"), "mdi:cctv", path("cameras")),
-        ...cams.slice(0, 4).map((c) => camera(c, cfg.panel_live_cameras !== false))], 2));
-    }
-    if (quick.length) out.splice(panel ? out.length : 1, 0, section(quick));
-    if (players.length) {
-      out.push(section([heading(t("music"), "mdi:music", path("media")),
-        musicCard({ variant: panel ? "full" : "compact", search: panel })]));
-    }
-    out.push(...roomSections());
+    // wide screens: balanced rows of large pictures (4 -> 4, 5 -> 3+2, 6 -> 3+3, 7 -> 4+3, 8 -> 4+4);
+    // phones: two per row
+    const camList = cams.slice(0, panel ? 8 : 4);
+    const live = panel && cfg.panel_live_cameras !== false;
+    const camRows = [];
+    const perRow = camList.length <= 4 ? 4 : Math.ceil(camList.length / Math.ceil(camList.length / 4));
+    for (let i = 0; i < camList.length; i += perRow) camRows.push(camList.slice(i, i + perRow));
+    const camBand = camList.length ? band([heading(t("cameras"), "mdi:cctv", path("cameras")),
+      ...camRows.map((row) => ({ type: "horizontal-stack", grid_options: { columns: "full" }, ...onlyWide,
+        cards: row.map((c) => { const x = camera(c, live); delete x.grid_options; return x; }) })),
+      ...camList.map((c) => Object.assign(camera(c, false), { grid_options: { columns: 6 } }, onlyNarrow))]) : null;
     const climates = all("climates");
-    if (climates.length) {
-      out.push(section([heading(t("climate"), "mdi:thermostat", path("climate")),
-        ...climates.slice(0, 6).map((e) => device(e, { name: e.full_name, layout: "wide" }))]));
-    }
-    if (!panel && cams.length) {
-      out.push(section([heading(t("cameras"), "mdi:cctv", path("cameras")), ...cams.slice(0, 4).map((c) => camera(c, false))]));
-    }
-    return out;
+    const climateBand = climates.length ? band([heading(t("climate"), "mdi:thermostat", path("climate")),
+      ...climates.slice(0, 8).map((e) => device(e, { name: e.full_name, layout: "wide" }))]) : null;
+    if (panel) out.push(camBand, roomsBand(), quickBand, climateBand);
+    else out.push(quickBand, roomsBand(), climateBand, camBand);
+    return out.filter(Boolean);
   };
   const view = (title, p, icon, sections, extra = {}) => Object.assign({
     title, path: p, icon, type: "sections", max_columns: extra.max_columns || 4, dense_section_placement: true,
@@ -281,8 +337,10 @@ export async function generateDashboard(config, hass) {
     const inBar = main.filter((v) => v.path !== "tablet" && v.path !== "installer").slice(0, menuOn ? 4 : 5);
     const items = inBar.map((v) => ({ icon: v.icon, label: v.title, path: path(v.path) }));
     const menu = menuOn ? moreMenu(main.filter((v) => !inBar.includes(v))) : null;
+    // On large screens HA's own view tabs are already at the top; the floating bar is for phones,
+    // tablets and kiosk panels (HA header hidden), where it stays on at every width.
     main.forEach((v) => v.sections.push(section([withLang({ type: "custom:ajnetweb-nav-card", items,
-      ...(menu ? { menu } : {}), grid_options: { columns: "full" } })], 4)));
+      ...(menu ? { menu } : {}), ...(hideHeader ? {} : { hide_wide: true }), grid_options: { columns: "full" } })], 4)));
   }
   // dashboard-wide default colour for every AJ Netweb card (a person's own choice still wins)
   if (cfg.palette && PALETTES[cfg.palette]) {

@@ -8,6 +8,8 @@
 //   temperature / humidity       # optional sensor ids
 //   tap_action: popup | navigate ; navigation_path: /dashboard/room-living-room
 //   size: normal | large
+//   style: photo (default) | tile  - tile: light card with the room icon and a column of quick buttons
+//          (lights, AC, shades, fan) so a room is controlled without opening it
 import { AjnBase, OFFLINE, bindGestures, cssUrl, esc, haptic } from "../core/base.js";
 import { COLORS, roomGradient } from "../core/styles.js";
 import { buildModel, roomEntities } from "../core/model.js";
@@ -95,7 +97,107 @@ export class AjnetwebAreaCard extends AjnBase {
     this.call(on.length ? "homeassistant.turn_off" : "homeassistant.turn_on", on.length ? on : ids);
   }
 
+  // ---------------------------------------------------------------- tile style: quick buttons
+  _quick() {
+    const e = this._room().entities;
+    const live = (g) => (e[g] || []).filter((id) => this.st(id) && !OFFLINE.includes(this.st(id).state));
+    const out = [];
+    const lights = live("lights");
+    if (lights.length) {
+      const on = lights.filter((id) => this.st(id).state === "on");
+      out.push({ key: "lights", icon: on.length ? "mdi:lightbulb-on" : "mdi:lightbulb-outline", on: on.length > 0, color: COLORS.amber,
+                 label: this.t("lights"), run: () => this.call(on.length ? "homeassistant.turn_off" : "homeassistant.turn_on", on.length ? on : lights) });
+    }
+    const acs = live("climates");
+    if (acs.length) {
+      const on = acs.filter((id) => this.st(id).state !== "off");
+      const target = on.length ? this.st(on[0]).attributes.temperature : null;
+      out.push({ key: "ac", icon: "mdi:snowflake", on: on.length > 0, color: COLORS.blue, text: target != null ? `${Math.round(target)}°` : "",
+                 label: this.t("climate"), run: () => this.call(on.length ? "climate.turn_off" : "climate.turn_on", on.length ? on : acs) });
+    }
+    const covers = live("covers");
+    if (covers.length) {
+      const open = covers.filter((id) => ["open", "opening"].includes(this.st(id).state));
+      out.push({ key: "covers", icon: open.length ? "mdi:curtains" : "mdi:curtains-closed", on: open.length > 0, color: COLORS.teal,
+                 label: this.t("covers"), run: () => this.call(open.length ? "cover.close_cover" : "cover.open_cover", covers) });
+    }
+    const fans = live("fans");
+    if (fans.length && out.length < 4) {
+      const on = fans.filter((id) => this.st(id).state === "on");
+      out.push({ key: "fans", icon: "mdi:fan", on: on.length > 0, color: COLORS.teal, spin: on.length > 0,
+                 label: this.t("fans"), run: () => this.call(on.length ? "fan.turn_off" : "fan.turn_on", on.length ? on : fans) });
+    }
+    return out.slice(0, 4);
+  }
+
+  _tileCss() {
+    return `
+      ha-card { position: relative; min-height: var(--ajn-room-height, 150px); transition: transform .18s var(--_ease); }
+      ha-card:active { transform: scale(.98); }
+      .t { position: relative; height: 100%; min-height: inherit; box-sizing: border-box; padding: 12px 10px 12px 14px;
+           display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      .info { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+      .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--_text); line-height: 1.2;
+              overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+      .sub { font-size: 12px; color: var(--_text2); margin-top: 2px; font-variant-numeric: tabular-nums; white-space: nowrap;
+             overflow: hidden; text-overflow: ellipsis; }
+      .big { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; margin-top: 10px;
+             background: var(--_muted); color: var(--_text2); transition: background .3s, color .3s, box-shadow .3s; }
+      .big ha-icon { --mdc-icon-size: 30px; }
+      .lit .big { background: rgba(${COLORS.amber}, .2); color: rgb(${COLORS.amber}); box-shadow: 0 0 24px rgba(${COLORS.amber}, .25); }
+      .alerts { display: flex; gap: 4px; margin-top: 6px; }
+      .alerts ha-icon { --mdc-icon-size: 15px; color: rgb(var(--c)); }
+      .btns { display: flex; flex-direction: column; gap: 6px; justify-content: flex-start; }
+      .q { width: 36px; height: 36px; border-radius: 50%; border: none; padding: 0; cursor: pointer; display: grid; place-items: center;
+           background: var(--_muted); color: var(--_text2); position: relative; font: inherit; }
+      .q ha-icon { --mdc-icon-size: 19px; }
+      .q.on { background: rgb(var(--c)); color: #fff; box-shadow: 0 4px 14px rgba(var(--c), .35); }
+      .q b { position: absolute; inset-inline-end: -4px; bottom: -4px; font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 6px;
+             background: var(--_surface-on); color: var(--_text-on); }
+      .q.spin ha-icon { animation: spin 1.6s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+    `;
+  }
+
+  _renderTile() {
+    const r = this._room();
+    const lightsOn = this._count("lights", (s) => s.state === "on");
+    const t = this.num(r.temperature);
+    const h = this.num(r.humidity);
+    const tUnit = (this.st(r.temperature) || { attributes: {} }).attributes.unit_of_measurement || "°";
+    const sub = [];
+    if (t !== null) sub.push(`${Math.round(t * 10) / 10}${tUnit}`);
+    if (h !== null) sub.push(`${Math.round(h)}%`);
+    const alerts = [];
+    if (this._count("safety", (s) => s.state === "on")) alerts.push(["mdi:alert", COLORS.red]);
+    if (this._count("openings", (s) => s.state === "on")) alerts.push(["mdi:door-open", COLORS.orange]);
+    if (this._count("motion", (s) => s.state === "on")) alerts.push(["mdi:motion-sensor", COLORS.teal]);
+    if (this._count("media", (s) => s.state === "playing")) alerts.push(["mdi:music", COLORS.purple]);
+    const q = this._quick();
+    this.shadowRoot.innerHTML = "";
+    this.html(`<style>${this._tileCss()}</style>
+      <ha-card class="tap ${lightsOn ? "lit" : ""}" tabindex="0" role="button" aria-label="${esc(r.name)}">
+        <div class="t">
+          <div class="info">
+            <div><div class="name">${esc(r.name)}</div><div class="sub">${sub.join(" · ") || "&nbsp;"}</div>
+              ${alerts.length ? `<div class="alerts">${alerts.map(([i, c]) => `<ha-icon icon="${i}" style="--c:${c}"></ha-icon>`).join("")}</div>` : ""}</div>
+            <div class="big"><ha-icon icon="${esc(r.icon)}"></ha-icon></div>
+          </div>
+          ${q.length ? `<div class="btns">${q.map((b, i) => `<button class="q ${b.on ? "on" : ""} ${b.spin ? "spin" : ""}" data-q="${i}"
+              style="--c:${b.color}" aria-label="${esc(b.label)}" title="${esc(b.label)}"><ha-icon icon="${b.icon}"></ha-icon>${b.text ? `<b>${esc(b.text)}</b>` : ""}</button>`).join("")}</div>` : ""}
+        </div>
+      </ha-card>`);
+    this.shadowRoot.querySelectorAll("button.q").forEach((btn) => {
+      btn.addEventListener("pointerdown", (e) => e.stopPropagation());
+      btn.addEventListener("pointerup", (e) => e.stopPropagation());
+      btn.addEventListener("click", (e) => { e.stopPropagation(); haptic("light"); q[+btn.dataset.q].run(); });
+    });
+    const card = this.shadowRoot.querySelector("ha-card");
+    bindGestures(card, { onTap: () => this._open(), onHold: this._config.navigation_path ? () => this.navigate(this._config.navigation_path) : null });
+  }
+
   css() {
+    if (this._config.style === "tile") return "";
     return `
       ha-card { position: relative; border: none; color: #fff; min-height: var(--ajn-room-height, 150px);
                 transition: transform .18s var(--_ease), box-shadow .3s var(--_ease); isolation: isolate; }
@@ -127,6 +229,7 @@ export class AjnetwebAreaCard extends AjnBase {
   }
 
   render() {
+    if (this._config.style === "tile") return this._renderTile();
     const r = this._room();
     const lightsOn = this._count("lights", (s) => s.state === "on");
     const acOn = this._count("climates", (s) => s.state !== "off");

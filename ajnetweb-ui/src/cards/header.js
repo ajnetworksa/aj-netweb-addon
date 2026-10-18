@@ -8,7 +8,7 @@ import { AjnBase, bindGestures, cssUrl, esc, formatState } from "../core/base.js
 import { openAppearance } from "./appearance.js";
 import { COLORS } from "../core/styles.js";
 
-const WEATHER_ICONS = {
+export const WEATHER_ICONS = {
   "clear-night": "mdi:weather-night", cloudy: "mdi:weather-cloudy", exceptional: "mdi:alert-circle-outline",
   fog: "mdi:weather-fog", hail: "mdi:weather-hail", lightning: "mdi:weather-lightning",
   "lightning-rainy": "mdi:weather-lightning-rainy", partlycloudy: "mdi:weather-partly-cloudy",
@@ -62,7 +62,7 @@ export class AjnetwebHeaderCard extends AjnBase {
     const set = (sel, txt) => { const el = this.shadowRoot.querySelector(sel); if (el) el.textContent = txt; };
     try {
       set(".time", now.toLocaleTimeString(lang, opts));
-      set(".date", now.toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "long" }));
+      set(".date", now.toLocaleDateString(lang, { weekday: "long", day: "numeric", month: "short" }));
     } catch (e) {
       set(".time", now.toLocaleTimeString());
       set(".date", now.toLocaleDateString());
@@ -102,49 +102,63 @@ export class AjnetwebHeaderCard extends AjnBase {
       ha-card { position: relative; border: none; background: transparent; box-shadow: none;
                 -webkit-backdrop-filter: none; backdrop-filter: none; }
       ha-card.hero { background: var(--_hero) center/cover; color: #fff; border-radius: var(--_radius); }
-      ha-card.hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.1)); }
-      .wrap { position: relative; padding: ${panel ? "8px 6px 4px" : "4px 4px 2px"}; display: grid; gap: 14px; }
-      .hero .wrap { padding: 22px; }
-      .top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-      .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--_accent); }
+      ha-card.hero::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+                             background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.1)); }
+      /* phone: clock + side on top, chips below. Wide: one tidy row - clock | chips | people + weather */
+      .wrap { position: relative; display: grid; gap: 12px 18px; padding: 4px 2px;
+              grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "clock side" "chips chips"; align-items: center; }
+      .hero .wrap { padding: 20px 22px; }
+      .clock { grid-area: clock; min-width: 0; }
+      .side { grid-area: side; display: flex; align-items: center; gap: 10px; justify-self: end; }
+      .row { grid-area: chips; display: flex; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: none; padding: 2px; min-width: 0; }
+      .row::-webkit-scrollbar { display: none; }
+      @container (min-width: 880px) {
+        .wrap { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "clock chips side"; }
+        .row { flex-wrap: wrap; overflow: visible; justify-content: flex-start; padding-inline-start: 18px;
+               border-inline-start: 1px solid var(--_border); min-height: 48px; }
+        .hero .row { border-color: rgba(255,255,255,.25); }
+      }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--_accent); }
       .hero .eyebrow { color: #fff; opacity: .85; }
-      .greet { font-size: 15px; color: var(--_text2); margin-top: 2px; }
-      .hero .greet, .hero .date { color: rgba(255,255,255,.85); }
-      .time { font-size: ${panel ? "84px" : "52px"}; font-weight: 200; line-height: 1; letter-spacing: -.04em;
-              color: var(--_text); font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
+      .line { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+      .time { font-size: ${panel ? "56px" : "40px"}; font-weight: 250; line-height: 1; letter-spacing: -.04em; white-space: nowrap;
+              color: var(--_text); font-variant-numeric: tabular-nums; margin: 2px 0; }
       .hero .time { color: #fff; }
-      .date { font-size: 15px; color: var(--_text2); }
-      .weather { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 18px;
-                 background: var(--_surface); border: 1px solid var(--_border);
+      .meta { display: grid; gap: 1px; }
+      .date { font-size: 14px; font-weight: 600; color: var(--_text); }
+      .greet { font-size: 13px; color: var(--_text2); }
+      .hero .greet, .hero .date { color: rgba(255,255,255,.88); }
+      .weather { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px 0 10px; border-radius: 16px;
+                 background: var(--_surface); border: 1px solid var(--_border); color: var(--_text);
                  -webkit-backdrop-filter: blur(var(--_blur)); backdrop-filter: blur(var(--_blur)); }
       .hero .weather { background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.2); color: #fff; }
-      .weather ha-icon { --mdc-icon-size: ${panel ? "46px" : "34px"}; color: var(--_accent); }
+      .weather ha-icon { --mdc-icon-size: 28px; color: var(--_accent); }
       .hero .weather ha-icon { color: #fff; }
-      .wtemp { font-size: ${panel ? "30px" : "22px"}; font-weight: 600; color: inherit; font-variant-numeric: tabular-nums; }
-      .wcond { font-size: 12px; color: var(--_text2); }
+      .wtemp { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+      .wcond { font-size: 11px; color: var(--_text2); white-space: nowrap; }
       .hero .wcond { color: rgba(255,255,255,.8); }
-      .row { display: flex; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: none; padding: 2px; }
-      .row::-webkit-scrollbar { display: none; }
-      .chip { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px 0 11px;
-              border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--_text); white-space: nowrap;
+      .chip { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 13px 0 10px;
+              border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--_text); white-space: nowrap;
               background: var(--_surface); border: 1px solid var(--_border);
               -webkit-backdrop-filter: blur(var(--_blur)); backdrop-filter: blur(var(--_blur)); }
-      .chip ha-icon { --mdc-icon-size: 19px; color: rgb(var(--chip-rgb)); }
-      .chip.on { background: rgba(var(--chip-rgb), .16); border-color: rgba(var(--chip-rgb), .32); }
-      .persons { display: flex; margin-inline-start: auto; padding-inline-start: 8px; }
-      .person { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
-                margin-inline-start: -8px; border: 2px solid var(--primary-background-color, #000);
-                background: var(--secondary-background-color, #333); font-size: 12px; font-weight: 700;
-                color: var(--_text2); filter: grayscale(1); opacity: .6; }
-      .person.home { filter: none; opacity: 1; box-shadow: 0 0 0 2px rgb(${COLORS.green}); }
+      .chip ha-icon { --mdc-icon-size: 18px; color: rgb(var(--chip-rgb)); }
+      .chip.on { background: rgba(var(--chip-rgb), .14); border-color: rgba(var(--chip-rgb), .32); }
+      .persons { display: flex; padding-inline-start: 6px; }
+      .person { width: 34px; height: 34px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; flex: none;
+                margin-inline-start: -6px; box-sizing: border-box; border: 2px solid var(--_border);
+                background: var(--_surface-on); color: var(--_text-on); font-size: 11px; font-weight: 700;
+                filter: grayscale(1); opacity: .55; }
+      .person.home { filter: none; opacity: 1; border-color: rgb(${COLORS.green}); }
       .person img { width: 100%; height: 100%; object-fit: cover; }
-      .me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; margin-inline-start: auto;
+      .more { margin-inline-start: -6px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+              background: var(--_muted); color: var(--_text2); font-size: 11px; font-weight: 700; border: 2px solid var(--_border); box-sizing: border-box; }
+      .me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
             background: var(--_grad); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 4px 14px var(--ajn-glow, rgba(0,0,0,.2)); }
-      .persons + .me { margin-inline-start: 6px; }
       .me ha-icon { --mdc-icon-size: 20px; }
-      .eyebrow { background: var(--_grad); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-      .hero .eyebrow { -webkit-text-fill-color: #fff; }
-      @container (max-width: 440px) { .time { font-size: ${panel ? "60px" : "44px"}; } }
+      @container (min-width: 880px) { .nowx .weather { display: none; } }
+      .row .persons { display: none; margin-inline-start: auto; }
+      @container (max-width: 560px) { .side .persons { display: none; } .row .persons { display: flex; } }
+      @container (max-width: 420px) { .time { font-size: ${panel ? "46px" : "36px"}; } .wcond { display: none; } }
     `;
   }
 
@@ -160,30 +174,31 @@ export class AjnetwebHeaderCard extends AjnBase {
         <div><div class="wtemp">${temp != null ? esc(Math.round(temp)) + esc(unit) : "--"}</div>
         <div class="wcond">${esc(formatState(this._hass, w))}</div></div></div>`;
     }
-    const persons = (c.persons || []).map((id) => this.st(id)).filter(Boolean).map((p) => {
+    const all = (c.persons || []).map((id) => this.st(id)).filter(Boolean)
+      .sort((a, b) => (b.state === "home") - (a.state === "home"));
+    const persons = all.slice(0, 4).map((p) => {
       const pic = p.attributes.entity_picture;
-      const initials = String(p.attributes.friendly_name || p.entity_id).split(" ").map((x) => x[0]).join("").slice(0, 2);
+      const initials = String(p.attributes.friendly_name || p.entity_id).split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
       return `<div class="person tap ${p.state === "home" ? "home" : ""}" data-entity="${esc(p.entity_id)}"
         title="${esc(p.attributes.friendly_name)} · ${esc(formatState(this._hass, p))}">
         ${pic ? `<img src="${esc(pic)}" alt="">` : esc(initials)}</div>`;
-    }).join("");
+    }).join("") + (all.length > 4 ? `<div class="more">+${all.length - 4}</div>` : "");
     const chips = this._chips().map((ch) => `
       <div class="chip tap ${ch.active ? "on" : ""}" tabindex="0" role="button" style="--chip-rgb:${COLORS[ch.color] || COLORS.blue}"
            ${ch.nav ? `data-nav="${esc(ch.nav)}"` : ""} ${ch.entity ? `data-entity="${esc(ch.entity)}"` : ""}>
         <ha-icon icon="${esc(ch.icon)}"></ha-icon>${esc(ch.text)}</div>`).join("");
+    const meBtn = c.appearance
+      ? `<div class="me tap" data-appearance tabindex="0" role="button" aria-label="${esc(this.t("appearance"))}" title="${esc(this.t("appearance"))}"><ha-icon icon="mdi:palette"></ha-icon></div>` : "";
 
     this.html(`
       <ha-card class="${c.image ? "hero" : ""}" ${c.image ? `style="--_hero:${esc(cssUrl(c.image))}"` : ""}>
-        <div class="wrap">
-          <div class="top">
-            <div>
-              ${c.title ? `<div class="eyebrow">${esc(c.title)}</div>` : ""}
-              <div class="greet"></div><div class="time"></div><div class="date"></div>
-            </div>
-            ${weather}
+        <div class="wrap ${c.weather_wide === false ? "nowx" : ""}">
+          <div class="clock">
+            ${c.title ? `<div class="eyebrow">${esc(c.title)}</div>` : ""}
+            <div class="line"><div class="time"></div><div class="meta"><div class="date"></div><div class="greet"></div></div></div>
           </div>
-          ${chips || persons || c.appearance ? `<div class="row">${chips}${persons ? `<div class="persons">${persons}</div>` : ""}${c.appearance
-            ? `<div class="me tap" data-appearance tabindex="0" role="button" aria-label="${esc(this.t("appearance"))}" title="${esc(this.t("appearance"))}"><ha-icon icon="mdi:palette"></ha-icon></div>` : ""}</div>` : ""}
+          ${chips || persons ? `<div class="row">${chips}${persons ? `<div class="persons">${persons}</div>` : ""}</div>` : ""}
+          <div class="side">${persons ? `<div class="persons">${persons}</div>` : ""}${weather}${meBtn}</div>
         </div>
       </ha-card>`);
     this._tick();

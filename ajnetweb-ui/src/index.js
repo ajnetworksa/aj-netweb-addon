@@ -9,6 +9,9 @@ import { AjnetwebNavCard } from "./cards/nav.js";
 import { AjnetwebPrayerCard } from "./cards/prayer.js";
 import { AjnetwebMusicCard } from "./cards/music.js";
 import { AjnetwebAppearanceCard } from "./cards/appearance.js";
+import { AjnetwebWeatherCard } from "./cards/weather.js";
+import { AjnetwebRoomsCard } from "./cards/rooms.js";
+import { AjnetwebStatusCard } from "./cards/status.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
 import { generateDashboard } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
@@ -25,6 +28,9 @@ const CARDS = [
   ["ajnetweb-actions-card", AjnetwebActionsCard, "AJ Netweb Actions", "Large buttons or scene chips with tap-again confirmation."],
   ["ajnetweb-prayer-card", AjnetwebPrayerCard, "AJ Netweb Prayer Times", "Next prayer countdown, today's times, Hijri date and adhan controls."],
   ["ajnetweb-music-card", AjnetwebMusicCard, "AJ Netweb Music", "Music player with Music Assistant search, favourites and room switching."],
+  ["ajnetweb-rooms-card", AjnetwebRoomsCard, "AJ Netweb Rooms", "All rooms with floor tabs; room tiles with quick buttons for lights, AC and shades."],
+  ["ajnetweb-status-card", AjnetwebStatusCard, "AJ Netweb Right now", "Only what needs attention: open doors, alerts, timers, lights and AC on, low batteries."],
+  ["ajnetweb-weather-card", AjnetwebWeatherCard, "AJ Netweb Weather", "Current weather and a 5-day forecast with temperature bars."],
   ["ajnetweb-appearance-card", AjnetwebAppearanceCard, "AJ Netweb Appearance", "Lets each person choose their own theme, colour gradient and wallpaper."],
   ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],
   ["ajnetweb-room-card", AjnetwebRoomCard, "AJ Netweb Hero (legacy)", "Kept for dashboards created by v1."],

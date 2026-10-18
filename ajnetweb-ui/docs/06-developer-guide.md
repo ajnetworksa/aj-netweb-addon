@@ -130,3 +130,27 @@ portrait tablet (820 px) and landscape panel (1280 px) in the preview.
 | Switch shows as "Devices" not "Lights" | Rename with light/lamp/spot/led… or set *Show as* |
 | Theme not applied | `frontend: themes:` include missing in configuration.yaml, then reload themes |
 | Cameras black | Camera entity unavailable, or the browser blocks mixed http/https images |
+
+## Layout rules for the generated Home and Wall Panel
+
+Home Assistant's sections view aligns each row of sections to the tallest one, so sections of different
+heights side by side leave holes. Each section's card grid is `12 × column_span` columns. The strategy
+therefore:
+
+1. Builds Home and Wall Panel from **full-width bands** (`column_span: 4`), one band per topic.
+2. Sizes cards in a band in **whole view columns** (`columns: 12` = one column, `6` = half). They then wrap
+   cleanly at any width: 4 / 3 / 2 / 1 columns depending on the screen.
+3. Puts things that must share one row with equal heights (weather · prayer · music, camera rows) in a native
+   `horizontal-stack`, shown only on screens ≥ 768 px (`visibility: screen`). Phones get the stacked
+   versions.
+
+Design ideas credited to **Flux UI** by ElementZoom (MIT,
+https://github.com/ElementZoom/Flux-UI-Home-Assistant-Dashboard): room tiles with quick buttons, room
+group tabs, the context-aware "Right now" panel, media-aware layout switching and cameras with controls.
+We re-implemented them as generated cards (no button-card, UIX or layout-card), so they need no
+per-site YAML and survive HA updates.
+
+`npm run preview` uses the same column rules as HA (min 320 px, max 500 px per column, 32 px gaps), so what
+you see there matches the real dashboard. `?house=sample-villa` loads a test villa with more cameras and
+people.
+

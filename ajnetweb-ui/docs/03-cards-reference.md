@@ -73,6 +73,7 @@ type: custom:ajnetweb-camera-card
 entity: camera.driveway
 name: Driveway
 refresh: 8                   # seconds between snapshots (min 2); paused when the app is in background
+controls: [switch.main_gate_relay, cover.garage_door]   # optional buttons on the picture (tap twice)
 ```
 Tap opens HA's camera dialog with live video.
 
@@ -169,6 +170,53 @@ drag-to-set volume and mute, room chips to switch speakers, **Move music here** 
 Spotify, Apple Music, Tidal, Deezer, SoundCloud, TuneIn, radio…) and favourites. Tapping a result
 plays it on the selected speaker. Plain media players (Cast, Sonos, AirPlay, Spotify Connect) get
 all playback controls; search needs Music Assistant.
+
+### `custom:ajnetweb-rooms-card` — all rooms with floor tabs
+
+```yaml
+type: custom:ajnetweb-rooms-card
+style: tile                     # tile (quick buttons) | photo
+min_width: 170                  # smallest room card width (px)
+groups:
+  - name: Ground Floor
+    icon: mdi:home-floor-0
+    rooms:
+      - { area: majlis }
+      - { area: living_room, name: Living }
+  - name: First Floor
+    rooms: [{ area: master_bedroom }]
+```
+Each room is an `ajnetweb-area-card`, so every area-card option works inside `rooms`. With `style: tile`
+the card shows the room icon (lit when lights are on) and up to 4 quick buttons: lights on/off, AC on/off
+(with set temperature), shades open/close and fan. The selected floor tab is remembered per device.
+
+### `custom:ajnetweb-status-card` — "Right now"
+
+```yaml
+type: custom:ajnetweb-status-card
+openings: [binary_sensor.front_door, binary_sensor.kitchen_window]
+safety: [binary_sensor.kitchen_smoke]
+lights: [light.majlis_chandelier, light.kitchen]
+climates: [climate.majlis_ac]
+media: [media_player.majlis_speakers]
+batteries: [sensor.front_door_lock_battery]      # shown at 20 % or less
+devices: [light.x, switch.y]                     # shown when unavailable (admins)
+timers: true                                     # running HA timers with time left
+navigation: { security: /villa/security, lights: /villa/lights }
+```
+Only rows that need attention are shown; with nothing to report it shows "All good". The generated
+dashboard fills all of this automatically.
+
+### `custom:ajnetweb-weather-card` — current weather + forecast
+
+```yaml
+type: custom:ajnetweb-weather-card
+entity: weather.forecast_home
+days: 5                  # forecast days (default 5)
+```
+Current temperature and condition, today's high/low, and one row per day with a temperature-range bar
+(blue → yellow → orange, scaled to the week). Uses the `weather.get_forecasts` action, refreshed every
+30 minutes. Tap opens HA's weather details.
 
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 

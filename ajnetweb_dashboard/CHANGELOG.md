@@ -1,5 +1,44 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.3.0 - organised Home and Wall Panel layout
+- **Home and Wall Panel are now built from full-width bands**, so there are no more big empty areas.
+  - Before, a short Cameras section could sit next to a tall Access section; Home Assistant's sections
+    grid aligns rows to the tallest section, which left a hole.
+  - Cards inside a band are sized in whole view columns, so they reflow cleanly: 4 per row on large
+    screens, 3 on a laptop, 2 on a tablet, 1-2 on a phone.
+  - Band order: compact header → weather · prayer · music in one row → scenes, quick actions, access,
+    favourites → rooms per floor → climate → cameras. On the Wall Panel the cameras come right after the
+    top band.
+- **Compact header:**
+  - Wide screens show one line: time and date | status chips | people and weather. Phones show the time,
+    date and weather, with the chips below.
+  - The giant clock and the empty middle are gone. People avatars are always round, at most 4 plus "+N".
+- **New weather card** (`custom:ajnetweb-weather-card`): current conditions plus a 5-day forecast with
+  temperature range bars (`weather.get_forecasts`).
+- **Cameras:** large pictures in balanced rows (4 → one row, 5 → 3 + 2, 8 → 4 + 4), two per row on phones.
+  - A clean "No picture" or "Offline" placeholder replaces the broken grey tile.
+  - Raw names are tidied ("bullet_cam" → "Bullet cam").
+- The floating navigation bar hides on screens 1200 px and wider, where Home Assistant's own tabs are already
+  at the top. Kiosk panels with the header hidden keep it at every width.
+- Raw entity names like `dome_cam` are shown as "Dome cam" everywhere.
+- **Ideas from Flux UI** (ElementZoom, MIT), rebuilt as our own self-generating cards with no extra HACS cards:
+  - **Room tiles with quick buttons** (`style: tile`): name, temperature and humidity, a big room icon that
+    lights up, and a column of buttons for lights, AC (with set temperature), shades and fan. Rooms are
+    controlled from Home without opening them.
+  - **Rooms card with floor tabs** (`custom:ajnetweb-rooms-card`): all rooms in one even grid. The chosen
+    floor is remembered per device.
+  - **"Right now" card** (`custom:ajnetweb-status-card`): only what needs attention - open doors and windows,
+    alarms, running timers (washer, sprinklers) with time left, lights and AC on, low batteries, and offline
+    devices for admins. "All good" when there is nothing.
+  - **Media-aware top row:** the music player takes its place while something plays; "Right now" otherwise.
+  - **Camera controls:** the gate, garage or lock of the same area appears on that area's first camera (tap
+    twice to act).
+- New strategy option `room_style: tile | photo` (default `tile`; `photo` keeps the photo room cards).
+
+## 3.2.1
+- Licence page: only asks for something when something is needed. With licensing not switched on, or when
+  licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).
+
 ## 3.2.0 - themes, personal appearance, kiosk menu, licensing
 - **AJ Netweb licence:** the add-ons and the dashboard now need this Home Assistant to be licensed by
   AJ Netweb, normally through **AJ Netweb Remote Access** (automatic, nothing to enter) or with an offline

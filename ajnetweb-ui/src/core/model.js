@@ -88,6 +88,14 @@ export function classify(id, name, attrs) {
 }
 
 /** Strip the room name from entity names inside that room ("Majlis AC" -> "AC"). */
+/** "bullet_cam" / "dome-cam2" (names nobody typed) -> "Bullet cam" / "Dome cam2". Real names stay. */
+export function niceName(name) {
+  const n = String(name || "");
+  if (!/^[a-z0-9]+([_-][a-z0-9]+)+$/.test(n)) return n;
+  const words = n.replace(/[_-]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 export function shortName(name, room) {
   if (!name || !room) return name;
   if (name.toLowerCase().startsWith(room.toLowerCase())) {
@@ -133,7 +141,7 @@ export function buildModel(hass, opts = {}) {
     if (domain === "update") return house.updates.push(id);
     if (reg.hidden) return;
     if (reg.entity_category && !(domain === "sensor" && attrs.device_class === "battery")) return;
-    const name = attrs.friendly_name || reg.name || id;
+    const name = niceName(attrs.friendly_name || reg.name || id);
     if (exclude.has(id) || isNoise(id, name)) return;
     const group = classify(id, name, attrs);
     if (!group) return;
