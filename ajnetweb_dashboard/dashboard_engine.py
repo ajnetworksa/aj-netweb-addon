@@ -23,12 +23,13 @@ from typing import Any, Dict, List, Optional
 
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
-from layout_builder import MIN_HA_VERSION, LayoutBuilder
-from themes import install_themes, theme_catalog, themes_include_status
+from themes import install_themes, theme_catalog, theme_name, themes_include_status
+
+MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "2.0.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.0.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -43,7 +44,7 @@ DEFAULT_PROJECT = {
     "title": "Smart Home",
     "url_path": "ajnetweb-home",
     "theme": "apple_frosted_glass",
-    "language": "en",
+    "language": "",
     "branding": {"company": "AJ Netweb", "phone": "", "email": "", "website": "", "notes": ""},
     "views": {"panel": True, "lights": True, "climate": True, "security": True,
               "cameras": True, "media": True, "installer": True},
@@ -55,6 +56,9 @@ DEFAULT_PROJECT = {
     "cameras_view_live": False,
     "show_in_sidebar": True,
     "require_admin": False,
+    "room_tap": "popup",
+    "header_image": "",
+    "navbar": True,
 }
 
 
@@ -140,9 +144,40 @@ class DashboardEngine:
         return ctx
 
     def generate(self, project: Dict[str, Any] = None, model: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        The dashboard is a *strategy*: Home Assistant runs the AJ Netweb UI kit in the browser and
+        builds every view from the current areas/devices. We only store the installer's options,
+        so new devices show up without redeploying and the same kit works in any project.
+        """
         project = project or self.load_project()
-        model = model or self.discover(project)
-        return LayoutBuilder(model, project, normalize_url_path(project["url_path"]), self._context()).build()
+        ctx = self._context()
+        hidden = [a for a, v in (project.get("areas") or {}).items() if v and v.get("included") is False]
+        shortcuts = []
+        if ctx.get("intercom_path"):
+            shortcuts.append({"name": "Door station", "icon": "mdi:doorbell-video", "navigation_path": ctx["intercom_path"]})
+        if ctx.get("cctv_path"):
+            shortcuts.append({"name": "CCTV", "icon": "mdi:cctv", "navigation_path": ctx["cctv_path"]})
+        options = {
+            "type": "custom:ajnetweb",
+            "title": project.get("title") or "Home",
+            "theme": theme_name(project.get("theme", "apple_frosted_glass")),
+            "language": project.get("language") or None,
+            "room_tap": project.get("room_tap") or "popup",
+            "header_image": project.get("header_image") or None,
+            "exclude_entities": project.get("excluded_entities") or [],
+            "hidden_areas": hidden,
+            "favorites": project.get("favorites") or [],
+            "weather": project.get("weather_entity") or None,
+            "views": {k: v for k, v in (project.get("views") or {}).items() if v is False},
+            "navbar": project.get("navbar", True),
+            "panel_live_cameras": project.get("panel_live_cameras", True),
+            "cameras_live": project.get("cameras_view_live") or None,
+            "shortcuts": shortcuts,
+            "branding": project.get("branding") or {},
+            "admins": ctx.get("admin_user_ids") or [],
+        }
+        options = {k: v for k, v in options.items() if v not in (None, [], {}, "")}
+        return {"strategy": options}
 
     # ------------------------------------------------------------------ health
     def health(self) -> Dict[str, Any]:
@@ -288,10 +323,9 @@ class DashboardEngine:
         bp = self.install_bundled_blueprints()
         steps.append({"step": "Blueprints", "ok": bp.get("ok"), "detail": f"{len(bp.get('installed', []))} installed"})
 
-        model = self.discover(project)
-        if model.get("errors"):
-            return {"ok": False, "error": "; ".join(model["errors"]), "steps": steps}
-        config = self.generate(project, model)
+        config = self.generate(project)
+        views = [{"title": "Home", "path": "home"}, {"title": "Wall Panel", "path": "tablet"}]
+        views = [v for v in views if v["path"] == "home" or (project.get("views") or {}).get("panel", True)]
 
         try:
             with self.client.session() as s:
@@ -309,15 +343,14 @@ class DashboardEngine:
                 if backup:
                     steps.append({"step": "Previous version backed up", "ok": True, "detail": backup})
                 s.call("lovelace/config/save", url_path=url_path, config=config)
-                steps.append({"step": "Layout saved", "ok": True,
-                              "detail": f"{len(config['views'])} views"})
+                steps.append({"step": "Dashboard saved", "ok": True,
+                              "detail": "live layout (AJ Netweb UI strategy) - updates itself when devices change"})
         except Exception as e:
             log.error("Deploy failed: %s", e)
             return {"ok": False, "error": str(e), "steps": steps}
 
         return {"ok": True, "url_path": url_path, "title": project["title"], "theme": project["theme"],
-                "views": [{"title": v["title"], "path": v["path"], "subview": v.get("subview", False)}
-                          for v in config["views"]],
+                "views": views,
                 "steps": steps}
 
     # ------------------------------------------------------------------ blueprints

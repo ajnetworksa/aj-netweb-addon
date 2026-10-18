@@ -39,6 +39,15 @@ used as defaults for the very first project.
 
 Gate relays, door strikes and locks always ask for confirmation before acting.
 
+## Live dashboard (strategy)
+
+Since 3.0 the deployed dashboard only contains `strategy: {type: custom:ajnetweb, ...options}`.
+Home Assistant runs the bundled AJ Netweb UI kit, which builds every view from the current areas,
+floors and devices each time the dashboard opens. Add a device to an area and it appears - no
+redeploy. Use HA's **Take control** if a client needs a hand-edited copy.
+
+The UI kit also works without this add-on in any project: see `ajnetweb-ui/README.md`.
+
 ## Stability rules (why it won't break on HA updates)
 
 - Only documented WebSocket APIs are used (`lovelace/dashboards/*`, `lovelace/config/*`,

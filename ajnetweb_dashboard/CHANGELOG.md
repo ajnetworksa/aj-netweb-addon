@@ -1,5 +1,22 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.0.0 - premium UI kit
+- **New AJ Netweb UI kit** (`ajnetweb-ui/`, bundled as the card suite):
+  - Apple Home-style device tiles: tap to toggle, drag across to dim / set shade position / fan speed,
+    hold for details, light colour glow, tap-again confirmation for locks and gates, AC +/- on the tile.
+  - Room cards with the HA area photo (or a room-type gradient) and live status; tapping opens a room
+    sheet (bottom sheet on phones, centred panel on tablets) with every device, scenes and an all-off button.
+    Back button and swipe-down close it.
+  - Camera tiles with refreshing snapshots, floating glass navigation bar, refreshed header and buttons.
+- **The dashboard is now a strategy** (`strategy: custom:ajnetweb`): Home Assistant builds it live from
+  areas/floors/devices, so new devices appear without redeploying. The Studio only stores options.
+  The same file works in any HA project without the add-on (see `ajnetweb-ui/README.md`), and appears
+  under *Community dashboards* on HA 2026.5+.
+- New Studio options: room tap behaviour (sheet or page), header image, navigation bar, language now
+  follows each user's HA language by default.
+- Themes gain `ajn-surface-on`, `ajn-text-on`, `ajn-sheet-bg`, `ajn-nav-bg` for the premium tiles.
+- The Python layout generator was removed (one source of truth: the UI kit).
+
 ## 2.0.1
 - Home and Wall Panel get "Door station" and "CCTV" shortcut buttons when the AJ Netweb Intercom / CCTV
   add-ons are installed (paths detected automatically).

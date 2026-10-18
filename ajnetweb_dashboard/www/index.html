@@ -72,15 +72,21 @@
               <small class="muted">Must contain a hyphen, e.g. <code>villa-home</code>.</small>
             </label>
             <label>Language
-              <select id="fLanguage"><option value="en">English</option><option value="ar">العربية (Arabic)</option></select>
+              <select id="fLanguage"><option value="">Follow each user's Home Assistant language</option><option value="en">English</option><option value="ar">العربية (Arabic)</option></select>
             </label>
             <label>Weather entity
               <select id="fWeather"><option value="">Automatic</option></select>
             </label>
+            <label>Tapping a room
+              <select id="fRoomTap"><option value="popup">Opens a sheet with its devices</option>
+                <option value="navigate">Opens the room page</option></select>
+            </label>
+            <label>Header image URL (optional)<input id="fHeaderImage" type="text" placeholder="/local/villa.jpg"></label>
           </div>
           <div class="toggles">
             <label class="switch"><input type="checkbox" id="fSidebar"><span></span>Show in sidebar</label>
             <label class="switch"><input type="checkbox" id="fAdmin"><span></span>Admins only</label>
+            <label class="switch"><input type="checkbox" id="fNavbar"><span></span>Bottom navigation bar</label>
           </div>
         </div>
 
@@ -141,10 +147,11 @@
           <div class="card-head">
             <div>
               <h2>Deploy</h2>
-              <p class="desc">Registers the dashboard, card suite and themes through Home Assistant's own API. No restart needed.</p>
+              <p class="desc">Saves a live dashboard: Home Assistant builds it from your rooms each time it opens, so new
+                devices appear automatically. Deploy again only when you change settings here.</p>
             </div>
             <div class="head-actions">
-              <button id="btnPreview" class="btn">Preview YAML</button>
+              <button id="btnPreview" class="btn">Show config</button>
               <button id="btnDeploy" class="btn primary">Deploy now</button>
             </div>
           </div>
