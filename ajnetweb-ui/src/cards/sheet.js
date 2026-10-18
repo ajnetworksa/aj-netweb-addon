@@ -36,6 +36,7 @@ class AjnetwebRoomSheet extends HTMLElement {
   }
 
   open(room, origin, hass) {
+    this._openedAt = Date.now();
     this._room = room;
     this._origin = origin;
     this._hass = hass;
@@ -47,7 +48,9 @@ class AjnetwebRoomSheet extends HTMLElement {
       window.history.pushState({ ajnSheet: true }, "", `${location.pathname}${location.search}#ajn-${room.id}`);
       this._pushed = true;
     } catch (e) { /* ignore */ }
-    this._onPop = () => this.close(true);
+    this._hash = `#ajn-${room.id}`;
+    // Only a real "back" (our hash gone) closes the sheet; WebViews can fire stray popstate events
+    this._onPop = () => { if (location.hash !== this._hash) this.close(true); };
     window.addEventListener("popstate", this._onPop);
     this._onKey = (e) => { if (e.key === "Escape") this.close(); };
     window.addEventListener("keydown", this._onKey);
@@ -202,7 +205,14 @@ class AjnetwebRoomSheet extends HTMLElement {
     this._renderMeta();
 
     const sr = this.shadowRoot;
-    sr.querySelector(".scrim").addEventListener("click", () => this.close());
+    // Close on the backdrop only when the whole tap happened there, and never right after opening
+    const scrim = sr.querySelector(".scrim");
+    let downOnScrim = false;
+    scrim.addEventListener("pointerdown", () => { downOnScrim = Date.now() - this._openedAt > 400; });
+    scrim.addEventListener("click", () => {
+      if (downOnScrim && Date.now() - this._openedAt > 400) this.close();
+      downOnScrim = false;
+    });
     sr.querySelector(".close").addEventListener("click", () => this.close());
     const off = sr.querySelector(".alloff");
     if (off) off.addEventListener("click", () => {

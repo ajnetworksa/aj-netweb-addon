@@ -1,5 +1,11 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.0.1
+- Fixed: in the Companion app (and other touch browsers) the room sheet opened and closed immediately.
+  Taps fire on finger-up, and the phone's follow-up synthetic click landed on the new backdrop and closed
+  it. Cards now swallow that ghost click, the backdrop only closes on a full tap that started on it, and
+  stray `popstate` events from WebViews are ignored.
+
 ## 3.0.0 - premium UI kit
 - **New AJ Netweb UI kit** (`ajnetweb-ui/`, bundled as the card suite):
   - Apple Home-style device tiles: tap to toggle, drag across to dim / set shade position / fan speed,

@@ -1,14 +1,16 @@
 {
   "name": "ajnetweb-ui",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "AJ Netweb premium cards + dashboard strategy for Home Assistant",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "preview": "node dev/serve.mjs"
   },
   "devDependencies": {
-    "esbuild": "0.24.2"
+    "esbuild": "0.24.2",
+    "@mdi/js": "7.4.47"
   }
 }

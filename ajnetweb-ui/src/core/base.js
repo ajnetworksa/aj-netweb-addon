@@ -50,6 +50,20 @@ export function entityName(hass, id) {
 }
 
 /**
+ * Touch browsers (Companion app, mobile Safari/Chrome) send a synthetic "click" ~0-300 ms after
+ * the finger lifts, at the same spot. Our taps fire on pointerup, so if the tap opened something
+ * (the room sheet), that late click would land on the new layer and close it again.
+ * Swallow the one click that follows a touch tap.
+ */
+export function swallowGhostClick(pointerType) {
+  if (pointerType === "mouse") return;
+  const kill = (e) => { e.stopPropagation(); e.preventDefault(); cleanup(); };
+  const cleanup = () => { window.removeEventListener("click", kill, true); clearTimeout(timer); };
+  const timer = setTimeout(cleanup, 600);
+  window.addEventListener("click", kill, true);
+}
+
+/**
  * Pointer gestures: tap, long-press (hold) and horizontal drag (0-100 %).
  * Works with mouse, touch and pen; a drag never fires a tap.
  */
@@ -102,7 +116,10 @@ export function bindGestures(el, { onTap, onHold, onDrag, onDragEnd, holdMs = 45
       if (onDragEnd) onDragEnd(pct(e.clientX));
     } else if (!held && !cancelled && onTap) {
       const moved = Math.abs(e.clientX - start.x) > dragThreshold || Math.abs(e.clientY - start.y) > dragThreshold;
-      if (!moved) onTap(e);
+      if (!moved) {
+        swallowGhostClick(e.pointerType);
+        onTap(e);
+      }
     }
     start = null;
     dragging = false;
