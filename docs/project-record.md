@@ -12,12 +12,30 @@ Versions at the time of writing:
 | Product | Version |
 |---|---|
 | Dashboard Suite + UI kit | 3.7.0 |
-| Prayer & Adhan | 1.3.0 |
+| Prayer & Adhan | 1.4.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
+
+---
+
+## Iqamah, Jumu'ah, per-prayer speakers, Quran after Fajr (Prayer & Adhan 1.4.0)
+
+**Asked for:** item 5 of the upgrade list: per-zone adhan, Iqamah reminder, Friday Jumu'ah settings, Quran after Fajr.
+
+**Done:**
+- Per-prayer `speakers` and `iqamah` minutes; `iqamah_lead` phone reminder and optional `iqamah_file`.
+- `jumuah`: adhan at home on/off, own audio, reminder before, Surat Al-Kahf reminder; Dhuhr named Jumu'ah on Fridays.
+- `quran_after_fajr`: file or http(s) stream, delay, volume, speakers; waits for the adhan and dua to finish and
+  uses normal `play_media` (not an announcement).
+- Settings are cleaned on save (media players only, bounded iqamah, http(s) URLs, HH:MM time); tests in
+  `tests/test_adhan_settings.py`.
+
+**Decisions:** no iqamah on Fridays (the khutbah sets the time); Friday follows the add-on's local time zone.
+
+**Open:** show the iqamah time on the dashboard prayer card.
 
 ---
 
