@@ -658,6 +658,52 @@
     renderModes();
   }
 
+  // ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk tablets)
+  const wp = { info: null, timer: null };
+
+  async function renderPanels(base) {
+    const info = await api("api/wall_panels" + (base ? `?base=${encodeURIComponent(base)}` : ""));
+    if (!info.ok) { $("wpQr").innerHTML = `<p class="muted">${esc(info.error || "Could not load.")}</p>`; return; }
+    wp.info = info;
+    if (document.activeElement !== $("wpBase")) $("wpBase").value = info.base_url || "";
+    $("wpViewOff").hidden = info.panel_view !== false;
+    const qr = info.qr || {};
+    const tile = (kind, title) => info.urls[kind] && qr[kind]
+      ? `<div class="qr">${qr[kind]}<b>${title}</b><code>${esc(info.urls[kind])}</code></div>` : "";
+    $("wpQr").innerHTML = (tile("browser", "Browser / Fully Kiosk") || `<p class="muted">Enter the Home Assistant address
+      (starting with http:// or https://) for the browser code.</p>`) + tile("app", "Home Assistant app") +
+      (qr.error ? `<p class="muted">${esc(qr.error)}</p>` : "");
+    const p = info.profile || {};
+    $("wpMotion").checked = !!p.motion;
+    $("wpKeepOn").checked = !!p.keep_on;
+    $("wpDimAfter").value = p.dim_after;
+    $("wpDimBright").value = p.dim_brightness;
+    const tabs = info.tablets || [];
+    $("wpTablets").classList.toggle("muted", !tabs.length);
+    $("wpTablets").innerHTML = tabs.length ? tabs.map((t) => `<div class="tablet-row"><div><b>${esc(t.name)}</b>
+        <small>${esc(t.model)}${t.entities.motion ? "" : " · no motion switch (needs PLUS)"}</small></div>
+        <button class="btn" data-wp="${esc(t.device_id)}">Apply wall panel profile</button></div>`).join("")
+      : "No Fully Kiosk tablets found in Home Assistant yet. Use the codes above, or add the Fully Kiosk Browser integration.";
+    $("wpTablets").querySelectorAll("[data-wp]").forEach((b) => b.addEventListener("click", () => applyPanel(b)));
+  }
+
+  async function applyPanel(btn) {
+    const url = (wp.info && wp.info.urls.browser) || "";
+    if (!url) return toast("Enter the Home Assistant address first");
+    btn.disabled = true;
+    $("wpResult").innerHTML = `<div class="result">Applying…</div>`;
+    const res = await api("api/wall_panels/apply", {
+      device_id: btn.dataset.wp, url,
+      profile: { motion: $("wpMotion").checked, keep_on: $("wpKeepOn").checked,
+        dim_after: Number($("wpDimAfter").value), dim_brightness: Number($("wpDimBright").value) },
+    });
+    btn.disabled = false;
+    const steps = (res.steps || []).map((s) =>
+      `<li>${s.ok ? "✓" : "✕"} ${esc(s.step)}${s.detail ? ` – <span class="muted">${esc(s.detail)}</span>` : ""}</li>`).join("");
+    $("wpResult").innerHTML = `<div class="result ${res.ok ? "ok" : "bad"}"><b>${res.ok ? `${esc(res.tablet)} is set up as a wall panel.` :
+      esc(res.error || "Some steps failed – see below.")}</b>${steps ? `<ul>${steps}</ul>` : ""}</div>`;
+  }
+
   // ------------------------------------------------------------------ tabs & init
   function activateTab(name) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
@@ -665,6 +711,7 @@
     if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
     if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
     if (name === "modes") renderModes();
+    if (name === "panels") renderPanels();
   }
 
   async function init() {
@@ -673,6 +720,10 @@
     $("btnDeployTop").addEventListener("click", deploy);
     $("btnApplyLayout").addEventListener("click", applyLayout);
     $("btnModesApply").addEventListener("click", applyModes);
+    $("wpBase").addEventListener("input", () => {
+      clearTimeout(wp.timer);
+      wp.timer = setTimeout(() => renderPanels($("wpBase").value.trim()), 500);
+    });
     document.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("[data-pv]").forEach((x) => x.classList.toggle("on", x === b));
       state.pv = b.dataset.pv; loadPreview();
