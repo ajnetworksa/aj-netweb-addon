@@ -82,7 +82,9 @@ strategy:
   cameras: [camera.gate, camera.garden]   # which cameras, in this order (omit = all)
   home_cameras: 4                     # how many cameras on Home
   custom_dashboard: ajnetweb-cards    # "My cards" dashboard merged in (Studio creates it)
-  insights: [calendar, energy, temperature]   # cards in the "Today at home" block
+  insights: [calendar, energy, temperature, water]   # cards in the "Today at home" block
+  water: { tanks: [sensor.roof_tank_level], pump: switch.booster_pump, zones: [valve.front_lawn], minutes: 10 }
+                                      # water card; default: found by name; false = never
   calendars: [calendar.family]        # agenda calendars (omit = all)
   energy: true                        # false = no energy card
   energy_power: sensor.house_power    # live power on the energy card (found automatically if omitted)

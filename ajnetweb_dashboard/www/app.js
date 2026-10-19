@@ -387,7 +387,7 @@
     favorites: ["⭐", "Favourites", "Devices you starred in Rooms & Devices"],
     rooms: ["🏠", "Rooms", "Room tiles with floor tabs"],
     climate: ["❄️", "Climate", "AC controls"],
-    insights: ["📊", "Today at home", "Agenda, energy today, room temperatures (24 h graph)"],
+    insights: ["📊", "Today at home", "Agenda, energy today, room temperatures (24 h graph), water"],
     cameras: ["📹", "Cameras", "Large pictures; gate/garage buttons on the picture"],
     custom: ["🧩", "My cards", "Your own cards from the My cards dashboard"],
   };
@@ -397,7 +397,8 @@
   };
   const INSIGHTS = { calendar: ["📅", "Agenda", "Next events from the HA calendars"],
     energy: ["⚡", "Energy", "Used today and the last 7 days (from HA's Energy settings)"],
-    temperature: ["🌡️", "Room temperatures", "Every room's temperature over 24 h"] };
+    temperature: ["🌡️", "Room temperatures", "Every room's temperature over 24 h"],
+    water: ["💧", "Water", "Tank levels, booster pump, garden watering (found by name: tank, pump, irrigation, zone)"] };
   const TOP = { weather: ["🌤️", "Weather forecast"], prayer: ["🕌", "Prayer times"], media: ["🎵", "Music / Right now"] };
 
   // A list that can be reordered by drag and drop (mouse) or ▲▼ (touch), each row with an on/off box.
@@ -488,7 +489,8 @@
     sortable($("lyTop"), topOrder.map((k) => ({ id: k, icon: TOP[k][0], title: TOP[k][1], on: topOn.includes(k) })), (list) => {
       p.top_cards = list.filter((r) => r.on).map((r) => r.id); saveSoon();
     });
-    const insOn = Array.isArray(p.insights) ? p.insights : Object.keys(INSIGHTS);
+    // the old default (before Water existed) still means "all of them"
+    const insOn = Array.isArray(p.insights) && p.insights.join() !== "calendar,energy,temperature" ? p.insights : Object.keys(INSIGHTS);
     const insOrder = [...insOn.filter((k) => INSIGHTS[k]), ...Object.keys(INSIGHTS).filter((k) => !insOn.includes(k))];
     sortable($("lyInsights"), insOrder.map((k) => ({ id: k, icon: INSIGHTS[k][0], title: INSIGHTS[k][1], sub: INSIGHTS[k][2], on: insOn.includes(k) })), (list) => {
       p.insights = list.filter((r) => r.on).map((r) => r.id); saveSoon();

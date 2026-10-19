@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.11.0 |
+| Dashboard Suite + UI kit | 3.12.0 |
 | Prayer & Adhan | 1.2.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
@@ -20,6 +20,26 @@ Versions at the time of writing:
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
 ---
+
+## Water card (Dashboard Suite 3.12.0)
+
+**Asked for:** item 11 of the upgrade list: water tank and irrigation card (the watchdog blueprint already
+existed, the dashboard showed nothing).
+
+**Done:**
+- `cards/water.js`: tanks (level gauge, litres when a capacity is set), booster pump, watering zones with last
+  watered and Run / Stop; `waterEntities()` finds them by name. New `water` insight (default on) and strategy
+  option `water`.
+- `ajnetweb_dashboard/water.py`: the timed watering script (open, wait, close; parallel, 1-120 min), created
+  by Deploy when zones exist. Tests in `tests/test_water.py`; preview mocks (`?water=0` hides them).
+
+**Decisions:**
+- *Timer inside HA, not in the browser:* a closed tablet or phone must never leave a valve open.
+- *Found by name*, like the AC share: HA has no device class for tank level or irrigation.
+- *Main shut-off, leak and gas valves are never zones.*
+- *The old insights default still means "all"*, so existing projects get the new card when it applies.
+
+**Open:** schedules (watering days and times) are left to HA automations or the irrigation controller's app.
 
 ## Studio: photo framing, save as scene, finger drag (Dashboard Suite 3.11.0)
 

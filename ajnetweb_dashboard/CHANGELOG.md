@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.12.0 - Water card
+- **Water card in *Today at home*:** tank levels (red when low), the booster pump, and each garden watering
+  zone with when it last watered and a **Run 10 min** button. Found by name (tank, pump, irrigation, zone,
+  sprinkler, drip, and the Arabic words); Arabic and English.
+- **Deploy creates `script.ajnetweb_water_run`** when the house has watering zones. The card's Run button uses
+  it, so the valve closes again on time inside Home Assistant even with no dashboard open.
+- Studio → Layout → *Today at home* has a **Water** entry. Projects saved with the old default
+  (agenda, energy, temperatures) get the water card automatically when the house has tanks or zones.
+
 ## 3.11.0 - Studio: photo framing, save as scene, finger drag
 - **Room photos: frame before upload.** After picking a photo, drag it and zoom to choose what shows; it is
   cropped to 4:3 and sent at up to 1600 px wide.
