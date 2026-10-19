@@ -8,7 +8,7 @@ Goal: clients install AJ Netweb Remote Access from the add-on store as usual, bu
 | Piece | Where | What it does |
 |---|---|---|
 | Compile option | `ajnetweb_tunnel/Dockerfile`, build arg `AJN_COMPILE=true` | Compiles `agent.py`, `features.py` and `attest.py` with **Nuitka 4.2.2** into native `.so` modules. Docstrings and asserts are stripped; no `.py` files go into the image. |
-| Release workflow | `.github/workflows/remote-access-image.yml` | Builds compiled images for amd64 and aarch64, pushes them to `ghcr.io/ajnetworksa/{arch}-addon-ajnetweb_tunnel:<version>`, and fails if any `.py` is left in the agent folder |
+| Release workflow | `.github/workflows/addon-images.yml` (shared by every add-on, see [releasing.md](releasing.md)) | Builds compiled images for amd64 and aarch64, pushes them to `ghcr.io/ajnetworksa/{arch}-addon-ajnetweb_tunnel:<version>`, and fails if any `.py` is left in the agent folder |
 | Default local build | `AJN_COMPILE` unset | Plain Python as before, so Supervisor builds on a Pi stay quick while you test |
 
 I checked that the three modules compile with Nuitka 4.2.2, and that the compiled `attest` module produces a
@@ -22,8 +22,9 @@ want, the next step is to move its logic into the compiled agent.
 
 ## Steps to go closed-source
 
-1. **Build the images.** GitHub → Actions → *Remote Access image* → *Run workflow*, or push a tag
-   `remote-access-v1.3.0`. Wait for both architectures to finish.
+1. **Build the images.** GitHub → Actions → *Add-on images* → *Run workflow* with `ajnetweb_tunnel`
+   (it also runs by itself whenever the version in `config.json` changes on `main` or `beta`). Wait for both
+   architectures to finish.
 2. **Make the images downloadable.** GitHub → your profile/organisation → Packages →
    `amd64-addon-ajnetweb_tunnel` → Package settings → Change visibility → **Public**. Do the same for aarch64.
    - The images contain compiled code only.
