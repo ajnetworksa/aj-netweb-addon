@@ -34,9 +34,22 @@ Audio files live in `/config/www/ajnetweb_adhan/` and are served by Home Assista
 | `input_boolean.aj_netweb_adhan_mute_next` | Skip only the next adhan (turns itself off) |
 | `input_button.aj_netweb_adhan_play_now` | Play the adhan now |
 | `input_button.aj_netweb_adhan_stop` | Stop playback |
+| `input_boolean.aj_netweb_precool` | AC pre-cooling on/off |
 
 Event `ajnetweb_adhan_played` (`prayer`, `manual`, `speakers`) fires after each adhan — use it for
 automations such as dimming lights or closing curtains at Maghrib.
+
+## AC pre-cooling
+
+**AC pre-cooling** tab → *Add pre-cooling*: choose the prayers, how many minutes before, the ACs and the
+temperature. Example: *Majlis before Maghrib*, 30 minutes, majlis AC, cool 22°, only in Ramadan.
+
+- **Seasons:** tick the summer months once. In the other months a rule uses its winter temperature, or does
+  nothing if that is blank.
+- **The family stays in charge:** an AC already set cooler than the rule, or running as fan or dry, is not
+  touched. Pre-cooling only starts the AC; it never switches one off.
+- Works even when the adhan itself is switched off. `input_boolean.aj_netweb_precool` turns all of it off.
+- Every run (and every skip, with the reason) is listed in **History**.
 
 ## Dashboard
 
