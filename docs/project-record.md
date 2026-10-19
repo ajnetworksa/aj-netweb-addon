@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.13.0 |
+| Dashboard Suite + UI kit | 3.14.0 |
 | Prayer & Adhan | 1.2.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
@@ -21,7 +21,7 @@ Versions at the time of writing:
 
 ---
 
-## Alarm pack (Dashboard Suite 3.13.0) and voice through Alexa (Alexa bridge 1.2.0)
+## Alarm pack (Dashboard Suite 3.14.0) and voice through Alexa (Alexa bridge 1.2.0)
 
 **Asked for:** items 8 and 12 of the upgrade list: an alarm pack with Alexa arming, and voice control through
 Alexa instead of a local Arabic voice assistant.

@@ -1,6 +1,6 @@
 # Changelog - AJ Netweb Dashboard Suite
 
-## 3.13.0 - Alarm pack
+## 3.14.0 - Alarm pack
 - **Studio → Alarm tab.** Uses the alarm panel the villa already has in Home Assistant, or makes our own when
   there is none: Home Assistant's built-in manual alarm with exit and entry delay and an optional disarm code
   (written to `packages/ajnetweb_alarm.yaml`; HA must load packages and be restarted once).
