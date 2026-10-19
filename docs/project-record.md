@@ -17,7 +17,7 @@ Versions at the time of writing:
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
-| Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+| Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
 
 ---
 
