@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 import house_modes
 import scenes
+import water
 import wall_panels
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
@@ -32,7 +33,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.11.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.12.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -69,7 +70,7 @@ DEFAULT_PROJECT = {
     "notifications": True,     # bell with the notification list in the header
     "layout": {},              # {"home": {"order": [...], "hidden": [...]}, "panel": {...}}  (Studio "Layout" tab)
     "top_cards": ["weather", "prayer", "media"],
-    "insights": ["calendar", "energy", "temperature"],   # "Today at home" band
+    "insights": ["calendar", "energy", "temperature", "water"],   # "Today at home" band
     "energy_tariff": "auto",   # bill estimate on the energy card: auto (SEC in Saudi Arabia) | sec | dewa | none
     "room_order": [],
     "room_style": "tile",
@@ -86,7 +87,8 @@ DEFAULT_PROJECT = {
 
 
 LAYOUT_BANDS = ("top", "modes", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
-INSIGHTS = ("calendar", "energy", "temperature")
+INSIGHTS = ("calendar", "energy", "temperature", "water")
+LEGACY_INSIGHTS = ["calendar", "energy", "temperature"]   # the default before 3.12.0: still means "all"
 TARIFFS = ("sec", "dewa", "none")
 
 
@@ -262,7 +264,8 @@ class DashboardEngine:
             "top_cards": project.get("top_cards") if isinstance(project.get("top_cards"), list)
                          and project.get("top_cards") != ["weather", "prayer", "media"] else None,
             "insights": [k for k in project["insights"] if k in INSIGHTS]
-                        if isinstance(project.get("insights"), list) and project.get("insights") != list(INSIGHTS) else None,
+                        if isinstance(project.get("insights"), list)
+                        and project.get("insights") not in (list(INSIGHTS), LEGACY_INSIGHTS) else None,
             "energy_tariff": project.get("energy_tariff") if project.get("energy_tariff") in TARIFFS else None,
             "room_order": [a for a in (project.get("room_order") or []) if isinstance(a, str)] or None,
             "room_style": "photo" if project.get("room_style") == "photo" else None,
@@ -456,6 +459,9 @@ class DashboardEngine:
                 s.call("lovelace/config/save", url_path=url_path, config=config)
                 steps.append({"step": "Dashboard saved", "ok": True,
                               "detail": "live layout (AJ Netweb UI strategy) - updates itself when devices change"})
+            step = water.ensure_script(self.client)
+            if step:
+                steps.append(step)
         except Exception as e:
             log.error("Deploy failed: %s", e)
             return {"ok": False, "error": str(e), "steps": steps}

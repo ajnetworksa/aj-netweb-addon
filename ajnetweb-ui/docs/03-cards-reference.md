@@ -289,6 +289,29 @@ The last 48 hours from HA's logbook, newest first and grouped by day; new entrie
 looked are marked. The strategy puts it behind a bell in the header (with a count of new entries) and fills
 the lists itself: doors, gates and garages but not windows.
 
+### `custom:ajnetweb-water-card` — tanks, pump and garden watering
+
+Part of *Today at home* (`water` insight) when tank sensors or watering zones are found by name: level
+sensors in % whose name has *tank* / *خزان*, a switch with *pump* / *مضخة*, and valves or switches with
+*irrigation*, *sprinkler*, *drip*, *garden*, *lawn*, *zone* / *ري*, *رشاش*, *تنقيط*, *حديقة* (never main
+shut-off, leak or gas valves). Tanks below `low` % turn red. **Run 10 min** calls
+`script.ajnetweb_water_run`, which Studio **Deploy** creates when the house has watering zones; it closes the
+valve again inside HA, so watering stops on time even with no dashboard open. Without the script the button
+is a plain Start / Stop.
+
+```yaml
+type: custom:ajnetweb-water-card
+tanks:
+  - sensor.roof_tank_level
+  - { entity: sensor.ground_tank_level, name: Ground tank, capacity: 5000 }   # litres -> "≈ 3,200 L"
+pump: switch.booster_pump
+zones: [valve.front_lawn, switch.drip_line_palms]
+minutes: 10          # Run length (1-120)
+low: 20              # red below this %
+```
+Pair it with the *Water Tank & Booster Pump Watchdog* blueprint (Studio → Blueprints) for low-level alerts and
+pump dry-run cut-off.
+
 ### `custom:ajnetweb-modes-card` — house modes
 
 ```yaml

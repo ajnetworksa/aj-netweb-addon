@@ -37,6 +37,21 @@ data.states["sensor.house_power"] = { entity_id: "sensor.house_power", state: "3
 // house modes helper (the Dashboard Suite creates it with Studio → House modes); ?modes=0 hides it
 if (q("modes", "1") !== "0") data.states["input_select.ajnetweb_house_mode"] = { entity_id: "input_select.ajnetweb_house_mode", state: "home",
   attributes: { friendly_name: "House mode", options: ["home", "away", "night", "guests"], icon: "mdi:home-switch" } };
+// water: tanks, booster pump, watering zones and the Studio's watering timer script; ?water=0 hides them
+if (q("water", "1") !== "0") {
+  const ago = (h) => new Date(Date.now() - h * 3600000).toISOString();
+  const add = (id, state, attributes, area, h = 1) => {
+    data.states[id] = { entity_id: id, state, last_changed: ago(h), attributes };
+    if (area) data.entities[id] = { entity_id: id, area_id: area, entity_category: null, labels: [] };
+  };
+  add("sensor.roof_tank_level", "64", { friendly_name: "Roof tank", unit_of_measurement: "%" }, "entrance");
+  add("sensor.ground_tank_level", "17", { friendly_name: "Ground tank", unit_of_measurement: "%" }, "entrance");
+  add("switch.booster_pump", "on", { friendly_name: "Booster pump" }, "entrance");
+  add("valve.front_lawn", "closed", { friendly_name: "Front lawn", device_class: "water" }, "entrance", 5);
+  add("switch.drip_line_palms", "on", { friendly_name: "Drip line palms" }, "entrance", 0.2);
+  add("valve.backyard_sprinklers", "closed", { friendly_name: "Backyard sprinklers", device_class: "water" }, "entrance", 30);
+  add("script.ajnetweb_water_run", "off", { friendly_name: "AJ Netweb - Water a zone" });
+}
 data.states["calendar.family"] = { entity_id: "calendar.family", state: "off", last_changed: "x", attributes: { friendly_name: "Family" } };
 data.states["calendar.school"] = { entity_id: "calendar.school", state: "off", last_changed: "x", attributes: { friendly_name: "School" } };
 const day0 = new Date(); day0.setHours(0, 0, 0, 0);
@@ -134,12 +149,17 @@ const hass = {
       document.querySelectorAll("*").forEach((el) => { if (el.setConfig && el._hass) el.hass = { ...hass }; });
       return;
     }
+    // watering timer script: open the zone the card asked for
+    if (domain === "script" && d.variables && d.variables.zone) d = { entity_id: d.variables.zone };
+    if (domain === "script" && d.entity_id) service = String(d.entity_id).startsWith("valve.") ? "open_valve" : "turn_on";
     [].concat(d.entity_id || []).forEach((id) => {
       const st = hass.states[id];
       if (!st) return;
       const ns = { ...st, attributes: { ...st.attributes } };
       if (service === "toggle") ns.state = st.state === "on" ? "off" : "on";
       if (service === "turn_on") ns.state = "on";
+      if (service === "open_valve") ns.state = "open";
+      if (service === "close_valve") ns.state = "closed";
       if (service === "turn_off") ns.state = "off";
       if (service === "select_option") ns.state = d.option;
       if (d.brightness_pct != null) { ns.state = "on"; ns.attributes.brightness = Math.round(d.brightness_pct * 2.55); }
