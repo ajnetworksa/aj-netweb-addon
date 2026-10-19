@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.11.0 - Studio: photo framing, save as scene, finger drag
+- **Room photos: frame before upload.** After picking a photo, drag it and zoom to choose what shows; it is
+  cropped to 4:3 and sent at up to 1600 px wide.
+- **Save as scene** (🎬 next to each room in Layout → Rooms): lists the room's lights, curtains, ACs, fans and
+  speakers with what each is doing now; name it, untick what shouldn't be in it, save. It becomes a normal HA
+  scene in `scenes.yaml`, put in that room, so it shows on the room page straight away.
+- **Reorder by finger on tablets and phones:** drag a row by its ⋮⋮ grip (before, only a mouse could drag;
+  ▲▼ still work).
+
 ## 3.10.0 - Wall panel setup
 - **Studio → Wall panels tab.** Two QR codes for the Wall Panel page: one for a browser or Fully Kiosk Browser
   (HA's address is filled in from its network settings and can be changed), one for the Home Assistant app.

@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.10.0 |
+| Dashboard Suite + UI kit | 3.11.0 |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
@@ -20,6 +20,27 @@ Versions at the time of writing:
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
 
 ---
+
+## Studio: photo framing, save as scene, finger drag (Dashboard Suite 3.11.0)
+
+**Asked for:** item 10 of the upgrade list: Studio upgrades (photo upload and crop, scene capture, drag to
+reorder rooms).
+
+**Done:**
+- Photo upload and mouse drag already existed. Added a crop dialog (4:3, drag + zoom, 400-1600 px JPEG) and
+  pointer-event drag on the ⋮⋮ grip for touch screens in every sortable list.
+- `ajnetweb_dashboard/scenes.py`: what a scene stores per domain (light brightness and colour, cover position,
+  climate mode and setpoint, fan speed, speaker volume), save through `/api/config/scene/config/<id>` (the
+  scene editor's API), then put the new entity in the room's area. Endpoints `GET /api/room/now?area=` and
+  `POST /api/room/scene`. Tests in `tests/test_scenes.py`.
+
+**Decisions:**
+- *Real HA scenes in scenes.yaml*, not our own store: they work from automations, Alexa and HA's scene editor.
+- *Scene ids `ajnetweb_<area>_<name>`*: saving the same name in the same room again updates it.
+- *Speakers and switches are unticked by default*; unavailable devices can't be ticked.
+- *Gates and garage doors are never offered* (they are in the access group, not covers).
+
+**Open:** nothing.
 
 ## Wall panel setup (Dashboard Suite 3.10.0)
 

@@ -57,6 +57,9 @@ The dashboard is built **from Areas**. Good areas = good dashboard.
    in the name, so they appear with lights. Real sockets: set *Show as → Outlet*.
 6. Create **scenes** for the moments the client cares about (Welcome, Cinema, Goodnight, Guests…)
    and assign each scene to an area — room scenes show in that room, house scenes on Home.
+   Quickest way for a room scene: set the room the way the client likes it, then Studio → **Layout** →
+   Rooms → 🎬 next to the room, name it, untick what shouldn't be in it, **Save scene**. It is a normal HA
+   scene (in `scenes.yaml`), already in that room.
 
 ## Step 3b — Music and prayer times (GCC standard)
 
@@ -72,7 +75,8 @@ The dashboard is built **from Areas**. Good areas = good dashboard.
 
 1. Take a **landscape** photo of each main room in good light (no people, lights on, curtains open).
 2. Crop to roughly **16:10**, ~1200 px wide, under 300 KB (any phone editor or squoosh.app).
-3. Studio → **Layout** → Rooms → 📷 next to the room → pick the photo (it is resized for you).
+3. Studio → **Layout** → Rooms → 📷 next to the room → pick the photo, drag and zoom to frame it, **Use photo**
+   (it is cropped to 4:3 and resized for you).
    Or: Settings → Areas → open the area → ✏️ → **Picture** → upload.
 
 Rooms without a photo get a soft gradient matched to the room type — fine for corridors, stores, etc.
