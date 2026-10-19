@@ -163,7 +163,16 @@ search: true                          # search box (Music Assistant players only
 favorites: true                       # favourite playlists / radio / albums (Music Assistant)
 music_assistant_entry: 01J...         # optional: config entry id (needed for non-admin users;
                                       # the Studio fills it in automatically)
+grouping: true                        # "Also play in": link speakers / amp zones (default on)
 ```
+**Play in more rooms:** under the speaker chips, *Also play in* lists the other speakers that can be
+grouped. Tap one to link it (🔗), tap again to unlink; **Everywhere** links all, **Ungroup** splits the
+group. The same music then plays in sync in every linked room, and play/pause/next act on the whole group
+(`media_player.join` / `unjoin`; the first speaker leads). Works with every player that supports grouping:
+Music Assistant players (AirPlay, Chromecast, Sonos, Snapcast, DLNA, squeezelite amps…), Sonos, and others.
+Music Assistant syncs players of the **same type** together; to mix types (e.g. an AirPlay amp with a Cast
+speaker), create a *Sync group* / *Universal group* player once in Music Assistant — it then shows up as
+one more speaker. Multi-zone amplifiers appear as one player per zone, so each zone can be linked.
 Full variant: artwork, title/artist, live progress, shuffle / previous / play-pause / next / repeat,
 drag-to-set volume and mute, room chips to switch speakers, **Move music here** (Music Assistant
 `transfer_queue`), search across every provider you added to Music Assistant (YouTube Music,
@@ -217,6 +226,48 @@ days: 5                  # forecast days (default 5)
 Current temperature and condition, today's high/low, and one row per day with a temperature-range bar
 (blue → yellow → orange, scaled to the week). Uses the `weather.get_forecasts` action, refreshed every
 30 minutes. Tap opens HA's weather details.
+
+### `custom:ajnetweb-graph-card` — temperature graph (one room or all rooms)
+
+```yaml
+type: custom:ajnetweb-graph-card
+entity: sensor.majlis_temperature      # one line with a soft fill, min / max and the live value
+# or several lines with a legend:
+entities:
+  - entity: sensor.majlis_temperature
+    name: Majlis
+  - sensor.master_bedroom_temperature
+hours: 24                # history window (default 24)
+title: Temperature       # optional
+compact: false           # true = small chart without axis (used in the room sheet)
+```
+Works for any number sensor (humidity, CO₂, power). History from `history/history_during_period`,
+reloaded every 10 minutes; the last point follows the live state. Drag across the chart to read past
+values. The generated dashboard puts one per room on the Climate page, the room page and the room sheet,
+and all rooms together in *Today at home*.
+
+### `custom:ajnetweb-calendar-card` — agenda
+
+```yaml
+type: custom:ajnetweb-calendar-card
+entities: [calendar.family, calendar.school]
+days: 7                  # look ahead (default 7)
+max: 6                   # events shown (default 6)
+```
+Next events grouped by day (Today / Tomorrow / weekday), a colour per calendar, running events
+highlighted. Any HA calendar works (Google, CalDAV, Local calendar). Tap opens the calendar.
+
+### `custom:ajnetweb-energy-card` — energy today
+
+```yaml
+type: custom:ajnetweb-energy-card
+power: sensor.house_power        # optional: live power (W / kW)
+days: 7
+entities: [sensor.main_meter]    # only if HA's Energy dashboard is NOT set up: meters to add up
+```
+Reads HA's Energy settings (grid import/export, solar, cost) and the daily totals from long-term
+statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
+and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
 
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 

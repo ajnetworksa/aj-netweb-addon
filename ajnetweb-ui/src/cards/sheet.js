@@ -181,6 +181,7 @@ class AjnetwebRoomSheet extends HTMLElement {
             const nm = (st && st.attributes.friendly_name) || id;
             return `<button class="chip" data-scene="${esc(id)}"><ha-icon icon="${esc((st && st.attributes.icon) || (id.startsWith("script.") ? "mdi:script-text-play" : "mdi:palette"))}"></ha-icon>${esc(shorten(nm, r.name))}</button>`;
           }).join("")}</div></div>` : ""}
+          ${r.temperature ? `<div class="sec graph"></div>` : ""}
           ${groups.map((g) => `<div class="sec"><h3><ha-icon icon="${g.icon}"></ha-icon>${esc(this._t(g.label))}</h3>
             <div class="grid ${g.layout}" data-group="${g.key}"></div></div>`).join("")}
           ${!groups.length && !scenes.length ? `<div class="empty">${esc(this._t("nothing_here"))}</div>` : ""}
@@ -188,6 +189,14 @@ class AjnetwebRoomSheet extends HTMLElement {
       </div>`;
 
     this._cards = [];
+    const gHost = this.shadowRoot.querySelector(".sec.graph");
+    if (gHost) {   // the room's temperature over the last 24 h
+      const el = document.createElement("ajnetweb-graph-card");
+      el.setConfig({ entity: r.temperature, title: this._t("temperature"), compact: true, hours: 24, ...(r.language ? { language: r.language } : {}) });
+      el.hass = this._hass;
+      gHost.appendChild(el);
+      this._cards.push(el);
+    }
     groups.forEach((g) => {
       const host = this.shadowRoot.querySelector(`[data-group="${g.key}"]`);
       g.ids.forEach((id) => {

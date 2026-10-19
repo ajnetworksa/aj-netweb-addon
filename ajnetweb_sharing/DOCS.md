@@ -23,7 +23,10 @@ Home Assistant lacks a granular native Role-Based Access Control (RBAC) system f
 ### 2. Visual User Room Permission Matrix (For Companion App Users)
 - Visual grid of all registered Home Assistant users (family members, kids, maids) vs Home Assistant Areas.
 - Check / uncheck room boxes on the screen with your mouse or finger.
-- **⚡ 1-Click Sync to HA Dashboards**: Automatically updates Lovelace view visibility rules using Home Assistant's internal API. Zero manual YAML editing!
+- **Device room** (wall tablets / room panels): give the tablet its own HA user and pick the room it belongs to. It opens on that room and controls only the ticked rooms.
+- **Live on the AJ Netweb dashboard**: after *Save* the add-on publishes `sensor.ajnetweb_room_access` and each restricted user's dashboard is built with only their rooms. Users with no ticks, and admins, see the whole home.
+- **⚡ 1-Click Sync to HA Dashboards**: also applies the rules to hand-made dashboards (view visibility).
+- Note: Home Assistant has no per-device permissions for logged-in users, so this controls what each person *sees and can tap*. Where it must be enforced by the server (rented rooms, staff quarters), use a permanent **room pass** on that tablet.
 
 ### 3. Scoped Security Engine & Audit Log
 - Cryptographically signed bearer tokens strictly isolate commands.

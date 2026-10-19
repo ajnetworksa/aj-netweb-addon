@@ -1,5 +1,38 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.4.0 - edit the dashboard without YAML
+- **New Studio tab: Layout**, with a live preview (phone or tablet width) and an **Apply** button.
+  - Drag the Home and Wall Panel blocks into any order, or untick one to hide it.
+  - Pick the top-row cards (weather, prayer, music).
+  - Rooms: drag the order, ✏️ rename, 📷 upload a photo (resized in the browser, saved to
+    `/config/www/ajnetweb/rooms/` and set as the HA area picture), tiles or photo cards.
+  - Cameras: which ones, in what order, how many on Home.
+- **My cards**: one click creates a normal HA dashboard (`ajnetweb-cards`) edited with HA's visual editor.
+  - Its first page is merged into Home and the Wall Panel as the *My cards* block.
+  - Its other pages become extra pages in the bottom bar.
+  - Admins get **Edit my cards** in the ⋯ menu.
+- Room tiles show the room photo when the area has one.
+- **Temperature graphs per room** (`custom:ajnetweb-graph-card`): 24 h history with min/max and the live value;
+  drag across to read past values.
+  - Climate page: all rooms in one graph on top, then one graph per room.
+  - Room pages and the room sheet show that room's graph.
+- **New "Today at home" block** on Home and the Wall Panel (movable in Layout):
+  - **Agenda** (`custom:ajnetweb-calendar-card`): next events from HA calendars, by day.
+  - **Energy** (`custom:ajnetweb-energy-card`): used today vs yesterday, 7-day bars, solar, export, cost and
+    live power, read from HA's Energy settings.
+  - **Room temperatures**: every room in one graph.
+  - Each card only shows when there is data for it; pick them in Studio → Layout.
+- **Music: play in more rooms.** *Also play in* links speakers and amp zones so the same music plays
+  everywhere in sync (*Everywhere*, *Ungroup*; `media_player.join`).
+- **Room-scoped users and room tablets:** with Room & Guest Pass Studio 1.3.0 (or the `room_access`
+  option) a non-admin user's dashboard holds only their rooms; a room tablet opens on its own room.
+- Installer page: **Devices without a room** (new devices, e.g. just added in Tuya, that still need a room).
+- Blocks added in a new version now appear next to their default neighbour in saved layouts.
+- New strategy options: `layout`, `top_cards`, `room_order`, `cameras`, `home_cameras`, `custom_dashboard`,
+  `insights`, `calendars`, `energy`, `energy_power`, `room_access`; music card `grouping`.
+- `AGENTS.md` / `CLAUDE.md` and `docs/ai-guide.md`: rules for AI assistants changing the code or a
+  client's dashboard.
+
 ## 3.3.1 - AC pre-cooling
 - **New blueprint: AC Pre-Cooling on Arrival** (`ac_precool_on_arrival.yaml`). When someone enters an approach
   zone around the house (e.g. a 5 km "Near home" zone) on the way home, the chosen AC units start cooling.

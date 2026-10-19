@@ -1,7 +1,7 @@
 // Stand-ins for HA's <ha-icon> and <ha-card> so cards render outside Home Assistant (preview only).
 import * as mdi from "@mdi/js";
 
-const camel = (n) => "mdi" + n.replace("mdi:", "").split("-").map((p) => p[0].toUpperCase() + p.slice(1)).join("");
+const camel = (n) => "mdi" + n.replace("mdi:", "").split("-").map((p) => (p ? p[0].toUpperCase() + p.slice(1) : "")).join("");
 customElements.define("ha-icon", class extends HTMLElement {
   static get observedAttributes() { return ["icon"]; }
   connectedCallback() { this.r(); }

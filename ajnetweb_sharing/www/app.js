@@ -560,7 +560,7 @@
       const areas = data.areas || state.areas;
 
       // Render Table Header
-      let headerHtml = `<th class="user-col">User / Person</th>`;
+      let headerHtml = `<th class="user-col">User / Person</th><th title="For a wall tablet or room panel: the room this device belongs to. It opens on that room and controls only the ticked rooms.">Device room</th>`;
       areas.forEach((a) => {
         headerHtml += `<th>${a.name}</th>`;
       });
@@ -568,7 +568,7 @@
 
       // Render Table Rows
       if (!state.matrix.length) {
-        el.matrixBody.innerHTML = `<tr><td colspan="${areas.length + 1}" class="loading-td">No Home Assistant users found.</td></tr>`;
+        el.matrixBody.innerHTML = `<tr><td colspan="${areas.length + 2}" class="loading-td">No Home Assistant users found.</td></tr>`;
         return;
       }
 
@@ -580,6 +580,10 @@
               <div>${u.name} ${u.is_admin ? '<span class="badge" style="background:#1e293b; color:#94a3b8; font-size:0.68rem;">Admin</span>' : ""}</div>
               <small style="color:var(--text-muted);">@${u.username || "user"}</small>
             </td>
+            <td>${u.is_admin ? '<small style="color:var(--text-muted);">Whole home</small>' : `<select class="home-select" data-user="${u.user_id}">
+              <option value="">— not a room device —</option>
+              ${areas.map((a) => `<option value="${a.id}" ${u.home_area === a.id ? "selected" : ""}>${a.name}</option>`).join("")}
+            </select>`}</td>
         `;
 
           areas.forEach((a) => {
@@ -595,6 +599,10 @@
           return row;
         })
         .join("");
+      el.matrixBody.querySelectorAll("select.home-select").forEach((sel) => sel.addEventListener("change", () => {
+        const cb = el.matrixBody.querySelector(`input.cell-checkbox[data-user="${sel.dataset.user}"][data-area="${sel.value}"]`);
+        if (cb) cb.checked = true;
+      }));
     } catch (e) {
       console.error("Failed to load user matrix:", e);
     }
@@ -604,12 +612,15 @@
   if (el.btnSaveMatrix) {
     el.btnSaveMatrix.addEventListener("click", async () => {
       const matrixMap = {};
+      const homes = {};
       el.matrixBody.querySelectorAll("tr[data-user-id]").forEach((row) => {
         const uId = row.dataset.userId;
         const checkedAreas = Array.from(row.querySelectorAll("input.cell-checkbox:checked")).map(
           (cb) => cb.dataset.area
         );
         matrixMap[uId] = checkedAreas;
+        const sel = row.querySelector("select.home-select");
+        if (sel) homes[uId] = sel.value;
       });
 
       el.matrixFeedback.innerHTML = '<span style="color:var(--accent);">Saving matrix permissions...</span>';
@@ -617,7 +628,7 @@
         const res = await safeFetchJson("api/matrix/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ matrix: matrixMap }),
+          body: JSON.stringify({ matrix: matrixMap, homes }),
         });
         const d = res.data || {};
         if (res.ok && d.ok) {

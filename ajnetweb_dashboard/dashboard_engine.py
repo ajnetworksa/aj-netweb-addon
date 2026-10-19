@@ -29,7 +29,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.3.1")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.4.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -63,10 +63,36 @@ DEFAULT_PROJECT = {
     "palette": "",
     "wallpaper": False,
     "menu": True,
+    "layout": {},              # {"home": {"order": [...], "hidden": [...]}, "panel": {...}}  (Studio "Layout" tab)
+    "top_cards": ["weather", "prayer", "media"],
+    "insights": ["calendar", "energy", "temperature"],   # "Today at home" band
+    "room_order": [],
+    "room_style": "tile",
+    "cameras": [],             # chosen cameras in order (empty = all)
+    "home_cameras": 4,
+    "custom_dashboard": "",    # "My cards" dashboard url_path once created
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
                        "settings": "admins", "studio": "admins", "exit_kiosk": "admins"}},
 }
+
+
+LAYOUT_BANDS = ("top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
+INSIGHTS = ("calendar", "energy", "temperature")
+
+
+def _clean_layout(layout) -> Optional[Dict[str, Any]]:
+    """Keep only known band ids; drop empty parts so the strategy uses its defaults."""
+    if not isinstance(layout, dict):
+        return None
+    out = {}
+    for page in ("home", "panel"):
+        conf = layout.get(page) if isinstance(layout.get(page), dict) else {}
+        order = [b for b in (conf.get("order") or []) if b in LAYOUT_BANDS]
+        hidden = [b for b in (conf.get("hidden") or []) if b in LAYOUT_BANDS]
+        if order or hidden:
+            out[page] = {k: v for k, v in (("order", order), ("hidden", hidden)) if v}
+    return out or None
 
 
 KIOSK_MENU_ITEMS = ("pages", "appearance", "profile", "reload", "settings", "studio", "exit_kiosk")
@@ -145,7 +171,7 @@ class DashboardEngine:
         project = _merge(self.load_project(), changes or {})
         project["url_path"] = normalize_url_path(project.get("url_path"))
         # lists are replaced, not merged
-        for key in ("excluded_entities", "favorites"):
+        for key in ("excluded_entities", "favorites", "room_order", "cameras", "top_cards", "insights"):
             if key in (changes or {}):
                 project[key] = list(dict.fromkeys(changes[key] or []))
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -219,6 +245,17 @@ class DashboardEngine:
             "palette": project.get("palette") or None,
             "wallpaper": True if project.get("wallpaper") else None,
             "menu": False if project.get("menu") is False else None,
+            "layout": _clean_layout(project.get("layout")),
+            "top_cards": project.get("top_cards") if isinstance(project.get("top_cards"), list)
+                         and project.get("top_cards") != ["weather", "prayer", "media"] else None,
+            "insights": [k for k in project["insights"] if k in INSIGHTS]
+                        if isinstance(project.get("insights"), list) and project.get("insights") != list(INSIGHTS) else None,
+            "room_order": [a for a in (project.get("room_order") or []) if isinstance(a, str)] or None,
+            "room_style": "photo" if project.get("room_style") == "photo" else None,
+            "cameras": [c for c in (project.get("cameras") or []) if isinstance(c, str) and c.startswith("camera.")] or None,
+            "home_cameras": int(project["home_cameras"]) if str(project.get("home_cameras", "")).isdigit()
+                            and int(project["home_cameras"]) != 4 else None,
+            "custom_dashboard": project.get("custom_dashboard") or None,
             "kiosk": _kiosk_options(project.get("kiosk")),
             "studio_path": ctx.get("studio_path") or None,
             "panel_live_cameras": project.get("panel_live_cameras", True),
@@ -227,7 +264,9 @@ class DashboardEngine:
             "branding": project.get("branding") or {},
             "admins": ctx.get("admin_user_ids") or [],
         }
-        options = {k: v for k, v in options.items() if v not in (None, [], {}, "")}
+        # an empty top row / "Today at home" choice is a choice (show none), not "use the default"
+        options = {k: v for k, v in options.items()
+                   if v not in (None, [], {}, "") or (k in ("top_cards", "insights") and v == [])}
         return {"strategy": options}
 
     # ------------------------------------------------------------------ health
@@ -403,6 +442,74 @@ class DashboardEngine:
         return {"ok": True, "url_path": url_path, "title": project["title"], "theme": project["theme"],
                 "views": views,
                 "steps": steps}
+
+    # ------------------------------------------------------------------ rooms: rename / photo (no HA settings needed)
+    def room_update(self, area_id: str, name: str = None, photo: str = None) -> Dict[str, Any]:
+        if not re.fullmatch(r"[a-z0-9_]{1,64}", area_id or ""):
+            return {"ok": False, "error": "invalid room"}
+        fields = {}
+        if name is not None:
+            name = str(name).strip()
+            if not 1 <= len(name) <= 60:
+                return {"ok": False, "error": "Room name must be 1-60 characters"}
+            fields["name"] = name
+        if photo:
+            import base64
+            try:
+                data = base64.b64decode(photo.split(",", 1)[-1], validate=False)
+            except ValueError:
+                return {"ok": False, "error": "invalid image"}
+            if len(data) > 8 * 1024 * 1024 or not data.startswith(b"\xff\xd8"):
+                return {"ok": False, "error": "Photo must be a JPEG under 8 MB"}
+            folder = os.path.join(self.config_dir, "www", "ajnetweb", "rooms")
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, f"{area_id}.jpg"), "wb") as f:
+                f.write(data)
+            fields["picture"] = f"/local/ajnetweb/rooms/{area_id}.jpg?v={int(time.time())}"
+        if not fields:
+            return {"ok": False, "error": "nothing to change"}
+        try:
+            with self.client.session() as s:
+                s.call("config/area_registry/update", area_id=area_id, **fields)
+        except Exception as e:
+            log.error("Room update failed: %s", e)
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, **fields}
+
+    # ------------------------------------------------------------------ "My cards"
+    MY_CARDS_URL = "ajnetweb-cards"
+
+    def my_cards(self) -> Dict[str, Any]:
+        """
+        Create (once) a normal HA dashboard that the installer edits with HA's own visual editor. Its first
+        view is merged into Home / Wall Panel, its other views become extra pages of the AJ Netweb dashboard.
+        Hidden from the sidebar, readable by every user (the strategy reads it for each person).
+        """
+        url = self.MY_CARDS_URL
+        try:
+            with self.client.session() as s:
+                dashboards = s.call("lovelace/dashboards/list") or []
+                if not any(d.get("url_path") == url for d in dashboards):
+                    s.call("lovelace/dashboards/create", url_path=url, mode="storage", title="AJ Netweb - My cards",
+                           icon="mdi:card-plus-outline", require_admin=False, show_in_sidebar=False)
+                try:
+                    current = s.call("lovelace/config", url_path=url, force=True)
+                except Exception:  # noqa: BLE001 - a new dashboard has no config yet
+                    current = None
+                if not current or not current.get("views"):
+                    s.call("lovelace/config/save", url_path=url, config={"views": [
+                        {"title": "On Home", "path": "home", "type": "sections", "max_columns": 4, "sections": [
+                            {"type": "grid", "column_span": 4, "cards": [
+                                {"type": "heading", "heading": "My cards"},
+                                {"type": "markdown", "content":
+                                    "Cards on this page appear on the AJ Netweb **Home** and **Wall Panel** "
+                                    "(Studio → Layout decides where). Add more pages here with **+** - they "
+                                    "become extra pages of the AJ Netweb dashboard. Delete this note when done."}]}]}]})
+        except Exception as e:
+            log.error("My cards dashboard: %s", e)
+            return {"ok": False, "error": str(e)}
+        project = self.save_project({"custom_dashboard": url})
+        return {"ok": True, "url_path": url, "edit_url": f"/{url}/home?edit=1", "project": project}
 
     # ------------------------------------------------------------------ blueprints
     def install_bundled_blueprints(self) -> Dict[str, Any]:

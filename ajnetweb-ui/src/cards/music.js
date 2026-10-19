@@ -6,11 +6,14 @@
 //   entities: [media_player.majlis, ...]   # default: Music Assistant players, else all speakers
 //   entity: media_player.majlis            # start with this one
 //   music_assistant_entry: <config entry id>  # optional; found automatically for admins
-//   variant: full | compact ; search: true ; favorites: true
+//   variant: full | compact ; search: true ; favorites: true ; grouping: true
+// Grouping ("play in more rooms"): link speakers / amp zones to the one you're on, so the same music
+// plays in sync everywhere (media_player.join / unjoin; Music Assistant, Sonos, Snapcast, ... players
+// that support it). The first speaker of a group leads; controls act on the whole group.
 import { AjnBase, OFFLINE, bindGestures, cssUrl, esc, haptic } from "../core/base.js";
 import { COLORS } from "../core/styles.js";
 
-const F = { PAUSE: 1, VOLUME_SET: 4, VOLUME_MUTE: 8, PREV: 16, NEXT: 32, PLAY: 16384, SHUFFLE: 32768, REPEAT: 262144 };
+const F = { GROUPING: 524288, PAUSE: 1, VOLUME_SET: 4, VOLUME_MUTE: 8, PREV: 16, NEXT: 32, PLAY: 16384, SHUFFLE: 32768, REPEAT: 262144 };
 const ACTIVE = ["playing", "paused", "buffering"];
 let _maEntry; // cached Music Assistant config entry id (undefined = not looked up yet)
 
@@ -134,6 +137,26 @@ export class AjnetwebMusicCard extends AjnBase {
     bar.style.width = `${Math.min(100, (pos / a.media_duration) * 100)}%`;
   }
 
+  // the group the shown speaker belongs to: leader first (HA's group_members order), then the others
+  _group(id) {
+    const own = (this.st(id).attributes.group_members || []).filter((p) => this.st(p));
+    if (own.length > 1) return own;
+    const leader = this._players().find((p) => ((this.st(p).attributes.group_members || []).slice(1)).includes(id));
+    return leader ? this.st(leader).attributes.group_members.filter((p) => this.st(p)) : [id];
+  }
+
+  _canGroup(id) {
+    const s = this.st(id);
+    return !!(s && ((s.attributes.supported_features || 0) & F.GROUPING) && !OFFLINE.includes(s.state));
+  }
+
+  async _toggleLink(id, p) {
+    haptic("light");
+    const group = this._group(id);
+    if (group.includes(p)) return this.call("media_player.unjoin", [p]);
+    return this.call("media_player.join", [group[0]], { group_members: [p] });
+  }
+
   _art(s) {
     return s && (s.attributes.entity_picture_local || s.attributes.entity_picture);
   }
@@ -244,13 +267,15 @@ export class AjnetwebMusicCard extends AjnBase {
         || `<div class="muted2">${esc(this.t("no_results"))}</div>`;
     }
     const favs = this._favs || [];
+    const group = this._group(id);
+    const linkable = c.grouping !== false && this._canGroup(id) ? players.filter((p) => p !== id && this._canGroup(p)) : [];
     const canSearch = c.search !== false && this._isMa(id);
 
     this.html(`<ha-card><div class="wrap">
       <div class="np">
         <div class="art tap" data-more ${art ? `style="background-image:${esc(cssUrl(art))}"` : ""}>${art ? "" : '<ha-icon icon="mdi:music"></ha-icon>'}</div>
         <div class="meta">
-          <div class="label">${esc(active ? this.t("now_playing") : a.friendly_name)}</div>
+          <div class="label">${esc(active ? this.t("now_playing") : a.friendly_name)}${group.length > 1 ? ` · ${esc(this.t("rooms_linked", group.length - 1, { n: group.length - 1 }))}` : ""}</div>
           <div class="title">${esc(title)}</div>
           <div class="artist">${esc(active ? artist : "")}</div>
           ${a.media_duration ? `<div class="prog"><i></i></div>` : ""}
@@ -271,6 +296,12 @@ export class AjnetwebMusicCard extends AjnBase {
         return `<button class="chip ${p === id ? "sel" : ""}" data-player="${esc(p)}">
           ${ps.state === "playing" ? '<span class="eq"></span>' : '<ha-icon icon="mdi:speaker"></ha-icon>'}${esc(ps.attributes.friendly_name || p)}</button>`;
       }).join("")}</div>` : ""}
+      ${linkable.length ? `<div class="grp">${esc(this.t("play_also_in"))}</div><div class="chips">
+        ${linkable.length > 1 ? `<button class="chip ${linkable.every((p) => group.includes(p)) ? "sel" : ""}" data-all><ha-icon icon="mdi:speaker-multiple"></ha-icon>${esc(this.t("everywhere"))}</button>` : ""}
+        ${linkable.map((p) => `<button class="chip ${group.includes(p) ? "sel" : ""}" data-link="${esc(p)}">
+          <ha-icon icon="${group.includes(p) ? "mdi:link-variant" : "mdi:plus"}"></ha-icon>${esc(this.st(p).attributes.friendly_name || p)}</button>`).join("")}
+        ${group.length > 1 ? `<button class="chip" data-unlink><ha-icon icon="mdi:link-variant-off"></ha-icon>${esc(this.t("ungroup"))}</button>` : ""}
+      </div>` : ""}
       ${this._isMa(id) && players.some((p) => p !== id && this.st(p).state === "playing" && this._isMa(p)) ? `
         <div class="chips"><button class="chip" data-transfer><ha-icon icon="mdi:swap-horizontal"></ha-icon>${esc(this.t("move_here"))}</button></div>` : ""}
       ${canSearch ? `<input class="search" type="search" placeholder="${esc(this.t("search_music"))}" value="${esc(this._query)}">` : ""}
@@ -309,6 +340,17 @@ export class AjnetwebMusicCard extends AjnBase {
     }
     sr.querySelectorAll("[data-player]").forEach((b) => bindGestures(b, {
       onTap: () => { haptic("light"); this._selected = b.dataset.player; this.render(); } }));
+    sr.querySelectorAll("[data-link]").forEach((b) => bindGestures(b, { onTap: () => this._toggleLink(id, b.dataset.link) }));
+    const all = sr.querySelector("[data-all]");
+    if (all) bindGestures(all, { onTap: () => {
+      haptic("light");
+      const group = this._group(id);
+      const rest = this._players().filter((p) => p !== id && this._canGroup(p));
+      if (rest.every((p) => group.includes(p))) return this.call("media_player.unjoin", group.slice(1));
+      return this.call("media_player.join", [group[0]], { group_members: rest.filter((p) => !group.includes(p) && p !== group[0]) });
+    } });
+    const un = sr.querySelector("[data-unlink]");
+    if (un) bindGestures(un, { onTap: () => { haptic("light"); const g = this._group(id); this.call("media_player.unjoin", g.filter((p) => p !== g[0])); } });
     const tr = sr.querySelector("[data-transfer]");
     if (tr) bindGestures(tr, { onTap: () => {
       const src = this._players().find((p) => p !== id && this.st(p).state === "playing" && this._isMa(p));
