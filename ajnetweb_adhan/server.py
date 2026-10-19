@@ -10,6 +10,7 @@ AJ Netweb Prayer & Adhan - scheduler + ingress studio.
     input_boolean.aj_netweb_adhan_mute_next  skip only the next adhan
     input_button.aj_netweb_adhan_play_now      play the adhan now (test)
     input_button.aj_netweb_adhan_stop       stop playback
+    input_boolean.aj_netweb_precool         AC pre-cooling before prayers on/off (precool.py)
 """
 
 import json
@@ -26,6 +27,7 @@ from socketserver import ThreadingMixIn
 import ha
 import player
 import prayer
+import precool
 
 import ajn_license
 
@@ -49,6 +51,7 @@ HELPERS = {
     "mute_next": ("input_boolean", "aj_netweb_adhan_mute_next", "AJ Netweb Adhan mute next", "mdi:volume-off"),
     "play": ("input_button", "aj_netweb_adhan_play_now", "AJ Netweb Adhan play now", "mdi:play-circle"),
     "stop": ("input_button", "aj_netweb_adhan_stop", "AJ Netweb Adhan stop", "mdi:stop-circle"),
+    "precool": ("input_boolean", "aj_netweb_precool", "AJ Netweb AC pre-cooling", "mdi:snowflake-thermometer"),
 }
 
 DEFAULTS = {
@@ -67,6 +70,7 @@ DEFAULTS = {
     "suhoor_minutes": 0,
     "hijri_adjust": 0,
     "resume_delay": 3,
+    "precool": precool.DEFAULTS,
 }
 
 _settings_lock = threading.Lock()
@@ -95,6 +99,8 @@ def save_settings(changes: dict) -> dict:
         for key in ("speakers", "pause_players"):
             if key in changes:
                 s[key] = [e for e in changes[key] if isinstance(e, str) and e.startswith("media_player.")]
+        if "precool" in changes:
+            s["precool"] = precool.sanitize(s["precool"])
         tmp = SETTINGS_FILE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(s, f, indent=2, ensure_ascii=False)
@@ -122,7 +128,7 @@ def ensure_helpers():
                 item = next((i for i in existing if i.get("id") == object_id or i.get("name") == name), None)
                 if not item:
                     item = ws.call(f"{domain}/create", name=name, icon=icon,
-                                   **({"initial": key == "master"} if domain == "input_boolean" else {}))
+                                   **({"initial": key in ("master", "precool")} if domain == "input_boolean" else {}))
                 STATE["helpers"][key] = f"{domain}.{item.get('id', object_id)}"
         log.info("Helpers: %s", STATE["helpers"])
     except Exception as e:
@@ -201,6 +207,36 @@ def run_adhan(key: str, manual: bool = False):
     return entry
 
 
+def run_precool(rule: dict, key: str, manual: bool = False):
+    """Start the ACs of one pre-cooling rule (see precool.py for when an AC is left alone)."""
+    s = load_settings()
+    all_states = ha.states()
+    pc = s.get("precool") or {}
+    season = precool.season(pc, datetime.now().month)
+    entry = {"kind": "precool", "rule": rule.get("name"), "prayer": key,
+             "at": datetime.now(timezone.utc).isoformat(), "manual": manual}
+    temp = precool.target_temp(rule, season)
+    if temp is None:
+        entry["result"] = f"rests in {season}"
+        add_history(entry)
+        return entry
+    result = {}
+    for eid in rule.get("climates") or []:
+        data, why = precool.plan(rule, temp, all_states.get(eid))
+        if data:
+            try:
+                ha.call_service("climate", "set_temperature", {"entity_id": eid, **data})
+            except ha.HAError as e:
+                why = f"failed: {e}"
+        result[eid] = why
+    entry["result"] = result
+    add_history(entry)
+    ha.fire_event("ajnetweb_precool_started", {"rule": rule.get("id"), "prayer": key, "manual": manual,
+                                                "result": result})
+    log.info("Pre-cooling %s before %s: %s", rule.get("name"), key, result)
+    return entry
+
+
 def tick():
     """Every few seconds: refresh times, fire due adhans / reminders."""
     if not LICENSE.allowed():
@@ -248,6 +284,18 @@ def tick():
                 add_history({"prayer": key, "at": now.isoformat(), "result": "skipped (nobody home)"})
             else:
                 threading.Thread(target=run_adhan, args=(key,), daemon=True).start()
+    pc = s.get("precool") or {}
+    if pc.get("rules") and helper_on("precool", all_states):
+        season = precool.season(pc, datetime.now().month)
+        for rule, key, at in precool.starts(pc, STATE["times"]):
+            if not due(f"precool-{rule['id']}-{key}", at):
+                continue
+            why = precool.skip_reason(rule, season, bool(hij.get("ramadan")), someone_home)
+            if why:
+                add_history({"kind": "precool", "rule": rule["name"], "prayer": key, "at": now.isoformat(),
+                             "result": f"skipped ({why})"})
+            else:
+                threading.Thread(target=run_precool, args=(rule, key), daemon=True).start()
     # forget old tags
     STATE["fired"] = {t for t in STATE["fired"] if t.split("@")[1] > (now - timedelta(days=2)).isoformat()}
     publish(hij)
@@ -342,6 +390,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._guard(self._status)
         if p == "/api/speakers":
             return self._guard(lambda: {"ok": True, "speakers": player.speakers(ha.states())})
+        if p == "/api/climates":
+            return self._guard(self._climates)
         if p == "/api/history":
             return self._guard(lambda: {"ok": True, "history": json.load(open(HISTORY_FILE)) if os.path.exists(HISTORY_FILE) else []})
         if p.startswith("/api/"):
@@ -363,6 +413,17 @@ class Handler(SimpleHTTPRequestHandler):
             "names": prayer.NAMES,
         }
 
+    def _climates(self):
+        out = []
+        for eid, st in sorted(ha.states().items()):
+            if eid.startswith("climate."):
+                a = st.get("attributes") or {}
+                out.append({"entity_id": eid, "name": a.get("friendly_name") or eid, "state": st.get("state"),
+                            "hvac_modes": a.get("hvac_modes") or [], "temperature": a.get("temperature"),
+                            "current_temperature": a.get("current_temperature")})
+        s = load_settings()
+        return {"ok": True, "climates": out, "season": precool.season(s["precool"], datetime.now().month)}
+
     def do_POST(self):
         if not self._ok():
             return
@@ -379,6 +440,11 @@ class Handler(SimpleHTTPRequestHandler):
             key = body.get("prayer") or "dhuhr"
             threading.Thread(target=run_adhan, args=(key, True), daemon=True).start()
             return self._json({"ok": True})
+        if p == "/api/precool/test":
+            rule = next((r for r in load_settings()["precool"]["rules"] if r["id"] == body.get("id")), None)
+            if not rule:
+                return self._json({"ok": False, "error": "unknown rule"}, 404)
+            return self._guard(lambda: {"ok": True, "entry": run_precool(rule, (rule["prayers"] or ["maghrib"])[0], True)})
         if p == "/api/stop":
             player.stop()
             return self._json({"ok": True})
