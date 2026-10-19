@@ -1,5 +1,15 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.9.0 - notifications in the header
+- **A bell in the dashboard header** with the number of new events since you last looked. Tap it for the list
+  of the last 48 hours, newest first, by day: doorbell rings, alarm armed / disarmed / triggered, water leaks,
+  smoke and gas, and doors, gates and garages opened (not windows). Tap an entry for its details.
+  - Read from Home Assistant's logbook, so it also shows what happened while the dashboard was closed.
+  - "New" is remembered per person on each phone or tablet. Arabic and English.
+  - Studio → Design → *Notifications bell in the header* turns it off (strategy option `notifications: false`).
+    The list is also a card:
+    `custom:ajnetweb-notifications-card`.
+
 ## 3.8.0 - electricity bill estimate and AC share
 - **Energy card: this month and the bill.** Below the 7-day bars: kWh this month, the bill so far and where the
   month will end at this rate. It uses the cost sensor from Home Assistant's Energy settings when there is one;

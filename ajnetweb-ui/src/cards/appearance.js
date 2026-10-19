@@ -162,7 +162,7 @@ class AjnetwebAppearanceSheet extends HTMLElement {
     this.attachShadow({ mode: "open" });
   }
 
-  open(origin, hass, config) {
+  open(origin, hass, config, tag = "ajnetweb-appearance-card") {
     const cs = getComputedStyle(origin);
     THEME_VARS.forEach((v) => {
       const val = cs.getPropertyValue(v);
@@ -184,16 +184,21 @@ class AjnetwebAppearanceSheet extends HTMLElement {
       }
       .x { position: absolute; top: 14px; inset-inline-end: 14px; z-index: 2; width: 36px; height: 36px; border-radius: 50%;
            border: none; background: var(--_muted); color: var(--_text); display: grid; place-items: center; cursor: pointer; }
-      ajnetweb-appearance-card { --ha-card-background: transparent; --ajn-surface: transparent; --ajn-glass-blur: 0px; }
+      .panel > :not(.x) { --ha-card-background: transparent; --ajn-surface: transparent; --ajn-glass-blur: 0px; }
     </style>
     <div class="scrim"></div>
     <div class="panel" role="dialog" aria-modal="true"><button class="x" aria-label="Close"><ha-icon icon="mdi:close"></ha-icon></button></div>`;
-    const card = document.createElement("ajnetweb-appearance-card");
+    const card = document.createElement(tag);
     card.setConfig(config || {});
     card.hass = hass;
     this.shadowRoot.querySelector(".panel").setAttribute("dir", card.lang() === "ar" ? "rtl" : "ltr");
     // re-dispatch HA events (notifications) from the opener, which is inside HA's tree
     card.addEventListener("hass-notification", (e) => { e.stopPropagation(); origin.dispatchEvent(new CustomEvent(e.type, { detail: e.detail, bubbles: true, composed: true })); });
+    card.addEventListener("hass-more-info", (e) => {
+      e.stopPropagation();
+      this.close();
+      setTimeout(() => origin.dispatchEvent(new CustomEvent(e.type, { detail: e.detail, bubbles: true, composed: true })), 300);
+    });
     this.shadowRoot.querySelector(".panel").appendChild(card);
     const scrim = this.shadowRoot.querySelector(".scrim");
     let downOnScrim = false;
@@ -214,10 +219,15 @@ class AjnetwebAppearanceSheet extends HTMLElement {
 
 if (!customElements.get("ajnetweb-appearance-sheet")) customElements.define("ajnetweb-appearance-sheet", AjnetwebAppearanceSheet);
 
-export function openAppearance(origin, hass, config) {
+/** Show any AJ Netweb card in the bottom sheet / centred panel (appearance, notifications). */
+export function openCardSheet(origin, hass, tag, config) {
   document.querySelectorAll("ajnetweb-appearance-sheet").forEach((s) => s.remove());
   const sheet = document.createElement("ajnetweb-appearance-sheet");
   document.body.appendChild(sheet);
-  sheet.open(origin, hass, config);
+  sheet.open(origin, hass, config, tag);
   return sheet;
+}
+
+export function openAppearance(origin, hass, config) {
+  return openCardSheet(origin, hass, "ajnetweb-appearance-card", config);
 }

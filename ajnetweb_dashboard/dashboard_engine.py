@@ -30,7 +30,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.8.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.9.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -64,6 +64,7 @@ DEFAULT_PROJECT = {
     "palette": "",
     "wallpaper": False,
     "menu": True,
+    "notifications": True,     # bell with the notification list in the header
     "layout": {},              # {"home": {"order": [...], "hidden": [...]}, "panel": {...}}  (Studio "Layout" tab)
     "top_cards": ["weather", "prayer", "media"],
     "insights": ["calendar", "energy", "temperature"],   # "Today at home" band
@@ -253,6 +254,7 @@ class DashboardEngine:
             "palette": project.get("palette") or None,
             "wallpaper": True if project.get("wallpaper") else None,
             "menu": False if project.get("menu") is False else None,
+            "notifications": False if project.get("notifications") is False else None,
             "layout": _clean_layout(project.get("layout")),
             "top_cards": project.get("top_cards") if isinstance(project.get("top_cards"), list)
                          and project.get("top_cards") != ["weather", "prayer", "media"] else None,

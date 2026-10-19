@@ -67,6 +67,14 @@ const hass = {
     if (msg.type === "frontend/get_themes") return { themes: registry, default_theme: "default", default_dark_theme: null };
     if (msg.type === "history/history_during_period") return Object.fromEntries(msg.entity_ids.map((id, i) =>
       [id, wave(id, parseFloat((hass.states[id] || {}).state) || 22, 1.4 + i * 0.3, i)]));
+    if (msg.type === "logbook/get_events") {   // a few things that "happened" for the notifications bell
+      const ago = (min) => Date.now() / 1000 - min * 60;
+      const ids = msg.entity_ids || [];
+      return [[ids.find((i) => i.startsWith("alarm_control_panel.")), "armed_away", 30], [ids.find((i) => i.startsWith("alarm_control_panel.")), "disarmed", 400],
+        [ids.find((i) => i.startsWith("binary_sensor.")), "on", 95], [ids.find((i) => i.startsWith("binary_sensor.")), "off", 90],
+        ["sensor.ajnetweb_doorbell", "ringing", 12], [ids.find((i) => i.startsWith("binary_sensor.")), "on", 60 * 26]]
+        .filter(([id]) => id && ids.includes(id)).map(([entity_id, state, min]) => ({ entity_id, state, when: ago(min) }));
+    }
     if (msg.type === "energy/get_prefs") return { energy_sources: [
       { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_import", stat_cost: "sensor.grid_cost" }], flow_to: [{ stat_energy_to: "sensor.grid_export" }] },
       { type: "solar", stat_energy_from: "sensor.solar_energy" }],

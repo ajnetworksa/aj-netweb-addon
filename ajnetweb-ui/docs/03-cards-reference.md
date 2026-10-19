@@ -274,6 +274,21 @@ and cost today. Underneath: this month's kWh, the bill so far and the projected 
 sensor, or estimated from the tariff), and the AC share of today's use when AC meters exist. Tap opens HA's
 Energy page. **Set up Settings → Dashboards → Energy first.** Tariff estimates leave out meter and fixed fees.
 
+### `custom:ajnetweb-notifications-card` — what happened at home
+
+```yaml
+type: custom:ajnetweb-notifications-card
+doorbell: sensor.ajnetweb_doorbell           # rings (Intercom add-on)
+alarms: [alarm_control_panel.house]          # armed / disarmed / triggered
+safety: [binary_sensor.kitchen_leak]         # leak, smoke, gas going on
+openings: [binary_sensor.front_door_contact] # doors and gates opened
+hours: 48
+max: 60
+```
+The last 48 hours from HA's logbook, newest first and grouped by day; new entries since the person last
+looked are marked. The strategy puts it behind a bell in the header (with a count of new entries) and fills
+the lists itself: doors, gates and garages but not windows.
+
 ### `custom:ajnetweb-modes-card` — house modes
 
 ```yaml

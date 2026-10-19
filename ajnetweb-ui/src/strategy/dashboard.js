@@ -20,6 +20,7 @@
 //   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
 //   insights: [calendar, energy, temperature]   cards of the "Today at home" band (Home / Wall Panel)
 //   calendars: [calendar ids] (default: all)   energy: false   energy_power: sensor.house_power (live power)
+//   notifications: false                      no bell (notification list) in the header
 //   energy_tariff: auto | sec | dewa | none   bill estimate on the energy card (auto = SEC when HA's country is SA)
 //   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
 //           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
@@ -220,6 +221,19 @@ export async function generateDashboard(config, rawHass) {
              ...(Array.isArray(m.confirm) ? { confirm: m.confirm } : {}) };
   })();
 
+  // the header bell: doorbell rings, alarm changes, leaks/smoke/gas, doors, gates and garages (not windows)
+  const notifications = (() => {
+    if (cfg.notifications === false) return null;
+    const doors = ids("openings").filter((id) => {
+      const a = (hass.states[id] || {}).attributes || {};
+      return ["door", "garage_door"].includes(a.device_class) || /gate|بوابة/i.test(`${id} ${a.friendly_name || ""}`);
+    });
+    const n = { ...(hass.states["sensor.ajnetweb_doorbell"] ? { doorbell: "sensor.ajnetweb_doorbell" } : {}),
+                ...(ids("alarms").length ? { alarms: ids("alarms") } : {}),
+                ...(ids("safety").length ? { safety: ids("safety") } : {}), ...(doors.length ? { openings: doors } : {}) };
+    return Object.keys(n).length ? n : null;
+  })();
+
   const header = (variant, extra = {}) => {
     const chips = [];
     if (ids("lights").length) chips.push({ icon: "mdi:lightbulb-on", entities: ids("lights"), active: ["on"],
@@ -238,6 +252,7 @@ export async function generateDashboard(config, rawHass) {
       ...(weather ? { weather } : {}), ...(alarm ? { alarm, alarm_navigation_path: path("security") } : {}),
       ...(model.house.persons.length ? { persons: model.house.persons.slice(0, 6) } : {}),
       ...(cfg.header_image ? { image: cfg.header_image } : {}),
+      ...(notifications ? { notifications } : {}),
       // with the ⋯ menu the picker lives there; the header button is for dashboards without the bar
       ...(canAppearance && !menuOn ? { appearance: true } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
       ...(cfg.appearance_themes ? { appearance_themes: cfg.appearance_themes } : {}),
