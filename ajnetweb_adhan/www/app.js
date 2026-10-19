@@ -98,10 +98,87 @@
     $("helpers").innerHTML = Object.entries(S.helpers).map(([k, v]) => `<div><code>${esc(v)}</code></div>`).join("") || "Not created yet";
   }
 
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let climates = [];
+
+  function savePrecool() { saveSoon({ precool: JSON.parse(JSON.stringify(S.settings.precool)) }); }
+
+  async function renderPrecool() {
+    const r = await api("api/climates");
+    climates = r.climates || [];
+    const pc = S.settings.precool;
+    $("pcEnabled").checked = pc.enabled;
+    $("pcSeason").textContent = r.season ? `(now: ${r.season})` : "";
+    $("pcMonths").innerHTML = MONTHS.map((m, i) =>
+      `<label class="small"><input type="checkbox" data-month="${i + 1}" ${pc.summer_months.includes(i + 1) ? "checked" : ""}> ${m}</label>`).join("");
+    $("pcMonths").querySelectorAll("[data-month]").forEach((cb) => cb.onchange = () => {
+      S.settings.precool.summer_months = [...$("pcMonths").querySelectorAll("[data-month]:checked")].map((x) => Number(x.dataset.month));
+      savePrecool();
+    });
+    renderRules();
+  }
+
+  function renderRules() {
+    const pc = S.settings.precool;
+    $("pcRules").innerHTML = pc.rules.map((rule, i) => `<div class="card" data-rule="${i}">
+      <div class="row"><input type="text" data-k="name" value="${esc(rule.name)}" style="flex:1;min-width:160px">
+        <label class="small"><input type="checkbox" data-k="enabled" ${rule.enabled ? "checked" : ""}> On</label></div>
+      <div class="grid" style="margin-top:12px">
+        <label class="f">Minutes before<input type="number" min="0" max="180" data-k="minutes" value="${rule.minutes}"></label>
+        <label class="f">Mode<select data-k="hvac_mode">${["cool", "heat", "heat_cool", "auto"].map((m) =>
+          `<option ${m === rule.hvac_mode ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+        <label class="f">Summer temperature °<input type="number" min="16" max="30" step="0.5" data-k="summer_temp" value="${rule.summer_temp}"></label>
+        <label class="f">Winter temperature ° (blank = rest)<input type="number" min="16" max="30" step="0.5" data-k="winter_temp" value="${rule.winter_temp ?? ""}"></label>
+      </div>
+      <div style="margin-top:12px"><div class="small" style="font-weight:600">Before</div><div class="chips">${PRAYERS.map((p) =>
+        `<label><input type="checkbox" data-prayer="${p}" ${rule.prayers.includes(p) ? "checked" : ""}> ${esc(nm(p))}</label>`).join("")}</div></div>
+      <div style="margin-top:12px"><div class="small" style="font-weight:600">ACs</div><div class="chips">${climates.map((c) =>
+        `<label><input type="checkbox" data-climate="${esc(c.entity_id)}" ${rule.climates.includes(c.entity_id) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")
+        || '<span class="muted small">No climate entities found.</span>'}</div></div>
+      <div class="row" style="margin-top:12px">
+        <div class="chips"><label><input type="checkbox" data-k="only_when_home" ${rule.only_when_home ? "checked" : ""}> Only when someone is home</label>
+          <label><input type="checkbox" data-k="ramadan_only" ${rule.ramadan_only ? "checked" : ""}> Only in Ramadan</label></div>
+        <div><button class="btn small" data-test>Run now</button> <button class="btn small" data-del>Delete</button></div></div>
+    </div>`).join("") || '<div class="card muted">No pre-cooling yet.</div>';
+
+    // Look the rule up on every change: the page reloads its status every minute.
+    $("pcRules").querySelectorAll("[data-rule]").forEach((card) => {
+      const idx = Number(card.dataset.rule);
+      const cur = () => S.settings.precool.rules[idx];
+      card.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => {
+        const k = el.dataset.k;
+        const rule = cur();
+        if (el.type === "checkbox") rule[k] = el.checked;
+        else if (k === "winter_temp") rule[k] = el.value === "" ? null : Number(el.value);
+        else if (el.type === "number") rule[k] = Number(el.value) || 0;
+        else rule[k] = el.value;
+        savePrecool();
+      });
+      card.querySelectorAll("[data-prayer]").forEach((el) => el.onchange = () => {
+        cur().prayers = [...card.querySelectorAll("[data-prayer]:checked")].map((x) => x.dataset.prayer); savePrecool();
+      });
+      card.querySelectorAll("[data-climate]").forEach((el) => el.onchange = () => {
+        cur().climates = [...card.querySelectorAll("[data-climate]:checked")].map((x) => x.dataset.climate); savePrecool();
+      });
+      card.querySelector("[data-del]").onclick = () => {
+        if (!confirm(`Delete ${cur().name}?`)) return;
+        S.settings.precool.rules.splice(idx, 1); savePrecool(); renderRules();
+      };
+      card.querySelector("[data-test]").onclick = async () => {
+        clearTimeout(saveTimer);
+        await api("api/settings", { precool: JSON.parse(JSON.stringify(S.settings.precool)) });
+        const res = await api("api/precool/test", { id: cur().id });
+        const out = res.entry && res.entry.result;
+        toast(!res.ok ? res.error || "Failed" : typeof out === "string" ? out
+          : Object.entries(out || {}).map(([e, m]) => `${e.replace("climate.", "")}: ${m}`).join(", ") || "Done");
+      };
+    });
+  }
+
   async function renderHistory() {
     const r = await api("api/history");
     $("history").innerHTML = (r.history || []).map((h) => `<div class="sp" style="grid-template-columns:1fr auto">
-      <div><b>${esc(nm(h.prayer))}</b> ${h.manual ? '<span class="tag">test</span>' : ""}<div class="muted small">${new Date(h.at).toLocaleString()}</div></div>
+      <div><b>${h.kind === "precool" ? `❄ ${esc(h.rule)} · before ${esc(nm(h.prayer))}` : esc(nm(h.prayer))}</b> ${h.manual ? '<span class="tag">test</span>' : ""}<div class="muted small">${new Date(h.at).toLocaleString()}</div></div>
       <div class="small muted">${esc(typeof h.result === "string" ? h.result : Object.entries(h.result || {}).map(([e, m]) => `${e}: ${m}`).join(", "))}</div></div>`).join("")
       || '<div class="muted">Nothing played yet.</div>';
   }
@@ -118,7 +195,16 @@
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + t.dataset.tab));
     if (t.dataset.tab === "speakers") renderSpeakers();
     if (t.dataset.tab === "history") renderHistory();
+    if (t.dataset.tab === "precool") renderPrecool();
   });
+  $("pcEnabled").onchange = () => { S.settings.precool.enabled = $("pcEnabled").checked; savePrecool(); };
+  $("pcAdd").onclick = () => {
+    const pc = S.settings.precool;
+    pc.rules.push({ id: "r" + Date.now().toString(36), name: `Pre-cool ${pc.rules.length + 1}`, enabled: true,
+      prayers: ["maghrib"], minutes: 30, climates: [], hvac_mode: "cool", summer_temp: 22, winter_temp: null,
+      only_when_home: false, ramadan_only: false });
+    savePrecool(); renderRules();
+  };
   $("volume").onchange = () => saveSoon({ volume: Number($("volume").value) / 100 });
   $("reminder").onchange = () => saveSoon({ reminder_minutes: Number($("reminder").value) || 0 });
   $("suhoor").onchange = () => saveSoon({ suhoor_minutes: Number($("suhoor").value) || 0 });
