@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Prayer & Adhan
 
+## 1.3.0 - AC pre-cooling before prayers
+- **New tab "AC pre-cooling":** start chosen ACs a set time before a prayer, e.g. cool the majlis to 22° 30 minutes
+  before Maghrib. Each rule picks its prayers, minutes before, ACs, mode and a summer temperature; a winter
+  temperature is optional (without one the rule rests in winter). Summer months are set once (April–October by
+  default). Options: only when someone is home, only in Ramadan (cool the majlis before iftar).
+- The family's choices win: an AC that is already set cooler, or running as fan or dry, is left alone.
+- New helper `input_boolean.aj_netweb_precool` switches all pre-cooling on or off (dashboard, voice, automations).
+  Event `ajnetweb_precool_started` after each run; runs show in History. *Run now* tries a rule straight away.
+
 ## 1.2.0
 - The page follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
   AJ Netweb add-on. Opened outside Home Assistant it keeps its own look.
