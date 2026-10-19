@@ -1,5 +1,16 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.8.0 - electricity bill estimate and AC share
+- **Energy card: this month and the bill.** Below the 7-day bars: kWh this month, the bill so far and where the
+  month will end at this rate. It uses the cost sensor from Home Assistant's Energy settings when there is one;
+  otherwise it estimates the bill from the residential tariff (VAT included, meter and fixed fees not):
+  - **SEC** (Saudi Arabia, used automatically when HA's country is SA): 0.18 SAR/kWh up to 6,000 kWh a month, 0.30 above, 15% VAT.
+  - **DEWA** (Dubai): 23/28/32/38 fils per kWh in 2,000 kWh steps, 6.5 fils fuel surcharge, 5% VAT.
+  - Studio → Design → *Electricity bill estimate* (Automatic / SEC / DEWA / Don't estimate); own tiers in card YAML.
+- **AC share today:** when AC meters are added under *Individual devices* in HA's Energy settings (names with
+  "AC", "split", "chiller", "مكيف"…), the card shows how much of today's electricity went to cooling. Or list
+  them in the card's `ac:` option.
+
 ## 3.7.0 - one look for every AJ Netweb add-on
 - **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone
   picks on the dashboard (⋯ → Appearance) also paint Dashboard Studio, CCTV Studio, Door Station, Room Access

@@ -66,3 +66,19 @@ def test_doorbell_press_maps_only_our_helpers(load_addon_module):
     assert doorbell.pressed_doors(dict(press, service_data={"entity_id": "input_button.ajnetweb_open_door_1"})) == [1]
     assert doorbell.pressed_doors(dict(press, domain="light")) == []
     assert doorbell.pressed_doors({}) == []
+
+
+def test_energy_tariff_option_reaches_the_strategy(load_addon_module, monkeypatch):
+    engine_mod = load_addon_module("ajnetweb_dashboard", "dashboard_engine")
+    engine = engine_mod.DashboardEngine.__new__(engine_mod.DashboardEngine)
+    monkeypatch.setattr(engine, "_context", lambda: {}, raising=False)
+    monkeypatch.setattr(engine, "_music_assistant_entry", lambda: None, raising=False)
+    project = dict(engine_mod.DEFAULT_PROJECT)
+
+    def option(value):
+        return engine.generate({**project, "energy_tariff": value})["strategy"].get("energy_tariff")
+
+    assert option("auto") is None          # the card decides from HA's country
+    assert option("dewa") == "dewa"
+    assert option("none") == "none"
+    assert option("<script>") is None

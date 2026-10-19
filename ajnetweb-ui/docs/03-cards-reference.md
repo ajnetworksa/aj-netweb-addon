@@ -264,10 +264,15 @@ type: custom:ajnetweb-energy-card
 power: sensor.house_power        # optional: live power (W / kW)
 days: 7
 entities: [sensor.main_meter]    # only if HA's Energy dashboard is NOT set up: meters to add up
+tariff: auto                     # bill estimate: auto (SEC when HA's country is SA) | sec | dewa | none
+                                 # or own tiers: { tiers: [[6000, 0.18], [null, 0.30]], per_kwh: 0, vat: 0.15, currency: SAR }
+ac: [sensor.majlis_ac_energy]    # optional: AC meters; default = Energy "individual devices" named like an AC
 ```
 Reads HA's Energy settings (grid import/export, solar, cost) and the daily totals from long-term
 statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
-and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
+and cost today. Underneath: this month's kWh, the bill so far and the projected month end (from the cost
+sensor, or estimated from the tariff), and the AC share of today's use when AC meters exist. Tap opens HA's
+Energy page. **Set up Settings → Dashboards → Energy first.** Tariff estimates leave out meter and fixed fees.
 
 ### `custom:ajnetweb-modes-card` — house modes
 
