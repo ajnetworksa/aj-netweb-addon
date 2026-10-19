@@ -12,12 +12,12 @@ Versions at the time of writing:
 | Product | Version |
 |---|---|
 | Dashboard Suite + UI kit | 3.9.0 |
-| Prayer & Adhan | 1.2.0 |
+| Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
-| Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+| Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
 
 ---
 
@@ -58,6 +58,27 @@ leak, gate left open) with history.
 - *Estimates exclude meter and fixed fees* (they depend on the breaker size); the label says "est.".
 
 **Open:** check the tariff figures against a current SEC and DEWA bill; ADDC/SEWA presets if needed.
+
+---
+
+## AC pre-cooling before prayers (Prayer & Adhan 1.3.0)
+
+**Asked for:** item 4 of the upgrade list: "cool the majlis 30 minutes before Maghrib", summer/winter profiles.
+
+**Done:**
+- `ajnetweb_adhan/precool.py`: rules (prayers, minutes before, ACs, mode, summer and optional winter
+  temperature, only when home, only in Ramadan), summer months, and the per-AC decision.
+- The scheduler starts each rule before its prayers with `climate.set_temperature` (mode + temperature);
+  helper `input_boolean.aj_netweb_precool`, event `ajnetweb_precool_started`, runs and skips in History.
+- Studio tab *AC pre-cooling* with *Run now*; tests in `tests/test_precool.py`.
+
+**Decisions:**
+- *In the Prayer & Adhan add-on*, because it already has the prayer times and a scheduler.
+- *Never override the family:* an AC already cooler, or in fan/dry, is left alone; pre-cooling never turns an AC off.
+- *Independent of the adhan switch*, so a family can pre-cool without playing the adhan.
+
+**Open:** a toggle for `input_boolean.aj_netweb_precool` on the dashboard prayer card; expose it to Alexa
+with the other house controls.
 
 ---
 
