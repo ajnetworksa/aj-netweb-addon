@@ -42,6 +42,31 @@ with the other house controls.
 
 ---
 
+## Release automation and beta/stable channels (no add-on version change)
+
+**Asked for:** item 1 of the upgrade list: release automation with beta/stable channels and ready-made images.
+
+**Done:**
+- `.github/workflows/addon-images.yml` replaces `remote-access-image.yml` and covers every add-on: when a
+  version changes on `main` or `beta` it builds amd64 + aarch64 images to `ghcr.io/ajnetworksa/{arch}-addon-<add-on>`
+  (Remote Access compiled, as before). On `main` it also tags `<add-on>-v<version>` and publishes a GitHub
+  release with the changelog section.
+- `tools/release.py bump` sets the version everywhere it lives and opens the changelog entry.
+- CI *versions* job: a pull request that changes an add-on without bumping its version fails.
+- `docs/releasing.md`: the flow, the two channels and how to switch an add-on to the images.
+
+**Decisions:**
+- *Channels are branches* (`main` stable, `beta` via `…/aj-netweb-addon#beta`), so pilot sites just use a
+  different repository URL and promotion is a merge.
+- *A version is built once and never overwritten*, so stable gets the exact image pilot sites tested.
+- *No `image` line added yet*: Home Assistant would fail to install until the images exist and are public.
+
+**Open:**
+- Create the `beta` branch, run the workflow once, make the packages public, then add `image` to each
+  add-on's `config.json` (one add-on first).
+
+---
+
 ## One look for every add-on (Dashboard Suite 3.7.0, Prayer 1.2.0, Intercom 1.8.0, CCTV 1.4.0, Room Access 1.4.0)
 
 **Asked for:** "once the user chooses the appearance it should affect the other add-ons also, like door or
