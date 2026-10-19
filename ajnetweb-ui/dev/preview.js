@@ -55,13 +55,16 @@ if (q("ring", "")) data.states["sensor.ajnetweb_doorbell"] = { entity_id: "senso
 ["1", "2"].forEach((n) => (data.states[`input_button.ajnetweb_open_door_${n}`] = { entity_id: `input_button.ajnetweb_open_door_${n}`, state: "unknown", attributes: { friendly_name: `Open door ${n}` } }));
 
 const lang = q("lang", "en");
+const userObj = { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") };
 const hass = {
-  ...data, language: lang, user: { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") },  // ?user=Mama&admin=0
+  ...data, language: lang, user: userObj,  // ?user=Mama&admin=0
   locale: { language: lang, time_format: "12" },
   config: { location_name: "Villa Al Noor", unit_system: { temperature: "°C" } },
   themes: { themes: registry, darkMode: modeQ === "dark" },
   callWS: async (msg) => {
     if (msg.type === "frontend/get_user_data") return { value: userData };
+    if (msg.type === "auth/current_user") return { ...userObj };
+    if (msg.type === "frontend/get_themes") return { themes: registry, default_theme: "default", default_dark_theme: null };
     if (msg.type === "history/history_during_period") return Object.fromEntries(msg.entity_ids.map((id, i) =>
       [id, wave(id, parseFloat((hass.states[id] || {}).state) || 22, 1.4 + i * 0.3, i)]));
     if (msg.type === "energy/get_prefs") return { energy_sources: [
@@ -140,7 +143,9 @@ const viewPath = q("view", "home");
 history.replaceState(null, "", `/villa-home/${viewPath}${location.search}`);
 let options = {};
 try { options = JSON.parse(q("options", "{}")); } catch (e) { console.warn("bad options JSON"); }
-const cfg = await customElements.get("ll-strategy-dashboard-ajnetweb").generate(options, hass);
+// ?late=1 : build before the user and the theme list have arrived, like HA does on a cold start
+const cfg = await customElements.get("ll-strategy-dashboard-ajnetweb").generate(options,
+  q("late", "") ? { ...hass, user: null, themes: { themes: {}, darkMode: modeQ === "dark" } } : hass);
 window.dashboardConfig = cfg; // inspect in the browser console
 
 const nav = document.getElementById("views");

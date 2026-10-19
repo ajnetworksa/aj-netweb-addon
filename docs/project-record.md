@@ -11,13 +11,32 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.6.0 |
+| Dashboard Suite + UI kit | 3.6.1 |
 | Prayer & Adhan | 1.1.0 |
 | Intercom & Door Station | 1.7.0 |
 | CCTV & NVR Studio | 1.3.0 |
 | Room & Guest Pass Studio | 1.3.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## Personal appearance fix (Dashboard Suite 3.6.1)
+
+**Asked for:** "if I try to change the appearance it doesn't work".
+
+**Done:**
+- The strategy now completes `hass` before building: if `hass.user` or the theme list is not there yet
+  (HA builds strategy dashboards before they arrive), it fetches them with `auth/current_user` and
+  `frontend/get_themes`. Before, the person's theme and wallpaper were dropped and room-scoped users
+  could get the whole house on a cold start.
+- The strategy has `shouldRegenerate`: rebuild when the registries, the user, the theme list or dark
+  mode change (newer HA asks the strategy; older HA ignores it, the fetch above covers it).
+- Preview: `?late=1` builds the dashboard without user and themes, like a cold start.
+
+**Decisions:** fetch instead of waiting, so it works on every HA version.
+
+**Open:** none.
 
 ---
 

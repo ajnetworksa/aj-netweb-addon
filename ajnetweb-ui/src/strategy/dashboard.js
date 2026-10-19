@@ -44,8 +44,39 @@ import { MODE_ENTITY } from "../cards/modes.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
-export async function generateDashboard(config, hass) {
+// HA can build the dashboard before the logged-in user and the theme list have arrived (both load
+// a moment after the states). Without them the person's own theme, wallpaper, room access and admin
+// pages would be missed, so fetch them here with the same calls HA itself makes.
+export async function completeHass(hass) {
+  if (!hass || typeof hass.callWS !== "function") return hass;
+  const out = { ...hass };
+  if (!out.user) {
+    try { out.user = await hass.callWS({ type: "auth/current_user" }); } catch (e) { /* stays unknown */ }
+  }
+  if (!out.themes || !Object.keys(out.themes.themes || {}).length) {
+    try {
+      const r = await hass.callWS({ type: "frontend/get_themes" });
+      const dark = out.themes && typeof out.themes.darkMode === "boolean" ? out.themes.darkMode
+        : !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      if (r && r.themes) out.themes = { ...(out.themes || {}), ...r, darkMode: dark };
+    } catch (e) { /* no theme list: the dashboard theme still applies */ }
+  }
+  return out;
+}
+
+/** HA asks this on every hass update: rebuild when the person, the theme list or dark mode arrive or change. */
+export function shouldRegenerate(config, oldHass, newHass) {
+  if (!oldHass || !newHass) return true;
+  const themes = (h) => Object.keys((h.themes && h.themes.themes) || {}).join("|");
+  return ["entities", "devices", "areas", "floors"].some((k) => oldHass[k] !== newHass[k])
+    || (oldHass.user && oldHass.user.id) !== (newHass.user && newHass.user.id)
+    || themes(oldHass) !== themes(newHass)
+    || !!(oldHass.themes && oldHass.themes.darkMode) !== !!(newHass.themes && newHass.themes.darkMode);
+}
+
+export async function generateDashboard(config, rawHass) {
   const cfg = config || {};
+  const hass = await completeHass(rawHass);
   const lic = licenseState(hass);
   if (!lic.ok) {
     // one page that says so (the cards render the notice) instead of the whole dashboard
