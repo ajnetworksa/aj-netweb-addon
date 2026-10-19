@@ -33,6 +33,7 @@
   .tag { font-size:11px; padding:1px 7px; border-radius:999px; background:var(--card); color:var(--muted); }
   .status { padding:10px 12px; border-radius:10px; background:var(--card2); }
   .status.bad { border:1px solid var(--bad); } .status.ok { border:1px solid var(--accent); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; } .chips label { padding:4px 10px; border-radius:999px; background:var(--card2); font-size:13px; }
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); padding:10px 18px; border-radius:10px; font-weight:600; display:none; }
 </style>
 <script src="ajnetweb-look.js" data-vars='{"--bg":"bg","--card":"surface","--card2":"surface2","--border":"border","--text":"text","--muted":"text2","--accent":"accent"}'></script>
@@ -43,6 +44,7 @@
   <nav class="tabs">
     <button class="tab active" data-tab="today">Today</button><button class="tab" data-tab="speakers">Speakers</button>
     <button class="tab" data-tab="prayers">Prayers</button><button class="tab" data-tab="audio">Audio</button>
+    <button class="tab" data-tab="precool">AC pre-cooling</button>
     <button class="tab" data-tab="setup">Setup</button><button class="tab" data-tab="history">History</button>
   </nav>
 
@@ -93,6 +95,20 @@
       </div>
       <div class="list" id="files" style="margin-top:14px"></div>
     </div>
+  </section>
+
+  <section class="panel" id="tab-precool">
+    <div class="card">
+      <div class="row"><div><h2>AC pre-cooling</h2>
+        <p class="muted small" style="margin:0">Start the AC a set time before a prayer, e.g. cool the majlis 30 minutes before
+          Maghrib. An AC that is already cooler, or running as fan or dry, is left as the family set it.</p></div>
+        <label class="small"><input type="checkbox" id="pcEnabled"> On</label></div>
+      <div style="margin-top:12px"><div class="small" style="font-weight:600">Summer months <span class="muted" id="pcSeason"></span></div>
+        <div class="row" id="pcMonths" style="justify-content:flex-start;margin-top:6px"></div>
+        <p class="muted small">In the other months a rule uses its winter temperature, or rests if it has none.</p></div>
+    </div>
+    <div id="pcRules" style="display:grid;gap:16px"></div>
+    <div><button class="btn primary" id="pcAdd">+ Add pre-cooling</button></div>
   </section>
 
   <section class="panel" id="tab-setup">
