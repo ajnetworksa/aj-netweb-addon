@@ -1,5 +1,13 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.6.1 - personal appearance always applies
+- **Fixed: a person's own theme and wallpaper were often ignored.** Home Assistant can build the dashboard
+  before it knows who is logged in and which themes exist; the dashboard then fell back to the default
+  look and was not rebuilt. It now asks Home Assistant for the user and the theme list itself, and is
+  rebuilt when they arrive or when dark mode changes.
+- The same fix makes room access (family members, staff, room tablets) and the admin-only pages reliable
+  on the first load.
+
 ## 3.6.0 - doorbell popup on every screen
 - **When someone rings, every wall panel and phone with the dashboard open shows a full-screen popup**:
   "Someone is at the Main Gate", the live door camera (falls back to the ring snapshot), and big

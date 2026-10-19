@@ -18,7 +18,7 @@ import { AjnetwebEnergyCard } from "./cards/energy.js";
 import { AjnetwebModesCard } from "./cards/modes.js";
 import { AjnetwebDoorbellCard } from "./cards/doorbell.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
-import { generateDashboard } from "./strategy/dashboard.js";
+import { generateDashboard, shouldRegenerate } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
 import "./cards/sheet.js";
 
@@ -66,6 +66,10 @@ class AjnetwebDashboardStrategy extends HTMLElement {
 
   static async generate(config, hass) {
     return generateDashboard(config, hass);
+  }
+
+  static shouldRegenerate(config, oldHass, newHass) {
+    return shouldRegenerate(config, oldHass, newHass);
   }
 }
 
