@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.10.0 - Wall panel setup
+- **Studio → Wall panels tab.** Two QR codes for the Wall Panel page: one for a browser or Fully Kiosk Browser
+  (HA's address is filled in from its network settings and can be changed), one for the Home Assistant app.
+- **Apply wall panel profile** for tablets added through HA's Fully Kiosk Browser integration: sets the Wall
+  Panel as the start page, opens it, wakes the screen on motion, dims it after a while and keeps it from
+  switching off. Only the integration's own actions and entities are used; the result lists every step.
+
 ## 3.9.0 - notifications in the header
 - **A bell in the dashboard header** with the number of new events since you last looked. Tap it for the list
   of the last 48 hours, newest first, by day: doorbell rings, alarm armed / disarmed / triggered, water leaks,

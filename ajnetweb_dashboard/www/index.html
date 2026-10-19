@@ -35,6 +35,7 @@
       <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
       <button class="tab" data-tab="modes" role="tab">House modes</button>
+      <button class="tab" data-tab="panels" role="tab">Wall panels</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
@@ -265,6 +266,51 @@
               is possible but means anyone who can switch the mode (Alexa too) disarms the house.</li>
             <li>Shades means curtains and blinds only. Gates and garage doors are never moved by a mode.</li>
             <li>After adding devices, press <b>Apply</b> (or Deploy) again so the modes include them.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-panels">
+        <div class="card">
+          <h2>Open the Wall Panel on a tablet</h2>
+          <p class="desc">Scan a code with the tablet's camera. The first opens the Wall Panel page in a browser or
+            Fully Kiosk Browser (use it as the <i>Start URL</i>); the second opens it in the Home Assistant app.</p>
+          <p class="muted" id="wpViewOff" hidden>The Wall Panel page is switched off in Design → Pages. Turn it on and
+            deploy, or the codes open a page that doesn't exist.</p>
+          <div class="form-grid">
+            <label>Home Assistant address as the tablet sees it
+              <input id="wpBase" type="url" placeholder="http://192.168.1.10:8123" maxlength="300">
+              <small class="muted">Taken from Settings → System → Network. Change it if the tablet uses another address.</small>
+            </label>
+          </div>
+          <div class="qr-row" id="wpQr"><p class="muted">Loading…</p></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Fully Kiosk tablets</h2>
+              <p class="desc">Tablets added through Home Assistant's <b>Fully Kiosk Browser</b> integration. <b>Apply</b>
+                sets the Wall Panel as the start page, opens it now, and sets the screen as below.</p>
+            </div>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="wpMotion"><span></span>Wake the screen when someone walks up (camera motion)</label>
+            <label class="switch"><input type="checkbox" id="wpKeepOn"><span></span>Never switch the screen fully off</label>
+          </div>
+          <div class="form-grid">
+            <label>Dim after (seconds, 0 = never)<input id="wpDimAfter" type="number" min="0" max="3600" step="10"></label>
+            <label>Brightness while dimmed (0–255)<input id="wpDimBright" type="number" min="0" max="255" step="1"></label>
+          </div>
+          <div id="wpTablets" class="muted">Looking for tablets…</div>
+          <div id="wpResult"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>To add a tablet: install Fully Kiosk Browser, turn on <i>Remote Administration</i> with a password,
+              then add the <b>Fully Kiosk Browser</b> integration in Home Assistant (it is usually found by itself).</li>
+            <li>Motion and dimming need a Fully Kiosk PLUS licence on the tablet. The start page works without one.</li>
+            <li>Log the tablet in as a normal (non-admin) user so the Installer page stays hidden. More in the Wall Panels guide.</li>
           </ul>
         </div>
       </section>

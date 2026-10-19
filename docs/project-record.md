@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.9.0 |
+| Dashboard Suite + UI kit | 3.10.0 |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
@@ -20,6 +20,26 @@ Versions at the time of writing:
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
 
 ---
+
+## Wall panel setup (Dashboard Suite 3.10.0)
+
+**Asked for:** item 9 of the upgrade list: set up a wall tablet by QR code instead of typing URLs.
+
+**Done:**
+- `ajnetweb_dashboard/wall_panels.py`: Wall Panel URLs (browser and `homeassistant://navigate/...`), QR codes
+  as SVG (segno, installed in the image), Fully Kiosk tablets from the registries, and the profile calls
+  (`fully_kiosk.set_config` startURL, `fully_kiosk.load_url`, motion switch, screensaver timer and
+  brightness, screen-off timer 0).
+- Studio tab *Wall panels*; endpoints `GET /api/wall_panels?base=` and `POST /api/wall_panels/apply`;
+  project key `wall_panel_profile`. Tests in `tests/test_wall_panels.py`.
+
+**Decisions:**
+- *HA's Fully Kiosk integration, not Fully's own provisioning QR*: its actions are public and update-proof,
+  and the installer sees each step's result. Fully's settings-file keys are not documented well enough.
+- *QR codes are made in the add-on*, not in the browser bundle, so nothing is added to the card suite.
+- *The address defaults to HA's internal URL* (then external); the installer can override it per scan.
+
+**Open:** confirm on a real tablet that `startURL` is the key Fully accepts through `set_config`.
 
 ## Notifications in the header (Dashboard Suite 3.9.0)
 

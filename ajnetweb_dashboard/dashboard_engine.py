@@ -22,6 +22,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 import house_modes
+import wall_panels
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
 from themes import install_themes, theme_catalog, theme_name, themes_include_status
@@ -30,7 +31,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.9.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.10.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -75,6 +76,7 @@ DEFAULT_PROJECT = {
     "home_cameras": 4,
     "custom_dashboard": "",    # "My cards" dashboard url_path once created
     "house_modes": house_modes.DEFAULTS,   # Home / Away / Night / Guests (Studio "House modes" tab)
+    "wall_panel_profile": wall_panels.DEFAULT_PROFILE,   # Studio "Wall panels" tab (Fully Kiosk tablets)
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
                        "settings": "admins", "studio": "admins", "exit_kiosk": "admins"},
@@ -481,6 +483,41 @@ class DashboardEngine:
         return {"ok": True, "config": cfg, "targets": {k: len(v) for k, v in plan["targets"].items()},
                 "current": st.get("state") if isinstance(st, dict) else None,
                 "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
+
+    # ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk profile)
+    def _ha_address(self) -> str:
+        cfg = self.client.rest_get("/core/api/config", {}) if self.client.connected else {}
+        cfg = cfg if isinstance(cfg, dict) else {}
+        return cfg.get("internal_url") or cfg.get("external_url") or ""
+
+    def wall_panels_info(self, base_url: str = None) -> Dict[str, Any]:
+        """Studio "Wall panels" tab: QR codes for the Wall Panel page and the Fully Kiosk tablets HA knows."""
+        project = self.load_project()
+        base = (base_url or "").strip() or self._ha_address()
+        if len(base) > 300:
+            return {"ok": False, "error": "Address is too long"}
+        urls = wall_panels.panel_urls(base, project["url_path"])
+        qr = {}
+        for kind, text in urls.items():
+            if text:
+                try:
+                    qr[kind] = wall_panels.qr_svg(text)
+                except RuntimeError as e:
+                    qr["error"] = str(e)
+        tablets = wall_panels.list_tablets(self.client) if self.client.connected else []
+        return {"ok": True, "base_url": base, "urls": urls, "qr": qr, "tablets": tablets,
+                "panel_view": (project.get("views") or {}).get("panel", True) is not False,
+                "profile": wall_panels.clean_profile(project.get("wall_panel_profile"))}
+
+    def wall_panels_apply(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = payload if isinstance(payload, dict) else {}
+        device_id = str(payload.get("device_id") or "")
+        if not re.fullmatch(r"[0-9a-zA-Z_-]{1,64}", device_id):
+            return {"ok": False, "error": "Pick a tablet first", "steps": []}
+        profile = wall_panels.clean_profile(payload.get("profile"))
+        self.save_project({"wall_panel_profile": profile})
+        url = str(payload.get("url") or "").strip()[:300]
+        return wall_panels.apply(self.client, device_id, url, profile)
 
     # ------------------------------------------------------------------ rooms: rename / photo (no HA settings needed)
     def room_update(self, area_id: str, name: str = None, photo: str = None) -> Dict[str, Any]:

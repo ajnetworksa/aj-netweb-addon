@@ -91,6 +91,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "/api/discovery": self._discovery,
             "/api/preview": lambda: {"ok": True, "config": engine.generate()},
             "/api/house_modes": engine.house_modes_info,
+            "/api/wall_panels": lambda: engine.wall_panels_info(self._query().get("base")),
         }
         if path in routes:
             self._guard(lambda: self._send_json(routes[path]()))
@@ -147,6 +148,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         elif path == "/api/house_modes/apply":
             self._guard(lambda: respond(engine.apply_house_modes(
                 engine.save_project(payload["project"]) if payload.get("project") else None)))
+        elif path == "/api/wall_panels/apply":
+            self._guard(lambda: respond(engine.wall_panels_apply(payload)))
         elif path == "/api/blueprints/install":
             self._guard(lambda: respond(engine.install_bundled_blueprints()))
         elif path == "/api/install_resources":
