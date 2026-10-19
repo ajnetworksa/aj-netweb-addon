@@ -43,7 +43,7 @@ Versions at the time of writing:
 **Open:** test on a real Hikvision/Dahua station: ring → popup latency, MJPEG load on cheap tablets,
 sound autoplay in the Companion app.
 
-## House modes (Dashboard Suite 3.5.0)
+## PR #10 + #11 — House modes (Dashboard Suite 3.5.0)
 
 **Asked for:** house modes (home, away, night) in the installer dashboard, wired through the Alexa bridge
 (product plan item 8).
@@ -55,7 +55,7 @@ sound autoplay in the Companion app.
   `automation.ajnetweb_house_modes` through HA's own APIs (input_select collection, script/automation config
   API, label and entity registries). Scripts of modes switched off are removed.
 - `custom:ajnetweb-modes-card` and a new `modes` band (Home and Wall Panel, after the header).
-- Unit tests: `python3 -m unittest discover -s ajnetweb_dashboard/tests`.
+- Tests: `tests/test_house_modes.py` (runs with the automatic checks).
 
 **Decisions:**
 - *The helper is the single source of truth, one automation does the work.* The dashboard, Alexa (via the
