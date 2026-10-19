@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Dashboard Suite",
-  "version": "3.7.0",
+  "version": "3.15.0",
   "slug": "ajnetweb_dashboard",
   "description": "Installer studio for a premium, responsive Home Assistant dashboard (phone, tablet, wall panel) that builds itself from your Areas and Floors. Bundles the AJ Netweb UI kit - no HACS, no card-mod.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",

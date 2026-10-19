@@ -480,6 +480,21 @@
     "device_class": "battery",
     "unit_of_measurement": "%"
    }
+  },
+  "binary_sensor.living_room_presence": {
+   "entity_id": "binary_sensor.living_room_presence",
+   "state": "on",
+   "attributes": {
+    "friendly_name": "Living Room Presence",
+    "device_class": "occupancy"
+   }
+  },
+  "fan.master_bedroom_fan": {
+   "entity_id": "fan.master_bedroom_fan",
+   "state": "on",
+   "attributes": {
+    "friendly_name": "Master Bedroom Fan"
+   }
   }
  },
  "entities": {
@@ -733,6 +748,18 @@
    "entity_id": "sensor.front_door_battery",
    "area_id": "entrance",
    "entity_category": "diagnostic",
+   "labels": []
+  },
+  "binary_sensor.living_room_presence": {
+   "entity_id": "binary_sensor.living_room_presence",
+   "area_id": "living_room",
+   "entity_category": null,
+   "labels": []
+  },
+  "fan.master_bedroom_fan": {
+   "entity_id": "fan.master_bedroom_fan",
+   "area_id": "master_bedroom",
+   "entity_category": null,
    "labels": []
   }
  },
