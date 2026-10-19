@@ -52,6 +52,12 @@ All options live in the add-on (`/data/project.json`) and are re-applied on ever
     following the house.
   - Admins also get **Edit my cards** in the ⋯ menu.
 - **Rooms & Devices**: hide rooms, exclude devices, ★ favourites (shown on Home).
+- **House modes**: Home / Away / Night / Guests. For each mode: lights off or leave, AC off or leave,
+  shades close / open / leave, pause music & TV, alarm (arm away / night / home, disarm or leave), then run
+  a scene or script; lights that no mode turns off; Alexa on/off. **Apply to Home Assistant** creates the
+  `House mode` helper, one script per mode (*Away mode*…) and the automation *AJ Netweb - House modes*.
+  The modes then work the same from the dashboard, from Alexa ("Alexa, turn on Away mode") and from any
+  automation (`input_select.select_option` or `script.ajnetweb_mode_away`).
 - **Support Info**: company/phone/email/notes on the admin-only Installer page.
 - **Deploy & Backups**: deploy, see the generated options (*Show config*), restore older versions.
 
@@ -71,7 +77,7 @@ strategy:
   layout:                             # block order / hidden blocks per page (Studio → Layout)
     home:  { order: [top, rooms, scenes, custom], hidden: [climate] }
     panel: { order: [top, cameras, rooms], hidden: [] }
-                                      # blocks: top scenes access favorites rooms climate insights cameras custom
+                                      # blocks: top modes scenes access favorites rooms climate insights cameras custom
   top_cards: [weather, prayer, media] # cards in the top row, in this order
   cameras: [camera.gate, camera.garden]   # which cameras, in this order (omit = all)
   home_cameras: 4                     # how many cameras on Home
@@ -80,6 +86,10 @@ strategy:
   calendars: [calendar.family]        # agenda calendars (omit = all)
   energy: true                        # false = no energy card
   energy_power: sensor.house_power    # live power on the energy card (found automatically if omitted)
+  house_modes:                        # Home / Away / Night / Guests chips (omit = shown when
+    entity: input_select.ajnetweb_house_mode   #   this helper exists; false = never)
+    names: { night: Sleep }
+    confirm: [away, night]
   header_image: /local/villa.jpg      # optional hero image behind the clock
   exclude_entities:                   # never shown anywhere
     - switch.pump_child_lock
@@ -165,6 +175,8 @@ the add-on on sites — never patch the JS file on one client's server.
 | "Rename the room / use this photo" | 2 | Studio → Layout → Rooms → ✏️ / 📷 |
 | "Add a garden irrigation card with a graph" | 2 | Studio → Layout → *My cards* → HA visual editor |
 | "Hide the store room" | 2 | Untick the room in Studio |
+| "One button when we travel" | 2 | Studio → House modes → *Away*: lights off, AC off, shades close, arm alarm → Apply |
+| "Keep the corridor light on at night" | 2 | Studio → House modes → *Lights no mode turns off* |
 | "Use our villa photo at the top" | 2 | Header image (upload to `/config/www/`, use `/local/...`) |
 | "Make it gold" | 2 / 5 | Desert Dusk / Hospitality theme + *Desert gold* palette, or a brand theme ([04](04-themes-branding.md)) |
 | "Like the new iPhone" | 2 | Liquid Glass theme |

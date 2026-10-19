@@ -1,5 +1,33 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.6.0 - doorbell popup on every screen
+- **When someone rings, every wall panel and phone with the dashboard open shows a full-screen popup**:
+  "Someone is at the Main Gate", the live door camera (falls back to the ring snapshot), and big
+  **Open** buttons per door (tap once to arm, again to open), plus *Dismiss*. It closes by itself after a
+  minute or when the door is opened.
+  - Wakes the screen on Fully Kiosk tablets and plays a short chime (where the browser allows sound).
+  - Arabic and English, right-to-left.
+  - Needs Intercom & Door Station Studio 1.7.0 (it publishes `sensor.ajnetweb_doorbell`).
+- Studio → Design → Kiosk & menu: **Doorbell popup** rule (everyone by default; e.g. *Nobody* for a
+  children's tablet, or specific people).
+- New card `custom:ajnetweb-doorbell-card` (invisible watcher; the dashboard adds it to every page).
+
+## 3.5.0 - house modes
+- **New Studio tab: House modes** (Home, Away, Night, Guests). For each mode choose what happens to lights,
+  AC, shades, music & TV and the alarm, and a scene or script to run after. Lights that must stay on (night
+  lights, aquarium) are ticked once for all modes.
+- **Apply to Home Assistant** creates normal HA items, so modes work without the dashboard too:
+  `input_select.ajnetweb_house_mode`, `script.ajnetweb_mode_<mode>` (*Away mode*…) and the automation
+  *AJ Netweb - House modes*, which runs the actions whenever the mode changes. Deploy also applies them.
+- **Alexa:** the mode scripts get the Alexa Matter Bridge's label (`auto_expose_label`, default `alexa`):
+  "Alexa, turn on Away mode".
+- **Dashboard:** new *House modes* block under the header on Home and the Wall Panel
+  (`custom:ajnetweb-modes-card`, movable in Layout). Away and Night ask "Tap again to confirm". Users limited
+  to some rooms don't get it.
+- Safe defaults: Home changes nothing, gates and garage doors are never moved, the alarm is never disarmed
+  unless you choose it, and a Home Assistant restart doesn't re-run a mode.
+- New strategy option `house_modes`.
+
 ## 3.4.0 - edit the dashboard without YAML
 - **New Studio tab: Layout**, with a live preview (phone or tablet width) and an **Apply** button.
   - Drag the Home and Wall Panel blocks into any order, or untick one to hide it.

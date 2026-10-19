@@ -269,6 +269,20 @@ Reads HA's Energy settings (grid import/export, solar, cost) and the daily total
 statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
 and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
 
+### `custom:ajnetweb-modes-card` — house modes
+
+```yaml
+type: custom:ajnetweb-modes-card
+entity: input_select.ajnetweb_house_mode   # its options are the modes (home, away, night, guests)
+names: { night: Sleep }                    # optional: own names instead of the translated ones
+icons: { away: mdi:airplane }              # optional
+confirm: [away, night]                     # optional: these ask "Tap again to confirm"
+```
+One row of chips; the current mode is highlighted. A tap selects the mode
+(`input_select.select_option`); the *AJ Netweb - House modes* automation that Studio → **House modes**
+creates then runs that mode's actions, so the dashboard, Alexa and your automations behave the same.
+Hold opens the helper's details. Works with any `input_select`: unknown options are shown as they are.
+
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 
 ```yaml
@@ -283,6 +297,20 @@ Each person picks a theme, one of 10 colour gradients and a gradient wallpaper. 
 off (`appearance: true` on the header card). Details: [04](04-themes-branding.md).
 
 Every AJ Netweb card also accepts `palette: <key>` to force a colour gradient on that card.
+
+### `custom:ajnetweb-doorbell-card` — doorbell popup (invisible)
+
+```yaml
+type: custom:ajnetweb-doorbell-card
+entity: sensor.ajnetweb_doorbell   # default; published by the Intercom add-on 1.7.0+
+camera: camera.gate                # optional: override the camera the add-on suggests
+sound: true                        # short chime
+```
+Shows nothing until the sensor turns `ringing`; then a full-screen popup opens over the page with the
+live camera (`camera_proxy_stream`, falling back to snapshots), **Open <door>** buttons (tap once to arm,
+again to press `input_button.ajnetweb_open_door_N`) and *Dismiss*. Each ring opens it once per screen;
+it closes when the sensor goes back to `idle`. The generated dashboard adds it to every page for the
+people allowed by the kiosk rule `doorbell` (default everyone).
 
 ### `custom:ajnetweb-nav-card` — floating navigation bar
 

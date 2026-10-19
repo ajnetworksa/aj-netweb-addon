@@ -21,6 +21,7 @@ import shutil
 import time
 from typing import Any, Dict, List, Optional
 
+import house_modes
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
 from themes import install_themes, theme_catalog, theme_name, themes_include_status
@@ -29,7 +30,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.4.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.6.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -71,13 +72,15 @@ DEFAULT_PROJECT = {
     "cameras": [],             # chosen cameras in order (empty = all)
     "home_cameras": 4,
     "custom_dashboard": "",    # "My cards" dashboard url_path once created
+    "house_modes": house_modes.DEFAULTS,   # Home / Away / Night / Guests (Studio "House modes" tab)
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
-                       "settings": "admins", "studio": "admins", "exit_kiosk": "admins"}},
+                       "settings": "admins", "studio": "admins", "exit_kiosk": "admins"},
+              "doorbell": "all"},
 }
 
 
-LAYOUT_BANDS = ("top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
+LAYOUT_BANDS = ("top", "modes", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
 INSIGHTS = ("calendar", "energy", "temperature")
 
 
@@ -117,6 +120,9 @@ def _kiosk_options(kiosk) -> Optional[Dict[str, Any]]:
         rule = _kiosk_rule(kiosk.get(key))
         if rule is not None and rule != "none":
             out[key] = rule
+    rule = _kiosk_rule(kiosk.get("doorbell"))   # doorbell popup: default everyone
+    if rule is not None and rule != "all":
+        out["doorbell"] = rule
     menu = {k: r for k, r in ((k, _kiosk_rule((kiosk.get("menu") or {}).get(k))) for k in KIOSK_MENU_ITEMS)
             if r is not None}
     if menu:
@@ -257,6 +263,8 @@ class DashboardEngine:
                             and int(project["home_cameras"]) != 4 else None,
             "custom_dashboard": project.get("custom_dashboard") or None,
             "kiosk": _kiosk_options(project.get("kiosk")),
+            # off is stored as false, otherwise the strategy would still show a helper it finds
+            "house_modes": house_modes.strategy_option(house_modes.merge_defaults(project.get("house_modes"))) or False,
             "studio_path": ctx.get("studio_path") or None,
             "panel_live_cameras": project.get("panel_live_cameras", True),
             "cameras_live": project.get("cameras_view_live") or None,
@@ -413,6 +421,11 @@ class DashboardEngine:
         bp = self.install_bundled_blueprints()
         steps.append({"step": "Blueprints", "ok": bp.get("ok"), "detail": f"{len(bp.get('installed', []))} installed"})
 
+        modes = house_modes.merge_defaults(project.get("house_modes"))
+        if modes["enabled"]:
+            hm = self.apply_house_modes(project)
+            steps.extend(hm.get("steps", []))
+
         config = self.generate(project)
         views = [{"title": "Home", "path": "home"}, {"title": "Wall Panel", "path": "tablet"}]
         views = [v for v in views if v["path"] == "home" or (project.get("views") or {}).get("panel", True)]
@@ -442,6 +455,27 @@ class DashboardEngine:
         return {"ok": True, "url_path": url_path, "title": project["title"], "theme": project["theme"],
                 "views": views,
                 "steps": steps}
+
+    # ------------------------------------------------------------------ house modes
+    def apply_house_modes(self, project: Dict[str, Any] = None) -> Dict[str, Any]:
+        project = project or self.load_project()
+        cfg = house_modes.merge_defaults(project.get("house_modes"))
+        if not cfg["enabled"]:
+            return {"ok": False, "error": "Turn house modes on first", "steps": []}
+        model = self.discover(project)
+        if model.get("errors"):
+            return {"ok": False, "error": "; ".join(model["errors"]), "steps": []}
+        return house_modes.apply(self.client, cfg, model)
+
+    def house_modes_info(self) -> Dict[str, Any]:
+        """Studio tab: what Apply would do, the helper's current state and the Alexa bridge."""
+        project = self.load_project()
+        cfg = house_modes.merge_defaults(project.get("house_modes"))
+        plan = house_modes.plan(cfg, self.discover(project))
+        st = self.client.rest_get(f"/core/api/states/{house_modes.HELPER_ENTITY}", None)
+        return {"ok": True, "config": cfg, "targets": {k: len(v) for k, v in plan["targets"].items()},
+                "current": st.get("state") if isinstance(st, dict) else None,
+                "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
 
     # ------------------------------------------------------------------ rooms: rename / photo (no HA settings needed)
     def room_update(self, area_id: str, name: str = None, photo: str = None) -> Dict[str, Any]:

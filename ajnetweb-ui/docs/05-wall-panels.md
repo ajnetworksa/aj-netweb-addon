@@ -23,6 +23,8 @@ cameras first, scenes, access and rooms. Phones use `/<dashboard-url>/home`.
    - Kiosk mode: on (PIN for installers).
    - Motion detection (camera): turn the screen on when someone approaches; screensaver/dim after 2 min.
    - Remote admin: on, so you can reload the page from your office.
+   - Advanced web settings: *Enable JavaScript interface* on, so the doorbell popup can wake the screen.
+   - Web content: *Autoplay audio* on, so the doorbell chime plays.
 4. Optional: integrate Fully Kiosk in HA (built-in integration) to control brightness/screen from automations.
 
 ## Kiosk lock: hide HA's header and sidebar, keep a ⋯ menu
@@ -82,6 +84,13 @@ menu: true            # false = no ⋯ button
 ```
 
 Other ways to hide the sidebar for one user: Profile → *Always hide the sidebar*.
+
+## Doorbell popup
+
+With Intercom & Door Station Studio 1.7.0+, a ring shows a full-screen popup on every panel: live door
+camera and **Open** buttons (tap twice). Nothing to set up on the panel. To keep it off a tablet (e.g. the
+children's room), use a separate HA user for that tablet and Studio → Design → Kiosk & menu →
+*Doorbell popup* → *Specific people* / *Everyone except*.
 
 ## Hardware notes
 

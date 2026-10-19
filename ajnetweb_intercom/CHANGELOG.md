@@ -1,5 +1,15 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.7.0
+- **Doorbell popup on the AJ Netweb dashboard.** On a ring the add-on publishes `sensor.ajnetweb_doorbell`
+  (state `ringing` for 60 s; doors, snapshot and camera as attributes). Dashboard Suite 3.6.0 shows a
+  full-screen camera + Open popup on every panel and phone. A custom event alone wasn't enough: only admin
+  users may subscribe to custom events, a sensor every user can read.
+- **Open-door helpers:** `input_button.ajnetweb_open_door_1` (and `_2` when the second door has a name),
+  created and named automatically. Pressing one opens that door - from the popup, a dashboard tile, Alexa,
+  a scene or an automation. Opening is logged in the visitor history as "(dashboard)".
+- Lock-screen actions and dashboard opens share one code path.
+
 ## 1.6.1
 - Licence page: only asks for something when something is needed. With licensing not switched on, or when
   licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).

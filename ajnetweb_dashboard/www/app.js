@@ -145,6 +145,7 @@
     ["menu.settings", "Menu: Home Assistant settings", "admins"],
     ["menu.studio", "Menu: Dashboard Studio", "admins"],
     ["menu.exit_kiosk", "Menu: exit kiosk mode", "admins"],
+    ["doorbell", "Doorbell popup (camera + open door, needs the Intercom add-on)", "all"],
   ];
   const WHO = [["all", "Everyone"], ["admins", "Admins only"], ["non_admins", "Everyone except admins"],
                ["none", "Nobody"], ["people", "Specific people…"]];
@@ -218,7 +219,7 @@
       return;
     }
     state.layout = res.layout;
-    if (state.project) renderLayoutRooms();
+    if (state.project) { renderLayoutRooms(); renderModesKeep(); renderModesTable(); }
     if (res.error) toast(res.error);
     renderKpis();
     renderRooms();
@@ -378,6 +379,7 @@
   // ------------------------------------------------------------------ layout (drag and drop, no YAML)
   const BANDS = {
     top: ["🕐", "Header + top row", "Clock, status chips, weather · prayer · music / Right now"],
+    modes: ["🌙", "House modes", "Home · Away · Night · Guests (when turned on in House modes)"],
     scenes: ["🎬", "Scenes & quick actions", "Scenes, all lights off, AC off, shades, shortcuts"],
     access: ["🔐", "Access", "Gates, doors, garage, locks"],
     favorites: ["⭐", "Favourites", "Devices you starred in Rooms & Devices"],
@@ -388,8 +390,8 @@
     custom: ["🧩", "My cards", "Your own cards from the My cards dashboard"],
   };
   const DEFAULT_ORDER = {
-    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
-    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
+    home: ["top", "modes", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
+    panel: ["top", "modes", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
   };
   const INSIGHTS = { calendar: ["📅", "Agenda", "Next events from the HA calendars"],
     energy: ["⚡", "Energy", "Used today and the last 7 days (from HA's Energy settings)"],
@@ -560,12 +562,107 @@
     loadPreview();
   }
 
+  // ------------------------------------------------------------------ house modes
+  const MODES = { home: ["🏠", "Home"], away: ["🧳", "Away"], night: ["🌙", "Night"], guests: ["🫖", "Guests"] };
+  const MODE_FIELDS = [
+    ["lights", "Lights", [["keep", "Leave"], ["off", "All off"]]],
+    ["climate", "AC", [["keep", "Leave"], ["off", "All off"]]],
+    ["covers", "Shades", [["keep", "Leave"], ["close", "Close"], ["open", "Open"]]],
+    ["media", "Music & TV", [["keep", "Leave"], ["pause", "Pause"]]],
+    ["alarm", "Alarm", [["keep", "Leave"], ["arm_away", "Arm away"], ["arm_night", "Arm night"], ["arm_home", "Arm home"], ["disarm", "Disarm"]]],
+  ];
+
+  function modesCfg() {
+    const p = state.project;
+    p.house_modes = p.house_modes || {};
+    p.house_modes.modes = p.house_modes.modes || {};
+    return p.house_modes;
+  }
+
+  async function renderModes() {
+    const hm = modesCfg();
+    $("mEnabled").checked = !!hm.enabled;
+    $("mAlexa").checked = hm.alexa !== false;
+    $("mEnabled").onchange = () => { hm.enabled = $("mEnabled").checked; renderModesTable(); saveSoon(); };
+    $("mAlexa").onchange = () => { hm.alexa = $("mAlexa").checked; saveSoon(); };
+    renderModesTable();
+    renderModesKeep();
+    const info = await api("api/house_modes");
+    if (!info.ok) return;
+    const t = info.targets || {};
+    const al = info.alexa || {};
+    $("modesInfo").textContent = `Modes act on ${t.lights || 0} lights, ${t.climate || 0} ACs, ${t.covers || 0} shades, ` +
+      `${t.media || 0} speakers/TVs${t.alarm ? " and the alarm" : " (no alarm found)"}.` +
+      (info.current ? ` Current mode: ${info.current}.` : " Not applied yet.") +
+      (al.installed ? ` Alexa Matter Bridge found (label "${al.label}").` : " Alexa Matter Bridge is not installed.");
+  }
+
+  function renderModesTable() {
+    const hm = modesCfg();
+    const scenes = state.layout ? state.layout.areas.flatMap((a) => [...(a.scenes || []), ...(a.scripts || [])])
+      .filter((e) => !String(e.entity_id).startsWith("script.ajnetweb_mode_")) : [];
+    const box = $("modesTable");
+    box.classList.toggle("off", !hm.enabled);
+    box.innerHTML = Object.entries(MODES).map(([k, [icon, label]]) => {
+      const m = hm.modes[k] || {};
+      const on = !!m.on;   // the add-on fills in the defaults of every mode
+      const sel = (field, opts) => `<select data-m="${k}" data-f="${field}">${opts.map(([o, l]) =>
+        `<option value="${o}" ${m[field] === o ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+      return `<div class="mrow ${on ? "" : "off"}">
+        <label class="mname"><input type="checkbox" data-m="${k}" data-f="on" ${on ? "checked" : ""}> ${icon}
+          <input type="text" data-m="${k}" data-f="name" placeholder="${label}" value="${esc(m.name || "")}" maxlength="40" title="Name on the dashboard and for Alexa"></label>
+        ${MODE_FIELDS.map(([f, l, opts]) => `<label>${l}${sel(f, opts)}</label>`).join("")}
+        <label>Then run<select data-m="${k}" data-f="scene"><option value="">Nothing</option>${scenes.map((e) =>
+          `<option value="${esc(e.entity_id)}" ${m.scene === e.entity_id ? "selected" : ""}>${esc(e.full_name || e.name)}</option>`).join("")}</select></label>
+      </div>`;
+    }).join("");
+    box.querySelectorAll("[data-m]").forEach((el) => el.addEventListener(el.type === "text" ? "input" : "change", () => {
+      const m = (hm.modes[el.dataset.m] = hm.modes[el.dataset.m] || {});
+      m[el.dataset.f] = el.type === "checkbox" ? el.checked : el.value.trim();
+      if (el.dataset.f === "on") el.closest(".mrow").classList.toggle("off", !el.checked);
+      saveSoon();
+    }));
+  }
+
+  function renderModesKeep() {
+    const hm = modesCfg();
+    if (!state.layout) return;
+    const keep = new Set(hm.keep_on || []);
+    const lights = state.layout.areas.flatMap((a) => (a.lights || []).map((e) => Object.assign({ area: a.name }, e)));
+    const box = $("modesKeep");
+    box.innerHTML = lights.length ? lights.map((e) => `<label class="switch"><input type="checkbox" data-keep="${esc(e.entity_id)}"
+      ${keep.has(e.entity_id) ? "checked" : ""}><span></span>${esc(e.area)} · ${esc(e.name)}</label>`).join("") : "No lights found.";
+    box.querySelectorAll("[data-keep]").forEach((cb) => cb.addEventListener("change", () => {
+      const set = new Set(hm.keep_on || []);
+      cb.checked ? set.add(cb.dataset.keep) : set.delete(cb.dataset.keep);
+      hm.keep_on = [...set];
+      saveSoon();
+    }));
+  }
+
+  async function applyModes() {
+    const b = $("btnModesApply");
+    if (!modesCfg().enabled) return toast("Turn on \"Use house modes\" first");
+    b.disabled = true;
+    $("modesResult").innerHTML = `<div class="result">Applying…</div>`;
+    await saveNow();
+    const res = await api("api/house_modes/apply", {});
+    b.disabled = false;
+    const steps = (res.steps || []).map((s) =>
+      `<li>${s.ok ? "✓" : s.ok === false ? "✕" : "•"} ${esc(s.step)}${s.detail ? ` – <span class="muted">${esc(s.detail)}</span>` : ""}</li>`).join("");
+    $("modesResult").innerHTML = `<div class="result ${res.ok ? "ok" : "bad"}"><b>${res.ok ? "House modes are set up." :
+      esc(res.error || "Some steps failed – see below.")}</b>${steps ? `<ul>${steps}</ul>` : ""}
+      ${res.ok ? `<p class="muted">Press <b>Deploy</b> (or Apply in Layout) once so the dashboard shows the modes.</p>` : ""}</div>`;
+    renderModes();
+  }
+
   // ------------------------------------------------------------------ tabs & init
   function activateTab(name) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === `tab-${name}`));
     if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
     if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
+    if (name === "modes") renderModes();
   }
 
   async function init() {
@@ -573,6 +670,7 @@
     $("btnDeploy").addEventListener("click", deploy);
     $("btnDeployTop").addEventListener("click", deploy);
     $("btnApplyLayout").addEventListener("click", applyLayout);
+    $("btnModesApply").addEventListener("click", applyModes);
     document.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("[data-pv]").forEach((x) => x.classList.toggle("on", x === b));
       state.pv = b.dataset.pv; loadPreview();

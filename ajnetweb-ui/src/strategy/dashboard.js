@@ -15,7 +15,7 @@
 //   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
 //   appearance_themes: [theme names] (limit what people can pick)
 //   menu: false (no ⋯ "More" button in the navigation bar), studio_path: <Dashboard Studio panel path>
-//   layout: { home: { order: [band ids], hidden: [band ids] }, panel: {...} }   bands: top scenes access
+//   layout: { home: { order: [band ids], hidden: [band ids] }, panel: {...} }   bands: top modes scenes access
 //           favorites rooms climate insights cameras custom          (Studio "Layout" tab, drag and drop)
 //   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
 //   insights: [calendar, energy, temperature]   cards of the "Today at home" band (Home / Wall Panel)
@@ -25,8 +25,12 @@
 //   room_access: { <user id or name>: { areas: [area ids], home: area id } }   rooms a non-admin user (or a
 //           wall tablet's user) may see and control; home = the room the device belongs to (shown first).
 //           The Room & Guest Pass add-on publishes the same as sensor.ajnetweb_room_access (it wins).
+//   house_modes: { entity, names: { away: "Out" }, icons: {...}, confirm: [away, night] } | false   house modes
+//           chip row ("modes" band). Default: shown when input_select.ajnetweb_house_mode exists (the Dashboard
+//           Suite creates it with Studio → House modes). Room-scoped users never get it.
 //   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
 //            menu: { pages, appearance, profile, reload, settings, studio, exit_kiosk } }  rules per item
+//            doorbell: who gets the full-screen doorbell popup (default all; needs the Intercom add-on)
 //     rule = all | admins | non_admins | none | [user names / ids]   (see core/access.js)
 import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
@@ -36,6 +40,7 @@ import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.j
 import { allowed } from "../core/access.js";
 import { licenseState } from "../core/license.js";
 import { energySources } from "../cards/energy.js";
+import { MODE_ENTITY } from "../cards/modes.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
 
@@ -174,6 +179,14 @@ export async function generateDashboard(config, hass) {
   };
   const weather = cfg.weather || (model.house.weather.includes("weather.forecast_home") ? "weather.forecast_home" : model.house.weather[0]);
   const alarm = (scope ? null : cfg.alarm) || ids("alarms")[0];   // room-scoped users only get an alarm in their rooms
+  const modes = (() => {
+    if (scope || cfg.house_modes === false) return null;
+    const m = typeof cfg.house_modes === "object" && cfg.house_modes ? cfg.house_modes : {};
+    const entity = m.entity || MODE_ENTITY;
+    if (!hass.states[entity]) return null;
+    return { entity, ...(m.names ? { names: m.names } : {}), ...(m.icons ? { icons: m.icons } : {}),
+             ...(Array.isArray(m.confirm) ? { confirm: m.confirm } : {}) };
+  })();
 
   const header = (variant, extra = {}) => {
     const chips = [];
@@ -271,8 +284,8 @@ export async function generateDashboard(config, hass) {
   // Studio "Layout": order of the Home / Wall Panel bands, and which are hidden. Bands added in later
   // versions appear at their default place unless hidden, so saved layouts never lose new features.
   const BANDS = {
-    home: ["top", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
-    panel: ["top", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
+    home: ["top", "modes", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom"],
+    panel: ["top", "modes", "cameras", "rooms", "scenes", "access", "favorites", "climate", "insights", "custom"],
   };
   const layoutOf = (panel) => {
     const key = panel ? "panel" : "home";
@@ -323,6 +336,8 @@ export async function generateDashboard(config, hass) {
       players.length && topCards.includes("media") ? musicCard({ variant: "compact", grid_options: { columns: "full" }, ...onlyNarrow }) : null,
       topCards.includes("media") ? statusCard({ grid_options: { columns: "full" }, ...onlyNarrow }) : null,
     ]);
+    // house modes: Home / Away / Night / Guests - whole-house, so not for room-scoped users
+    built.modes = modes ? band([withLang({ type: "custom:ajnetweb-modes-card", ...modes, grid_options: { columns: "full" } })]) : null;
     // scenes + house-wide buttons (all lights off, AC off, shades, add-on shortcuts)
     const scenes = all("scenes");
     const sceneCards = [];
@@ -457,6 +472,14 @@ export async function generateDashboard(config, hass) {
     // tablets and kiosk panels (HA header hidden), where it stays on at every width.
     main.forEach((v) => v.sections.push(section([withLang({ type: "custom:ajnetweb-nav-card", items,
       ...(menu ? { menu } : {}), ...(hideHeader ? {} : { hide_wide: true }), grid_options: { columns: "full" } })], 4)));
+  }
+  // doorbell popup (camera + Open door) on every page, for the people the kiosk rule allows
+  if (hass.states["sensor.ajnetweb_doorbell"] && allowed(kiosk.doorbell, hass, "all")) {
+    views.forEach((v) => {
+      const last = v.sections[v.sections.length - 1];
+      const watcher = withLang({ type: "custom:ajnetweb-doorbell-card", entity: "sensor.ajnetweb_doorbell", grid_options: { columns: "full" } });
+      if (last) last.cards.push(watcher); else v.sections.push(section([watcher], 4));
+    });
   }
   // dashboard-wide default colour for every AJ Netweb card (a person's own choice still wins)
   if (cfg.palette && PALETTES[cfg.palette]) {

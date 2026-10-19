@@ -30,6 +30,7 @@ from intercom_dahua import DahuaIntercomClient
 from intercom_hikvision import HikvisionIntercomClient
 
 import ajn_license
+import doorbell
 
 LICENSE = ajn_license.License("intercom", "AJ Netweb Intercom & Door Station")
 
@@ -573,6 +574,65 @@ def notify_homeassistant_event(event_name: str, data: dict):
         log.debug("HA event trigger failed: %s", e)
 
 
+def publish_doorbell(ringing: bool, snapshot: str = None, camera: str = None, station: str = None):
+    """sensor.ajnetweb_doorbell for the dashboard popup (see doorbell.py)."""
+    sup_token = os.environ.get("SUPERVISOR_TOKEN")
+    if not sup_token:
+        return
+    body = doorbell.sensor_payload(dict(_config_cache), ringing, snapshot, camera, station)
+    try:
+        import urllib.request
+        req = urllib.request.Request(f"http://supervisor/core/api/states/{doorbell.SENSOR}",
+                                     data=json.dumps(body).encode("utf-8"), method="POST",
+                                     headers={"Authorization": f"Bearer {sup_token}", "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5):
+            pass
+    except Exception as e:
+        log.debug("Publishing %s failed: %s", doorbell.SENSOR, e)
+
+
+_ring_seq = 0
+
+
+def _end_ring(seq: int):
+    if seq == _ring_seq:   # a newer ring keeps the popup open
+        publish_doorbell(False)
+
+
+def ensure_open_buttons():
+    """input_button helpers the dashboard presses to open a door (created once, renamed after the doors)."""
+    have = {i.get("id") for i in (ha_ws_command("input_button/list") or [])}
+    for door, name in doorbell.door_names(dict(_config_cache)).items():
+        oid = doorbell.button_id(door)
+        if oid not in have and ha_ws_command("input_button/create", name=oid, icon="mdi:door-open") is None:
+            log.warning("Could not create input_button.%s", oid)
+            continue
+        ha_ws_command("config/entity_registry/update", entity_id=f"input_button.{oid}", name=f"Open {name}")
+
+
+def doorbell_startup():
+    ensure_open_buttons()
+    publish_doorbell(False)
+
+
+def unlock_from_ha(door_id: int, source: str):
+    """Open a door for an action that came through Home Assistant (lock-screen button, dashboard helper)."""
+    with _state_lock:
+        client = _active_client
+        cfg = dict(_config_cache)
+    if not client:
+        log.warning("Cannot open door %s (%s): door station not connected", door_id, source)
+        return False
+    door_name = cfg.get(f"door_{door_id}_name") or f"Door {door_id}"
+    ok = client.unlock_door(door_id)
+    if ok:
+        log.info("Opened %s via %s", door_name, source)
+        record_visitor_event("door_unlock", f"Unlocked {door_name} ({source})")
+        notify_homeassistant_event("ajnetweb_door_unlocked", {"door": door_id, "name": door_name, "source": source})
+        broadcast_sse({"event": "door_unlocked", "door": door_id, "name": door_name})
+    return ok
+
+
 def get_active_mobile_app_notifiers() -> list:
     """
     Dynamically discover all active Companion App notification services in Home Assistant.
@@ -721,30 +781,10 @@ def handle_mobile_notification_action(action: str, ev_data: dict):
     device_name = ev_data.get("device_id") or ev_data.get("source_device_id") or "Mobile Device"
     log.info("Received Lock-Screen Action from %s: %s", device_name, action)
 
-    with _state_lock:
-        client = _active_client
-        cfg = dict(_config_cache)
-
-    if not client:
-        log.warning("Cannot execute lock screen action %s: Door station client not connected", action)
-        return
-
     if action == "AJNETWEB_UNLOCK_1":
-        door_name = cfg.get("door_1_name", "Main Gate")
-        ok = client.unlock_door(1)
-        if ok:
-            log.info("Successfully unlocked %s via Mobile Lock-Screen Action", door_name)
-            record_visitor_event("door_unlock", f"Unlocked {door_name} (Mobile Lock-Screen Action)")
-            notify_homeassistant_event("ajnetweb_door_unlocked", {"door": 1, "name": door_name, "source": "mobile_action"})
-            broadcast_sse({"event": "door_unlocked", "door": 1, "name": door_name})
+        unlock_from_ha(1, "Mobile Lock-Screen Action")
     elif action == "AJNETWEB_UNLOCK_2":
-        door_name = cfg.get("door_2_name", "Pedestrian Door")
-        ok = client.unlock_door(2)
-        if ok:
-            log.info("Successfully unlocked %s via Mobile Lock-Screen Action", door_name)
-            record_visitor_event("door_unlock", f"Unlocked {door_name} (Mobile Lock-Screen Action)")
-            notify_homeassistant_event("ajnetweb_door_unlocked", {"door": 2, "name": door_name, "source": "mobile_action"})
-            broadcast_sse({"event": "door_unlocked", "door": 2, "name": door_name})
+        unlock_from_ha(2, "Mobile Lock-Screen Action")
 
 
 # ---------------------------------------------------------------- Credential & Guest Key Management
@@ -852,11 +892,22 @@ def ha_action_listener_worker():
                             "type": "subscribe_events",
                             "event_type": "html5_notification.clicked",
                         }))
+                        # "Open" on the dashboard doorbell popup / tile = input_button.press on our helpers
+                        ws.send(json.dumps({
+                            "id": 3,
+                            "type": "subscribe_events",
+                            "event_type": "call_service",
+                        }))
                     elif mtype == "event":
-                        ev_data = msg.get("event", {}).get("data", {})
-                        action = ev_data.get("action")
-                        if LICENSE.allowed():
-                            handle_mobile_notification_action(action, ev_data)
+                        event = msg.get("event", {})
+                        ev_data = event.get("data", {})
+                        if not LICENSE.allowed():
+                            return
+                        if event.get("event_type") == "call_service":
+                            for door in doorbell.pressed_doors(ev_data):
+                                threading.Thread(target=unlock_from_ha, args=(door, "dashboard"), daemon=True).start()
+                            return
+                        handle_mobile_notification_action(ev_data.get("action"), ev_data)
                 except Exception as err:
                     log.error("Error processing HA WebSocket event: %s", err)
 
@@ -891,7 +942,7 @@ def start_ha_action_listener():
 
 def on_door_event(event_info: dict):
     """Callback triggered whenever an event is received from Door Station."""
-    global _last_ring_time
+    global _last_ring_time, _ring_seq
     if not LICENSE.allowed():
         return
     ev = event_info.get("event")
@@ -951,6 +1002,11 @@ def on_door_event(event_info: dict):
 
         record_visitor_event("doorbell_ring", "Doorbell button pressed", history_fn)
         notify_homeassistant_event("ajnetweb_doorbell_ring", event_info)
+        # dashboard popup on wall panels and phones (sensor.ajnetweb_doorbell), closes by itself
+        _ring_seq += 1
+        cams = doorbell_camera_candidates()
+        publish_doorbell(True, snapshot_filename, cams[0] if cams else None, event_info.get("station"))
+        threading.Timer(doorbell.RING_SHOW_SEC, _end_ring, args=(_ring_seq,)).start()
 
         # Dynamic Hik-Connect / DMSS Push Notification Broadcast
         if _config_cache.get("push_notify_mode", "all_mobile_devices") == "all_mobile_devices":
@@ -2004,6 +2060,7 @@ def main():
     init_client()
     start_ha_action_listener()
     start_credential_pruner()
+    threading.Thread(target=doorbell_startup, daemon=True, name="doorbell-setup").start()
 
     # Ingress always connects to this exact port, so falling back to another port would only
     # hide the problem. Fail loudly instead (another host-network add-on is using it).

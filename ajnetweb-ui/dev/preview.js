@@ -34,6 +34,9 @@ const userData = (() => {
   data.entities[id] = { entity_id: id, area_id: area, entity_category: null, labels: [] };
 });
 data.states["sensor.house_power"] = { entity_id: "sensor.house_power", state: "3420", attributes: { friendly_name: "House power", device_class: "power", unit_of_measurement: "W" } };
+// house modes helper (the Dashboard Suite creates it with Studio → House modes); ?modes=0 hides it
+if (q("modes", "1") !== "0") data.states["input_select.ajnetweb_house_mode"] = { entity_id: "input_select.ajnetweb_house_mode", state: "home",
+  attributes: { friendly_name: "House mode", options: ["home", "away", "night", "guests"], icon: "mdi:home-switch" } };
 data.states["calendar.family"] = { entity_id: "calendar.family", state: "off", last_changed: "x", attributes: { friendly_name: "Family" } };
 data.states["calendar.school"] = { entity_id: "calendar.school", state: "off", last_changed: "x", attributes: { friendly_name: "School" } };
 const day0 = new Date(); day0.setHours(0, 0, 0, 0);
@@ -44,6 +47,12 @@ const wave = (id, base, amp, phase) => [...Array(97)].map((_, i) => ({ s: String
 // speakers that can be grouped (Music Assistant / Sonos style)
 Object.values(data.states).filter((st) => st.entity_id.startsWith("media_player.") && st.attributes.device_class !== "tv")
   .forEach((st) => { st.attributes.supported_features = (st.attributes.supported_features || 0) | 524288; st.attributes.group_members = [st.entity_id]; });
+
+// ?ring=1 : the doorbell is ringing (Intercom add-on sensor)
+if (q("ring", "")) data.states["sensor.ajnetweb_doorbell"] = { entity_id: "sensor.ajnetweb_doorbell", state: "ringing", last_changed: new Date().toISOString(),
+  attributes: { friendly_name: "Doorbell", rang_at: new Date().toISOString(), show_seconds: 60, camera: Object.keys(data.states).find((k) => k.startsWith("camera.")),
+    doors: [{ door: 1, name: "Main Gate", button: "input_button.ajnetweb_open_door_1" }, { door: 2, name: "Pedestrian Door", button: "input_button.ajnetweb_open_door_2" }] } };
+["1", "2"].forEach((n) => (data.states[`input_button.ajnetweb_open_door_${n}`] = { entity_id: `input_button.ajnetweb_open_door_${n}`, state: "unknown", attributes: { friendly_name: `Open door ${n}` } }));
 
 const lang = q("lang", "en");
 const hass = {
@@ -108,13 +117,14 @@ const hass = {
       document.querySelectorAll("*").forEach((el) => { if (el.setConfig && el._hass) el.hass = { ...hass }; });
       return;
     }
-    (d.entity_id || []).forEach((id) => {
+    [].concat(d.entity_id || []).forEach((id) => {
       const st = hass.states[id];
       if (!st) return;
       const ns = { ...st, attributes: { ...st.attributes } };
       if (service === "toggle") ns.state = st.state === "on" ? "off" : "on";
       if (service === "turn_on") ns.state = "on";
       if (service === "turn_off") ns.state = "off";
+      if (service === "select_option") ns.state = d.option;
       if (d.brightness_pct != null) { ns.state = "on"; ns.attributes.brightness = Math.round(d.brightness_pct * 2.55); }
       if (d.temperature != null) ns.attributes.temperature = d.temperature;
       hass.states = { ...hass.states, [id]: ns };
