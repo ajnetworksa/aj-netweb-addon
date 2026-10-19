@@ -138,6 +138,8 @@ open `/<url>/tablet`, screen always on, auto-start on boot.
 - [ ] Scenes run. "All lights off" asks for confirmation.
 - [ ] House modes: Away asks to confirm, then lights/AC/shades/alarm do what was agreed; Home and Night too.
       With Alexa: "Alexa, turn on Night mode" switches the chip on the dashboard.
+- [ ] Alarm (Studio → Alarm): arm Away, open the front door after the exit delay, check the siren sounds and every
+      chosen phone gets the alert; disarm stops the siren; "Alexa, turn on Alarm away" arms it.
 - [ ] Cameras show pictures; tap opens live video.
 - [ ] Arabic users see Arabic (if used).
 - [ ] Appearance (⋯ More → *My theme & colour*): pick a colour and theme on one phone, check that person's tablet.

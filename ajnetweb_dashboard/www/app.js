@@ -755,6 +755,87 @@
     renderModes();
   }
 
+  // ------------------------------------------------------------------ alarm pack
+  const ARM = [["away", "Away"], ["night", "Night"], ["home", "Home"]];
+  function alarmCfg() {
+    const p = state.project;
+    p.alarm = p.alarm || {};
+    p.alarm.sensors = p.alarm.sensors || {};
+    return p.alarm;
+  }
+
+  async function renderAlarm() {
+    const info = await api("api/alarm");
+    if (!info.ok) { $("alarmInfo").textContent = info.error || "Could not read Home Assistant."; return; }
+    const a = alarmCfg();
+    Object.keys(info.config).forEach((k) => { if (a[k] === undefined) a[k] = info.config[k]; });
+    $("aEnabled").checked = !!a.enabled;
+    $("aAlexa").checked = a.alexa !== false;
+    $("aLights").checked = !!a.lights_on;
+    $("aSource").innerHTML = `<option value="auto">Automatic (${info.panels.length ? "the panel in Home Assistant" : "our own - no panel found"})</option>
+      <option value="own">Our own alarm (door, window and motion sensors)</option>` +
+      info.panels.map((pn) => `<option value="panel:${esc(pn.entity_id)}">${esc(pn.name)}</option>`).join("");
+    $("aSource").value = a.source === "panel" && a.panel ? `panel:${a.panel}` : a.source === "own" ? "own" : "auto";
+    $("aCode").value = a.code || "";
+    $("aExit").value = a.exit_delay; $("aEntry").value = a.entry_delay; $("aSiren").value = a.siren_minutes;
+    const own = () => $("aSource").value === "own" || ($("aSource").value === "auto" && !info.panels.length);
+    $("tab-alarm").classList.toggle("own-off", !own());
+    const set = (key, val) => { alarmCfg()[key] = val; saveSoon(); };
+    $("aEnabled").onchange = () => set("enabled", $("aEnabled").checked);
+    $("aAlexa").onchange = () => set("alexa", $("aAlexa").checked);
+    $("aLights").onchange = () => set("lights_on", $("aLights").checked);
+    $("aSource").onchange = () => {
+      const v = $("aSource").value;
+      alarmCfg().source = v.startsWith("panel:") ? "panel" : v;
+      alarmCfg().panel = v.startsWith("panel:") ? v.slice(6) : "";
+      $("tab-alarm").classList.toggle("own-off", !own()); saveSoon();
+    };
+    $("aCode").oninput = () => { const v = $("aCode").value.replace(/\D/g, ""); $("aCode").value = v; if (!v || v.length >= 4) set("code", v); };
+    [["aExit", "exit_delay"], ["aEntry", "entry_delay"], ["aSiren", "siren_minutes"]].forEach(([id, key]) => {
+      $(id).onchange = () => set(key, Number($(id).value));
+    });
+    const u = info.using || {};
+    $("alarmInfo").textContent = (u.own ? `Our own alarm (${u.panel})` : u.panel ? `Using ${u.panel}` : "No alarm panel found.") +
+      (u.state ? ` - now ${u.state}.` : u.own ? " - not created yet; Apply, then restart Home Assistant once." : "") +
+      (u.own && !info.packages_ok ? " Home Assistant doesn't load packages yet (see Good to know)." : "") +
+      (info.alexa && info.alexa.installed ? " Alexa Matter Bridge found." : "");
+    $("alarmSensors").classList.toggle("muted", !info.sensors.length);
+    $("alarmSensors").innerHTML = info.sensors.length ? `<div class="asrow head"><span>Sensor</span>${ARM.map(([, l]) => `<span style="text-align:center">${l}</span>`).join("")}</div>` +
+      info.sensors.map((x) => `<div class="asrow"><span>${esc(x.name)} <small>${x.kind === "motion" ? "motion" : "door / window"}</small></span>
+        ${ARM.map(([m]) => `<label><input type="checkbox" data-as="${esc(x.entity_id)}" data-m="${m}" ${x.modes.includes(m) ? "checked" : ""}></label>`).join("")}</div>`).join("")
+      : "No door, window or motion sensors found.";
+    $("alarmSensors").querySelectorAll("[data-as]").forEach((cb) => cb.addEventListener("change", () => {
+      const row = [...$("alarmSensors").querySelectorAll(`[data-as="${CSS.escape(cb.dataset.as)}"]`)];
+      alarmCfg().sensors[cb.dataset.as] = row.filter((c) => c.checked).map((c) => c.dataset.m);
+      saveSoon();
+    }));
+    const picks = (box, list, key, idKey, empty) => {
+      const chosen = Array.isArray(a[key]) ? a[key] : list.map((x) => x[idKey]);
+      $(box).innerHTML = list.length ? list.map((x) => `<label class="switch"><input type="checkbox" data-pk="${esc(x[idKey])}"
+        ${chosen.includes(x[idKey]) ? "checked" : ""}><span></span>${esc(x.name)}</label>`).join("") : `<span class="muted">${empty}</span>`;
+      $(box).querySelectorAll("[data-pk]").forEach((cb) => cb.addEventListener("change", () => {
+        set(key, [...$(box).querySelectorAll("[data-pk]:checked")].map((c) => c.dataset.pk));
+      }));
+    };
+    picks("alarmSirens", info.sirens, "sirens", "entity_id", "No sirens found (siren entities, or switches named siren).");
+    picks("alarmPhones", info.phones, "notify", "service", "No phones with the Home Assistant app found.");
+  }
+
+  async function applyAlarm() {
+    const b = $("btnAlarmApply");
+    if (!alarmCfg().enabled) return toast("Turn on \"Use the alarm pack\" first");
+    b.disabled = true;
+    $("alarmResult").innerHTML = `<div class="result">Applying…</div>`;
+    await saveNow();
+    const res = await api("api/alarm/apply", {});
+    b.disabled = false;
+    const steps = (res.steps || []).map((x) =>
+      `<li>${x.ok ? "✓" : x.ok === false ? "✕" : "•"} ${esc(x.step)}${x.detail ? ` – <span class="muted">${esc(x.detail)}</span>` : ""}</li>`).join("");
+    $("alarmResult").innerHTML = `<div class="result ${res.ok ? "ok" : "bad"}"><b>${res.ok ? "The alarm pack is set up." :
+      esc(res.error || "Some steps failed – see below.")}</b>${steps ? `<ul>${steps}</ul>` : ""}</div>`;
+    renderAlarm();
+  }
+
   // ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk tablets)
   const wp = { info: null, timer: null };
 
@@ -809,6 +890,7 @@
     if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
     if (name === "modes") renderModes();
     if (name === "panels") renderPanels();
+    if (name === "alarm") renderAlarm();
   }
 
   async function init() {
@@ -817,6 +899,7 @@
     $("btnDeployTop").addEventListener("click", deploy);
     $("btnApplyLayout").addEventListener("click", applyLayout);
     $("btnModesApply").addEventListener("click", applyModes);
+    $("btnAlarmApply").addEventListener("click", applyAlarm);
     $("wpBase").addEventListener("input", () => {
       clearTimeout(wp.timer);
       wp.timer = setTimeout(() => renderPanels($("wpBase").value.trim()), 500);

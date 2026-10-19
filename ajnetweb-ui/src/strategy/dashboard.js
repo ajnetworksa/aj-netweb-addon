@@ -4,7 +4,7 @@
 //
 // Options (all optional):
 //   title, language (en|ar), theme (HA theme name applied to every view), header_image
-//   exclude_entities: [], hidden_areas: [], favorites: [], weather, alarm
+//   exclude_entities: [], hidden_areas: [], favorites: [], weather, alarm (header alarm; Studio Alarm tab sets it)
 //   views: { panel, lights, climate, security, cameras, media, installer }   (true/false)
 //   navbar: true, room_tap: popup|navigate, panel_live_cameras: true, cameras_live: false
 //   shortcuts: [{ name, icon, navigation_path }]   e.g. intercom / CCTV add-on panels
