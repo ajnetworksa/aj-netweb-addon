@@ -106,7 +106,7 @@ body {
   box-shadow: 0 0 12px var(--accent-glow);
 }
 .title-row { display: flex; align-items: center; gap: 8px; }
-.title-row h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; color: #fff; }
+.title-row h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text-primary); }
 .subtitle { font-size: 0.75rem; color: var(--text-secondary); }
 
 .badge {
@@ -225,7 +225,7 @@ body {
 
 /* Section Header */
 .section-sub-header { margin-bottom: 14px; }
-.section-sub-header h3 { font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+.section-sub-header h3 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
 .hint { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; }
 
 /* Passes Grid */
@@ -244,7 +244,7 @@ body {
 .pass-card:hover { border-color: var(--accent); }
 .pass-card.expired { opacity: 0.65; border-color: var(--border-color); }
 .pass-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.pass-title { font-size: 1rem; font-weight: 700; color: #fff; }
+.pass-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); }
 .pass-guest { font-size: 0.8rem; color: var(--accent); margin-top: 2px; }
 
 .pass-rooms-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
@@ -284,7 +284,7 @@ body {
 .matrix-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem; }
 .matrix-table th, .matrix-table td { padding: 12px 16px; border-bottom: 1px solid var(--border-color); }
 .matrix-table th { background: var(--bg-card); color: var(--text-secondary); font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
-.user-col { min-width: 180px; font-weight: 700; color: #fff; }
+.user-col { min-width: 180px; font-weight: 700; color: var(--text-primary); }
 .cell-checkbox { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
 .loading-td { text-align: center; color: var(--text-muted); padding: 30px; }
 
@@ -304,7 +304,7 @@ body {
   width: 100%;
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  color: #fff;
+  color: var(--text-primary);
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
@@ -354,7 +354,7 @@ body {
   justify-content: space-between;
   align-items: center;
 }
-.modal-header h3 { font-size: 1.05rem; font-weight: 700; color: #fff; }
+.modal-header h3 { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); }
 .modal-close-x { background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
 .modal-body { padding: 18px; max-height: 80vh; overflow-y: auto; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; border-top: 1px solid var(--border-color); padding-top: 14px; }

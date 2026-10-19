@@ -2430,3 +2430,11 @@ body.mode-view .admin-only {
 
 
 
+
+/* Following the dashboard appearance (ajnetweb-look.js): keep the call buttons readable on light themes */
+html.ajn-look .audio-action-btn { background: var(--bg-card); }
+html.ajn-look .audio-action-btn.primary { background: var(--accent-subtle); color: var(--accent); }
+html.ajn-look .audio-action-btn.secondary { color: color-mix(in srgb, #a855f7 75%, var(--text-primary)); }
+html.ajn-look .audio-action-btn.warning { color: color-mix(in srgb, #f59e0b 75%, var(--text-primary)); }
+html.ajn-look .logo-icon { background: var(--accent-subtle); }
+html.ajn-look .discover-banner { background: linear-gradient(135deg, var(--accent-subtle) 0%, var(--bg-card) 100%); }

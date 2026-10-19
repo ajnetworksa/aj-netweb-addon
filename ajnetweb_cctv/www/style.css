@@ -1553,3 +1553,7 @@ body {
   padding-bottom: 4px;
 }
 
+
+/* Following the dashboard appearance (ajnetweb-look.js): no fixed dark shades on light themes */
+html.ajn-look .logo-icon { background: var(--accent-subtle); }
+html.ajn-look .discover-banner { background: linear-gradient(135deg, var(--accent-subtle) 0%, var(--bg-card) 100%); }

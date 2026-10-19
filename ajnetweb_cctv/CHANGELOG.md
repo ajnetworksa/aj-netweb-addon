@@ -1,5 +1,10 @@
 # Changelog - AJ Netweb CCTV & NVR Studio
 
+## 1.4.0
+- The Studio follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
+  AJ Netweb add-on. Its own colour picker is hidden while it does, with a note saying where to change it.
+  Opened outside Home Assistant it keeps its own look.
+
 ## 1.3.1
 - Licence page: only asks for something when something is needed. With licensing not switched on, or when
   licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).

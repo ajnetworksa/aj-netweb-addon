@@ -41,7 +41,7 @@ jobs:
       - name: Build the cards
         run: npm run build
       - name: Committed bundle matches the source
-        run: git diff --exit-code -- dist ../ajnetweb_dashboard/www/ajnetweb-card-suite.js
+        run: git diff --exit-code -- dist ../ajnetweb_dashboard/www/ajnetweb-card-suite.js ../ajnetweb_*/www/ajnetweb-look.js
       - name: Add-on web pages parse
         working-directory: .
         run: for f in ajnetweb_*/www/*.js; do node --check "$f"; done

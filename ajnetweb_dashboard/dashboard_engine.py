@@ -30,7 +30,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.6.1")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.7.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AJ Netweb Room &amp; Guest Pass Studio</title>
   <link rel="stylesheet" href="style.css">
+  <script src="ajnetweb-look.js" data-vars='{"--bg-primary":"bg","--bg-space":"bg","--bg-panel":"surface","--bg-surface":"surface","--bg-card":"surface2","--bg-hover":"hover","--border-color":"border","--border-subtle":"border","--text-primary":"text","--text-secondary":"text2","--text-muted":"muted","--text-dim":"muted","--accent":"accent","--accent-hover":"accent_hover","--accent-glow":"accent_glow","--accent-subtle":"accent_soft"}'></script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔑</text></svg>">
 </head>
 <body>
@@ -65,7 +66,7 @@
 
     <!-- Header Actions -->
     <div class="header-actions">
-      <div class="theme-select">
+      <div class="theme-select" data-ajn-look-hide>
         <select id="quickThemeSelect" title="Color Theme">
           <option value="cyan">⚡ Cyber Cyan</option>
           <option value="emerald">🌲 Emerald Night</option>
@@ -75,7 +76,7 @@
           <option value="custom">🎨 Custom Color</option>
         </select>
       </div>
-      <label class="theme-color-picker" id="colorPickerWrapper" title="Choose Accent Color" style="display:none;">
+      <label class="theme-color-picker" id="colorPickerWrapper" data-ajn-look-hide title="Choose Accent Color" style="display:none;">
         <input type="color" id="headerColorPicker" value="#00e5ff">
       </label>
     </div>
@@ -192,7 +193,9 @@
         <h2>Studio Settings &amp; Defaults</h2>
         <p class="hint">Configure default guest pass expiration, permitted device domains, and interface appearance.</p>
 
-        <!-- Appearance -->
+        <!-- Appearance (hidden while the page follows the dashboard appearance) -->
+        <p class="ajn-look-note" data-ajn-look-note hidden></p>
+        <div data-ajn-look-hide>
         <div class="settings-section-title">Color Theme &amp; OLED Mode</div>
         <div class="form-grid-2">
           <div class="form-row">
@@ -206,6 +209,7 @@
               <option value="true">Pure OLED Black (#000000)</option>
             </select>
           </div>
+        </div>
         </div>
 
         <!-- Pass Defaults -->

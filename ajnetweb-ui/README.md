@@ -36,7 +36,7 @@ any Home Assistant project.
 ## Use it in any project
 
 1. Copy `dist/ajnetweb-ui.js` to `/config/www/ajnetweb-ui.js`.
-2. Settings → Dashboards → ⋮ → Resources → add `/local/ajnetweb-ui.js?v=3.6.1` as **JavaScript module**.
+2. Settings → Dashboards → ⋮ → Resources → add `/local/ajnetweb-ui.js?v=3.7.0` as **JavaScript module**.
 3. Create the dashboard:
    - HA 2026.5+: Settings → Dashboards → **Add dashboard** → *Community dashboards* → **AJ Netweb Home**.
    - Older: add a blank dashboard, open the raw configuration editor and paste
