@@ -247,6 +247,35 @@ THEMES: Dict[str, Dict] = {
                           gradient="linear-gradient(135deg, #d0bcff 0%, #efb8c8 100%)"),
         },
     },
+    # ------------------------------------------------------------ 3.16 themes
+    "rounded_bubble": {
+        "name": "AJ Netweb Bubble",
+        "label": "Bubble",
+        "description": "Soft, very round cards that float on a light shadow. Friendly and playful, no blur.",
+        "modes": {
+            "light": _mode("#eef1f6", "#eef1f6", "#ffffff", "rgba(20, 30, 60, 0.05)", "#1b1f2a", "#6b7385", "#4f7cff",
+                           is_dark=False, radius="32px", shadow="0 6px 20px rgba(30, 45, 90, 0.08)",
+                           surface_on="#e3eaff", text_on="#1b2a5c", nav="rgba(27, 31, 42, 0.86)",
+                           gradient="linear-gradient(135deg, #4f7cff 0%, #8a63ff 100%)"),
+            "dark": _mode("#15171c", "#15171c", "#22252c", "rgba(255, 255, 255, 0.05)", "#eef1f6", "#9aa1b0",
+                          "#7c9cff", is_dark=True, radius="32px", shadow="0 6px 20px rgba(0, 0, 0, 0.35)",
+                          surface_on="#2f3b6b", text_on="#e3eaff", glow="rgba(124, 156, 255, 0.2)",
+                          nav="rgba(34, 37, 44, 0.94)",
+                          gradient="linear-gradient(135deg, #7c9cff 0%, #b18cff 100%)"),
+        },
+    },
+    "pastel_minimal": {
+        "name": "AJ Netweb Pastel",
+        "label": "Pastel Minimal",
+        "description": "Near-black and quiet, with soft pastel accents (lavender, rose, mint). Calm at night.",
+        "modes": {
+            "dark": _mode("#09090b", "#09090b", "#131316", "rgba(255, 255, 255, 0.06)", "#f5f5f7", "#8e8e96",
+                          "#a99af2", is_dark=True, radius="22px", header="#09090b",
+                          surface_on="#ece7ff", text_on="#2a2440", glow="rgba(169, 154, 242, 0.18)",
+                          nav="rgba(19, 19, 22, 0.94)",
+                          gradient="linear-gradient(135deg, #9d8cf0 0%, #e394ad 55%, #6fc9a6 100%)"),
+        },
+    },
 }
 
 

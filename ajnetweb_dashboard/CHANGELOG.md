@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.16.0 - Bubble and Pastel themes
+- **New theme "AJ Netweb Bubble"** (light + dark): very round 32 px cards on a soft shadow, solid surfaces,
+  no blur, blue-violet accent. Friendly and fast on any tablet.
+- **New theme "AJ Netweb Pastel"** (dark): near-black and quiet with soft pastel accents (lavender, rose,
+  mint). Calm for bedrooms and night use.
+- Both appear in Studio, in each person's Appearance picker and on the add-on pages, like every other theme.
+
 ## 3.7.0 - one look for every AJ Netweb add-on
 - **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone
   picks on the dashboard (⋯ → Appearance) also paint Dashboard Studio, CCTV Studio, Door Station, Room Access

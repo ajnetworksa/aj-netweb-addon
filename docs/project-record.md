@@ -11,13 +11,29 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.7.0 |
+| Dashboard Suite + UI kit | 3.16.0 |
 | Prayer & Adhan | 1.2.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## Bubble and Pastel themes (Dashboard Suite 3.16.0)
+
+**Asked for:** cards and looks inspired by https://jlnbln.gumroad.com/: his Rounded-Bubble theme and his
+2026 Black Minimalist dashboard (near-black, pastel accents).
+
+**Done:**
+- `ajnetweb_dashboard/themes.py`: `rounded_bubble` (AJ Netweb Bubble, light + dark) and `pastel_minimal`
+  (AJ Netweb Pastel, dark), documented in `ajnetweb-ui/docs/04-themes-branding.md`.
+
+**Decisions:**
+- Our own colour values built on `_mode()`; nothing from his YAML was used.
+- His "7 custom colours" are already covered by our 10 per-person palettes, so no new palettes.
+- Both themes in one PR because they edit the same lines of `themes.py`.
 
 ---
 
