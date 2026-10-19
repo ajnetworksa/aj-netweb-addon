@@ -20,6 +20,7 @@
 //   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
 //   insights: [calendar, energy, temperature]   cards of the "Today at home" band (Home / Wall Panel)
 //   calendars: [calendar ids] (default: all)   energy: false   energy_power: sensor.house_power (live power)
+//   energy_tariff: auto | sec | dewa | none   bill estimate on the energy card (auto = SEC when HA's country is SA)
 //   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
 //           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
 //   room_access: { <user id or name>: { areas: [area ids], home: area id } }   rooms a non-admin user (or a
@@ -301,7 +302,8 @@ export async function generateDashboard(config, rawHass) {
     const make = {
       calendar: () => (calendars.length ? withLang({ type: "custom:ajnetweb-calendar-card", entities: calendars, days: 7, max: 5 }) : null),
       energy: () => (energy || cfg.energy_entities ? withLang({ type: "custom:ajnetweb-energy-card",
-        ...(powerSensor ? { power: powerSensor } : {}), ...(cfg.energy_entities ? { entities: cfg.energy_entities } : {}) }) : null),
+        ...(powerSensor ? { power: powerSensor } : {}), ...(cfg.energy_entities ? { entities: cfg.energy_entities } : {}),
+        ...(cfg.energy_tariff ? { tariff: cfg.energy_tariff } : {}) }) : null),
       temperature: () => tempGraph(tempRooms),
     };
     return pick.map((k) => make[k] && make[k]()).filter(Boolean).map((c) => { delete c.grid_options; return c; });

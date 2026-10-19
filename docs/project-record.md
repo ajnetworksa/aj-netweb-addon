@@ -11,13 +11,32 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.7.0 |
+| Dashboard Suite + UI kit | 3.8.0 |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
+
+---
+
+## Electricity bill estimate and AC share (Dashboard Suite 3.8.0)
+
+**Asked for:** item 6 of the upgrade list: an energy card for SEC/DEWA bills with the AC share.
+
+**Done:**
+- Energy card: kWh this month, bill so far and projected month end (cost sensor if HA has one, otherwise a
+  tiered tariff estimate), and the AC share of today's use from AC meters.
+- Tariffs `sec` and `dewa` (`TARIFFS` in `cards/energy.js`), `auto` = SEC when HA's country is SA; own tiers in YAML.
+- Strategy option `energy_tariff`, Studio select, preview `?cost=0` to see the estimate.
+
+**Decisions:**
+- *HA's cost sensor wins* over our estimate: it can carry the client's exact tariff.
+- *No auto tariff in the UAE*: Dubai, Abu Dhabi and Sharjah have different utilities; the installer picks.
+- *Estimates exclude meter and fixed fees* (they depend on the breaker size); the label says "est.".
+
+**Open:** check the tariff figures against a current SEC and DEWA bill; ADDC/SEWA presets if needed.
 
 ---
 
