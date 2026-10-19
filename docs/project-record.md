@@ -11,15 +11,37 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.5.0 |
+| Dashboard Suite + UI kit | 3.6.0 |
 | Prayer & Adhan | 1.1.0 |
-| Intercom & Door Station | 1.6.0 |
+| Intercom & Door Station | 1.7.0 |
 | CCTV & NVR Studio | 1.3.0 |
 | Room & Guest Pass Studio | 1.3.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
 
 ---
+
+## Doorbell popup on the wall panels (Dashboard Suite 3.6.0, Intercom 1.7.0)
+
+**Asked for:** "doorbell popups on the wall panels".
+
+**Done:**
+- Intercom 1.7.0 publishes `sensor.ajnetweb_doorbell` (ringing for 60 s, doors / snapshot / camera) and
+  creates `input_button.ajnetweb_open_door_N` helpers; a press (any source) opens that door.
+- UI kit: `custom:ajnetweb-doorbell-card` watcher on every page → full-screen popup with live camera,
+  tap-twice Open buttons, Dismiss, auto-close, chime, Fully Kiosk screen wake, Arabic RTL.
+- Kiosk rule `doorbell` (who gets the popup) in the Studio; tests for the sensor payload and press mapping.
+
+**Decisions:**
+- *A sensor, not an event:* HA lets only admins subscribe to custom events; every user can read states.
+- *input_button helpers to open:* any user may press a helper, the add-on (admin token) sees the
+  `call_service` event. No add-on port is exposed to the browser, and the same helper works for Alexa,
+  tiles and automations.
+- *Live view with `camera_proxy_stream`* (HA's own signed MJPEG stream) instead of WebRTC: works for every
+  camera and every browser, no extra component. Two-way talk stays in the Intercom page.
+
+**Open:** test on a real Hikvision/Dahua station: ring → popup latency, MJPEG load on cheap tablets,
+sound autoplay in the Companion app.
 
 ## PR #10 + #11 — House modes (Dashboard Suite 3.5.0)
 

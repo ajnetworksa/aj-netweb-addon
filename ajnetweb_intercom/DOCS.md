@@ -146,7 +146,16 @@ rest_command:
     method: GET
 ```
 
-### 2. Native Event Bus Hooks
+### 2. Doorbell popup on the dashboard (AJ Netweb Dashboard Suite 3.6.0+)
+- On a ring, `sensor.ajnetweb_doorbell` turns `ringing` for 60 seconds. Every screen with the AJ Netweb
+  dashboard open shows a full-screen popup: the live door camera and **Open** buttons (tap twice).
+- Each door gets a helper, `input_button.ajnetweb_open_door_1` / `_2`. Pressing it opens the door, so you can
+  also put it on any dashboard, give it to Alexa, or use it in automations ("open the gate when the car
+  arrives"). Anyone with a Home Assistant login can press it, just like the lock-screen button.
+- The camera shown is the add-on option `doorbell_camera_entity`, else the first door-like camera.
+- Who sees the popup: Dashboard Studio → Design → Kiosk & menu → *Doorbell popup*.
+
+### 3. Native Event Bus Hooks
 - `ajnetweb_doorbell_ring`: Dispatched on doorbell button press (ideal for smart speaker chimes or flashing smart lights).
 - `ajnetweb_door_unlocked`: Dispatched on electric strike release with door ID, label, and trigger source.
 

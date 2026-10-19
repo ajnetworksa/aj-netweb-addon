@@ -48,6 +48,12 @@ const wave = (id, base, amp, phase) => [...Array(97)].map((_, i) => ({ s: String
 Object.values(data.states).filter((st) => st.entity_id.startsWith("media_player.") && st.attributes.device_class !== "tv")
   .forEach((st) => { st.attributes.supported_features = (st.attributes.supported_features || 0) | 524288; st.attributes.group_members = [st.entity_id]; });
 
+// ?ring=1 : the doorbell is ringing (Intercom add-on sensor)
+if (q("ring", "")) data.states["sensor.ajnetweb_doorbell"] = { entity_id: "sensor.ajnetweb_doorbell", state: "ringing", last_changed: new Date().toISOString(),
+  attributes: { friendly_name: "Doorbell", rang_at: new Date().toISOString(), show_seconds: 60, camera: Object.keys(data.states).find((k) => k.startsWith("camera.")),
+    doors: [{ door: 1, name: "Main Gate", button: "input_button.ajnetweb_open_door_1" }, { door: 2, name: "Pedestrian Door", button: "input_button.ajnetweb_open_door_2" }] } };
+["1", "2"].forEach((n) => (data.states[`input_button.ajnetweb_open_door_${n}`] = { entity_id: `input_button.ajnetweb_open_door_${n}`, state: "unknown", attributes: { friendly_name: `Open door ${n}` } }));
+
 const lang = q("lang", "en");
 const hass = {
   ...data, language: lang, user: { id: "u1", is_admin: q("admin", "1") === "1", name: q("user", "Owner") },  // ?user=Mama&admin=0
@@ -111,7 +117,7 @@ const hass = {
       document.querySelectorAll("*").forEach((el) => { if (el.setConfig && el._hass) el.hass = { ...hass }; });
       return;
     }
-    (d.entity_id || []).forEach((id) => {
+    [].concat(d.entity_id || []).forEach((id) => {
       const st = hass.states[id];
       if (!st) return;
       const ns = { ...st, attributes: { ...st.attributes } };

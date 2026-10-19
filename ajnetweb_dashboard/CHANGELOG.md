@@ -1,5 +1,17 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.6.0 - doorbell popup on every screen
+- **When someone rings, every wall panel and phone with the dashboard open shows a full-screen popup**:
+  "Someone is at the Main Gate", the live door camera (falls back to the ring snapshot), and big
+  **Open** buttons per door (tap once to arm, again to open), plus *Dismiss*. It closes by itself after a
+  minute or when the door is opened.
+  - Wakes the screen on Fully Kiosk tablets and plays a short chime (where the browser allows sound).
+  - Arabic and English, right-to-left.
+  - Needs Intercom & Door Station Studio 1.7.0 (it publishes `sensor.ajnetweb_doorbell`).
+- Studio → Design → Kiosk & menu: **Doorbell popup** rule (everyone by default; e.g. *Nobody* for a
+  children's tablet, or specific people).
+- New card `custom:ajnetweb-doorbell-card` (invisible watcher; the dashboard adds it to every page).
+
 ## 3.5.0 - house modes
 - **New Studio tab: House modes** (Home, Away, Night, Guests). For each mode choose what happens to lights,
   AC, shades, music & TV and the alarm, and a scene or script to run after. Lights that must stay on (night

@@ -16,6 +16,7 @@ import { AjnetwebGraphCard } from "./cards/graph.js";
 import { AjnetwebCalendarCard } from "./cards/calendar.js";
 import { AjnetwebEnergyCard } from "./cards/energy.js";
 import { AjnetwebModesCard } from "./cards/modes.js";
+import { AjnetwebDoorbellCard } from "./cards/doorbell.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
 import { generateDashboard } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
@@ -38,6 +39,7 @@ const CARDS = [
   ["ajnetweb-calendar-card", AjnetwebCalendarCard, "AJ Netweb Agenda", "Next events from your calendars, by day."],
   ["ajnetweb-energy-card", AjnetwebEnergyCard, "AJ Netweb Energy", "Electricity used today, last 7 days, solar, cost and power now."],
   ["ajnetweb-modes-card", AjnetwebModesCard, "AJ Netweb House modes", "Home / Away / Night / Guests in one row; each mode runs its own actions."],
+  ["ajnetweb-doorbell-card", AjnetwebDoorbellCard, "AJ Netweb Doorbell popup", "Invisible: shows a full-screen camera + Open door popup when the doorbell rings."],
   ["ajnetweb-weather-card", AjnetwebWeatherCard, "AJ Netweb Weather", "Current weather and a 5-day forecast with temperature bars."],
   ["ajnetweb-appearance-card", AjnetwebAppearanceCard, "AJ Netweb Appearance", "Lets each person choose their own theme, colour gradient and wallpaper."],
   ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],
@@ -49,7 +51,7 @@ window.customCards = window.customCards || [];
 CARDS.forEach(([tag, cls, name, description]) => {
   if (!customElements.get(tag)) customElements.define(tag, cls);
   if (!window.customCards.some((c) => c.type === tag)) {
-    window.customCards.push({ type: tag, name, description, preview: !tag.includes("nav"), documentationURL: DOCS });
+    window.customCards.push({ type: tag, name, description, preview: !tag.includes("nav") && !tag.includes("doorbell"), documentationURL: DOCS });
   }
 });
 

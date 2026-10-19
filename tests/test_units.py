@@ -43,3 +43,26 @@ def test_themes_include_status(load_addon_module, tmp_path):
     assert themes.themes_include_status(str(tmp_path))["ok"] is True
     cfg.write_text("default_config:\n")
     assert themes.themes_include_status(str(tmp_path))["ok"] is False
+
+
+def test_doorbell_sensor_and_open_buttons(load_addon_module):
+    doorbell = load_addon_module("ajnetweb_intercom", "doorbell")
+    cfg = {"door_1_name": "Main Gate", "door_2_name": ""}
+    idle = doorbell.sensor_payload(cfg, False)
+    assert idle["state"] == "idle" and "rang_at" not in idle["attributes"]
+    assert [d["button"] for d in idle["attributes"]["doors"]] == ["input_button.ajnetweb_open_door_1"]
+    ring = doorbell.sensor_payload(dict(cfg, door_2_name="Pedestrian"), True, "ring_x.jpg", "camera.gate")
+    assert ring["state"] == "ringing"
+    assert ring["attributes"]["snapshot"] == "/local/ajnetweb_intercom/ring_x.jpg"
+    assert ring["attributes"]["camera"] == "camera.gate"
+    assert len(ring["attributes"]["doors"]) == 2
+
+
+def test_doorbell_press_maps_only_our_helpers(load_addon_module):
+    doorbell = load_addon_module("ajnetweb_intercom", "doorbell")
+    press = {"domain": "input_button", "service": "press",
+             "service_data": {"entity_id": ["input_button.ajnetweb_open_door_2", "input_button.other"]}}
+    assert doorbell.pressed_doors(press) == [2]
+    assert doorbell.pressed_doors(dict(press, service_data={"entity_id": "input_button.ajnetweb_open_door_1"})) == [1]
+    assert doorbell.pressed_doors(dict(press, domain="light")) == []
+    assert doorbell.pressed_doors({}) == []
