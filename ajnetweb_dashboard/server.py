@@ -90,6 +90,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "/api/backups": lambda: {"ok": True, "backups": engine.list_backups()},
             "/api/discovery": self._discovery,
             "/api/preview": lambda: {"ok": True, "config": engine.generate()},
+            "/api/house_modes": engine.house_modes_info,
         }
         if path in routes:
             self._guard(lambda: self._send_json(routes[path]()))
@@ -143,6 +144,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         elif path == "/api/preview":
             self._guard(lambda: self._send_json({"ok": True, "config": engine.generate(
                 engine.save_project(payload["project"]) if payload.get("project") else None)}))
+        elif path == "/api/house_modes/apply":
+            self._guard(lambda: respond(engine.apply_house_modes(
+                engine.save_project(payload["project"]) if payload.get("project") else None)))
         elif path == "/api/blueprints/install":
             self._guard(lambda: respond(engine.install_bundled_blueprints()))
         elif path == "/api/install_resources":

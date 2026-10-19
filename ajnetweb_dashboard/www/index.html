@@ -33,6 +33,7 @@
       <button class="tab" data-tab="design" role="tab">Design</button>
       <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
+      <button class="tab" data-tab="modes" role="tab">House modes</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
@@ -220,6 +221,44 @@
             </div>
           </div>
           <div id="roomsList" class="rooms"><div class="muted">Scanning Home Assistant…</div></div>
+        </div>
+      </section>
+
+      <!-- HOUSE MODES -->
+      <section class="panel" id="tab-modes">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>House modes</h2>
+              <p class="desc">One row of buttons on Home and the Wall Panel: <b>Home</b>, <b>Away</b>, <b>Night</b>, <b>Guests</b>.
+                Each mode does what you choose below. <b>Apply</b> creates normal Home Assistant items, so modes also work
+                from Alexa and from your own automations: the <code>House mode</code> helper, one script per mode
+                (<i>Away mode</i>…) and the automation <i>AJ Netweb - House modes</i>.</p>
+            </div>
+            <div class="head-actions"><button id="btnModesApply" class="btn primary">Apply to Home Assistant</button></div>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="mEnabled"><span></span>Use house modes</label>
+            <label class="switch"><input type="checkbox" id="mAlexa"><span></span>Alexa: "Alexa, turn on Away mode"</label>
+          </div>
+          <p class="muted" id="modesInfo"></p>
+          <div class="modes-table" id="modesTable"></div>
+          <div id="modesResult"></div>
+        </div>
+        <div class="card">
+          <h2>Lights no mode turns off</h2>
+          <p class="desc">Night lights, aquarium, a corridor light that should stay on. Every other light in the
+            rooms you show is switched off by a mode set to <i>Lights: off</i>.</p>
+          <div id="modesKeep" class="keep-list muted">Scanning Home Assistant…</div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>Arming the alarm only works when your alarm doesn't ask for a code to arm. Disarming from a mode
+              is possible but means anyone who can switch the mode (Alexa too) disarms the house.</li>
+            <li>Shades means curtains and blinds only. Gates and garage doors are never moved by a mode.</li>
+            <li>After adding devices, press <b>Apply</b> (or Deploy) again so the modes include them.</li>
+          </ul>
         </div>
       </section>
 

@@ -269,6 +269,20 @@ Reads HA's Energy settings (grid import/export, solar, cost) and the daily total
 statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
 and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
 
+### `custom:ajnetweb-modes-card` — house modes
+
+```yaml
+type: custom:ajnetweb-modes-card
+entity: input_select.ajnetweb_house_mode   # its options are the modes (home, away, night, guests)
+names: { night: Sleep }                    # optional: own names instead of the translated ones
+icons: { away: mdi:airplane }              # optional
+confirm: [away, night]                     # optional: these ask "Tap again to confirm"
+```
+One row of chips; the current mode is highlighted. A tap selects the mode
+(`input_select.select_option`); the *AJ Netweb - House modes* automation that Studio → **House modes**
+creates then runs that mode's actions, so the dashboard, Alexa and your automations behave the same.
+Hold opens the helper's details. Works with any `input_select`: unknown options are shown as they are.
+
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 
 ```yaml

@@ -34,6 +34,9 @@ const userData = (() => {
   data.entities[id] = { entity_id: id, area_id: area, entity_category: null, labels: [] };
 });
 data.states["sensor.house_power"] = { entity_id: "sensor.house_power", state: "3420", attributes: { friendly_name: "House power", device_class: "power", unit_of_measurement: "W" } };
+// house modes helper (the Dashboard Suite creates it with Studio → House modes); ?modes=0 hides it
+if (q("modes", "1") !== "0") data.states["input_select.ajnetweb_house_mode"] = { entity_id: "input_select.ajnetweb_house_mode", state: "home",
+  attributes: { friendly_name: "House mode", options: ["home", "away", "night", "guests"], icon: "mdi:home-switch" } };
 data.states["calendar.family"] = { entity_id: "calendar.family", state: "off", last_changed: "x", attributes: { friendly_name: "Family" } };
 data.states["calendar.school"] = { entity_id: "calendar.school", state: "off", last_changed: "x", attributes: { friendly_name: "School" } };
 const day0 = new Date(); day0.setHours(0, 0, 0, 0);
@@ -115,6 +118,7 @@ const hass = {
       if (service === "toggle") ns.state = st.state === "on" ? "off" : "on";
       if (service === "turn_on") ns.state = "on";
       if (service === "turn_off") ns.state = "off";
+      if (service === "select_option") ns.state = d.option;
       if (d.brightness_pct != null) { ns.state = "on"; ns.attributes.brightness = Math.round(d.brightness_pct * 2.55); }
       if (d.temperature != null) ns.attributes.temperature = d.temperature;
       hass.states = { ...hass.states, [id]: ns };

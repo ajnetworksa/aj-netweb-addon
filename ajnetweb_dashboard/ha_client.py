@@ -135,6 +135,21 @@ class HAClient:
             log.debug("GET %s failed: %s", path, e)
         return default
 
+    def rest(self, method: str, path: str, body: Any = None):
+        """POST / DELETE against the Supervisor; returns (HTTP status, body). Status 0 = not reached."""
+        if not self.token or requests is None:
+            return 0, "no Supervisor connection"
+        try:
+            r = requests.request(method, f"{SUPERVISOR_URL}{path}", headers=self._headers(), timeout=20,
+                                 data=json.dumps(body) if body is not None else None)
+            try:
+                return r.status_code, r.json()
+            except ValueError:
+                return r.status_code, r.text[:200]
+        except Exception as e:
+            log.debug("%s %s failed: %s", method, path, e)
+            return 0, str(e)
+
     def core_version(self) -> str:
         cfg = self.rest_get("/core/api/config", {}) or {}
         return cfg.get("version", "")
