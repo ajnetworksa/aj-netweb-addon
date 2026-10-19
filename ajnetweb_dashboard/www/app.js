@@ -424,6 +424,36 @@
         const list = rows.slice(); const [m] = list.splice(from, 1); list.splice(to, 0, m); from = null; commit(list);
       });
     });
+    // fingers and pens: native drag and drop doesn't work on touch screens, so drag by the grip with pointer events
+    box.querySelectorAll(".srow .grip").forEach((grip) => grip.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      const row = grip.closest(".srow");
+      const start = +row.dataset.i;
+      let to = start;
+      row.classList.add("touch-drag");
+      grip.setPointerCapture(e.pointerId);
+      const y0 = e.clientY;
+      const move = (ev) => {
+        row.style.transform = `translateY(${ev.clientY - y0}px)`;
+        const el = [...box.querySelectorAll(".srow")].find((r) => {
+          if (r === row) return false;
+          const b = r.getBoundingClientRect();
+          return ev.clientY >= b.top && ev.clientY <= b.bottom;
+        });
+        box.querySelectorAll(".srow.over").forEach((r) => r.classList.remove("over"));
+        if (el) { el.classList.add("over"); to = +el.dataset.i; }
+      };
+      const end = () => {
+        grip.removeEventListener("pointermove", move);
+        row.classList.remove("touch-drag"); row.style.transform = "";
+        if (to === start) return box.querySelectorAll(".srow.over").forEach((r) => r.classList.remove("over"));
+        const list = rows.slice(); const [m] = list.splice(start, 1); list.splice(to, 0, m); commit(list);
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", end, { once: true });
+      grip.addEventListener("pointercancel", end, { once: true });
+    }));
     box.querySelectorAll("[data-up],[data-dn]").forEach((b) => b.addEventListener("click", () => {
       const i = +(b.dataset.up ?? b.dataset.dn); const j = b.dataset.up !== undefined ? i - 1 : i + 1;
       if (j < 0 || j >= rows.length) return;
@@ -497,9 +527,9 @@
     const ord = p.room_order || [];
     const sorted = areas.map((a, i) => [a, ord.includes(a.id) ? ord.indexOf(a.id) : 1000 + i]).sort((x, y) => x[1] - y[1]).map(([a]) => a);
     sortable($("lyRooms"), sorted.map((a) => ({ id: a.id, icon: a.picture ? `<img src="${esc(a.picture)}" alt="">` : "🚪", title: a.name,
-      on: true, fixed: floors[a.floor_id] || "No floor", actions: [["rename", "✏️", "Rename room"], ["photo", "📷", "Upload room photo"]] })),
+      on: true, fixed: floors[a.floor_id] || "No floor", actions: [["rename", "✏️", "Rename room"], ["photo", "📷", "Upload room photo"], ["scene", "🎬", "Save what the room does now as a scene"]] })),
       (list) => { p.room_order = list.map((r) => r.id); saveSoon(); },
-      (act, row) => (act === "rename" ? renameRoom(row) : pickPhoto(row)));
+      (act, row) => (act === "rename" ? renameRoom(row) : act === "scene" ? saveScene(row) : pickPhoto(row)));
     const cams = state.layout.areas.flatMap((a) => (a.cameras || []).map((c) => Object.assign({ area: a.name }, c)));
     const chosen = p.cameras && p.cameras.length ? p.cameras : cams.map((c) => c.entity_id);
     const camRows = [...chosen.map((id) => cams.find((c) => c.entity_id === id)).filter(Boolean), ...cams.filter((c) => !chosen.includes(c.entity_id))];
@@ -518,7 +548,7 @@
     renderLayoutRooms(); renderRooms();
   }
 
-  // pick a photo, shrink it in the browser (max 1600 px, JPEG) and set it as the HA area picture
+  // pick a photo, let the installer frame it (4:3, drag + zoom), send it as a JPEG of at most 1600 x 1200
   function pickPhoto(row) {
     const input = document.createElement("input");
     input.type = "file"; input.accept = "image/*";
@@ -526,24 +556,89 @@
       const file = input.files && input.files[0];
       if (!file) return;
       const img = new Image();
-      img.onload = async () => {
-        const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-        const c = document.createElement("canvas");
-        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(img.src);
-        toast("Uploading photo…");
-        const r = await api("api/room", { area_id: row.id, photo: c.toDataURL("image/jpeg", 0.85) });
-        if (!r.ok) return toast(r.error || "Upload failed");
-        const a = state.layout.areas.find((x) => x.id === row.id);
-        if (a) a.picture = r.picture;
-        toast("Photo set - it shows on the photo room cards and room sheets");
-        renderLayoutRooms();
-      };
+      img.onload = () => { URL.revokeObjectURL(img.src); cropPhoto(row, img); };
       img.onerror = () => toast("That file is not an image");
       img.src = URL.createObjectURL(file);
     };
     input.click();
+  }
+
+  function cropPhoto(row, img) {
+    const dlg = $("cropDialog"), cv = $("cropCanvas"), ctx = cv.getContext("2d"), zoom = $("cropZoom");
+    const W = cv.width, H = cv.height;
+    const base = Math.max(W / img.width, H / img.height);   // zoom 1 = the photo just covers the frame
+    const view = { z: 1, x: 0, y: 0 };                       // x/y: offset of the photo centre from the frame centre
+    const clamp = () => {
+      const s = base * view.z, mx = Math.max(0, (img.width * s - W) / 2), my = Math.max(0, (img.height * s - H) / 2);
+      view.x = Math.max(-mx, Math.min(mx, view.x)); view.y = Math.max(-my, Math.min(my, view.y));
+    };
+    const draw = (c, w, h) => {
+      const s = base * view.z * (w / W), iw = img.width * s, ih = img.height * s;
+      c.fillStyle = "#111"; c.fillRect(0, 0, w, h);
+      c.drawImage(img, (w - iw) / 2 + view.x * (w / W), (h - ih) / 2 + view.y * (h / H), iw, ih);
+    };
+    const paint = () => { clamp(); draw(ctx, W, H); };
+    zoom.value = 1;
+    zoom.oninput = () => { view.z = +zoom.value; paint(); };
+    let drag = null;
+    cv.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = (e) => {
+      if (!drag) return;
+      const k = W / cv.getBoundingClientRect().width;
+      view.x = drag.vx + (e.clientX - drag.x) * k; view.y = drag.vy + (e.clientY - drag.y) * k; paint();
+    };
+    cv.onpointerup = cv.onpointercancel = () => { drag = null; };
+    cv.onwheel = (e) => { e.preventDefault(); zoom.value = view.z = Math.max(1, Math.min(4, view.z * (e.deltaY < 0 ? 1.08 : 0.93))); paint(); };
+    $("btnCropCancel").onclick = () => dlg.close();
+    $("btnCropSave").onclick = async () => {
+      const out = document.createElement("canvas");   // as many pixels as the frame covers in the original, 400-1600 wide
+      out.width = Math.round(Math.max(400, Math.min(1600, W / (base * view.z))));
+      out.height = Math.round(out.width * H / W);
+      draw(out.getContext("2d"), out.width, out.height);
+      $("btnCropSave").disabled = true;
+      toast("Uploading photo…");
+      const r = await api("api/room", { area_id: row.id, photo: out.toDataURL("image/jpeg", 0.85) });
+      $("btnCropSave").disabled = false;
+      if (!r.ok) return toast(r.error || "Upload failed");
+      dlg.close();
+      const a = state.layout.areas.find((x) => x.id === row.id);
+      if (a) a.picture = r.picture;
+      toast("Photo set - it shows on the photo room cards and room sheets");
+      renderLayoutRooms();
+    };
+    paint();
+    dlg.showModal();
+  }
+
+  // save what a room's devices are doing now as a normal HA scene in that room
+  async function saveScene(row) {
+    const dlg = $("sceneDialog");
+    $("sceneTitle").textContent = `Save ${row.title} as a scene`;
+    $("sceneName").value = "";
+    $("sceneResult").innerHTML = "";
+    $("sceneList").classList.add("muted");
+    $("sceneList").textContent = "Reading the room…";
+    $("btnSceneCancel").onclick = () => dlg.close();
+    dlg.showModal();
+    const res = await api(`api/room/now?area=${encodeURIComponent(row.id)}`);
+    const list = res.entities || [];
+    $("sceneList").classList.toggle("muted", !list.length);
+    $("sceneList").innerHTML = list.length ? list.map((e) => `<label><input type="checkbox" value="${esc(e.entity_id)}"
+        ${e.now === "unavailable" ? "disabled" : e.group === "media" || e.group === "switches" ? "" : "checked"}>
+        ${esc(e.name)}<small>${esc(e.now)}</small></label>`).join("")
+      : esc(res.error || "This room has no lights, curtains, ACs, fans or speakers.");
+    $("btnSceneSave").onclick = async () => {
+      const name = $("sceneName").value.trim();
+      const ids = [...$("sceneList").querySelectorAll("input:checked")].map((cb) => cb.value);
+      if (!name) return toast("Give the scene a name");
+      if (!ids.length) return toast("Tick at least one device");
+      $("btnSceneSave").disabled = true;
+      const r = await api("api/room/scene", { area_id: row.id, name, entities: ids });
+      $("btnSceneSave").disabled = false;
+      if (!r.ok) { $("sceneResult").innerHTML = `<div class="result bad">${esc(r.error || "Could not save the scene")}</div>`; return; }
+      dlg.close();
+      toast(`Scene "${name}" saved with ${r.count} devices - it shows on the room page`);
+    };
   }
 
   function loadPreview() {

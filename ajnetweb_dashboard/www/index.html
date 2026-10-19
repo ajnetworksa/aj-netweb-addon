@@ -375,6 +375,28 @@
     <pre id="previewCode"></pre>
   </dialog>
 
+  <dialog id="cropDialog" class="small">
+    <div class="dialog-head"><h3>Room photo</h3>
+      <div><button class="btn" id="btnCropCancel">Cancel</button> <button class="btn primary" id="btnCropSave">Use photo</button></div></div>
+    <div class="dialog-body">
+      <p class="muted">Drag the photo to choose what shows. Room cards show the middle of this frame.</p>
+      <canvas id="cropCanvas" width="800" height="600"></canvas>
+      <label class="crop-zoom">Zoom<input id="cropZoom" type="range" min="1" max="4" step="0.01" value="1"></label>
+    </div>
+  </dialog>
+
+  <dialog id="sceneDialog" class="small">
+    <div class="dialog-head"><h3 id="sceneTitle">Save as scene</h3>
+      <div><button class="btn" id="btnSceneCancel">Cancel</button> <button class="btn primary" id="btnSceneSave">Save scene</button></div></div>
+    <div class="dialog-body">
+      <p class="muted">Set the room the way the client likes it first (from the dashboard or the devices themselves),
+        then save. The scene remembers what the ticked devices are doing now and appears on the room's page.</p>
+      <label class="field">Scene name<input id="sceneName" type="text" maxlength="60" placeholder="Evening, Guests, Movie…"></label>
+      <div id="sceneList" class="scene-list muted">Reading the room…</div>
+      <div id="sceneResult"></div>
+    </div>
+  </dialog>
+
   <div id="toast" class="toast" role="status"></div>
   <script src="app.js"></script>
 </body>

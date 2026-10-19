@@ -22,6 +22,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 import house_modes
+import scenes
 import wall_panels
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
@@ -31,7 +32,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.10.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.11.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -551,6 +552,25 @@ class DashboardEngine:
             log.error("Room update failed: %s", e)
             return {"ok": False, "error": str(e)}
         return {"ok": True, **fields}
+
+    # ------------------------------------------------------------------ rooms: save what a room does now as a scene
+    def room_now(self, area_id: str) -> Dict[str, Any]:
+        if not re.fullmatch(r"[a-z0-9_]{1,64}", area_id or ""):
+            return {"ok": False, "error": "invalid room"}
+        return {"ok": True, "entities": scenes.room_now(self.client, self.discover_raw(), area_id)}
+
+    def save_scene(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = payload if isinstance(payload, dict) else {}
+        area_id = str(payload.get("area_id") or "")
+        if not re.fullmatch(r"[a-z0-9_]{1,64}", area_id):
+            return {"ok": False, "error": "invalid room"}
+        name = str(payload.get("name") or "").strip()
+        if not 1 <= len(name) <= 60:
+            return {"ok": False, "error": "Scene name must be 1-60 characters"}
+        icon = str(payload.get("icon") or "")
+        icon = icon if re.fullmatch(r"mdi:[a-z0-9-]{1,60}", icon) else ""
+        ids = [str(e) for e in (payload.get("entities") or []) if isinstance(e, str)][:100]
+        return scenes.save(self.client, self.discover_raw(), area_id, name, ids, icon)
 
     # ------------------------------------------------------------------ "My cards"
     MY_CARDS_URL = "ajnetweb-cards"

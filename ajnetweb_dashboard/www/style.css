@@ -240,3 +240,18 @@ dialog pre { margin: 0; padding: 16px; font-size: 12px; overflow: auto; max-heig
 .tablet-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0;
   border-top: 1px solid var(--border); }
 .tablet-row small { color: var(--text-2); }
+
+/* crop and scene dialogs */
+dialog.small { width: min(560px, 94vw); }
+.dialog-body { padding: 14px 16px 18px; display: grid; gap: 12px; }
+.dialog-body p { margin: 0; }
+#cropCanvas { width: 100%; height: auto; border-radius: 12px; background: #111; touch-action: none; cursor: grab; }
+.crop-zoom { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); }
+.crop-zoom input { flex: 1; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.scene-list { display: grid; gap: 6px; max-height: 46vh; overflow: auto; }
+.scene-list label { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 14px; }
+.scene-list label small { margin-inline-start: auto; color: var(--text-2); }
+.srow .grip { touch-action: none; }
+.srow.touch-drag { position: relative; z-index: 2; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
