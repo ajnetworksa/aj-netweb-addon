@@ -17,6 +17,7 @@ import { AjnetwebCalendarCard } from "./cards/calendar.js";
 import { AjnetwebEnergyCard } from "./cards/energy.js";
 import { AjnetwebModesCard } from "./cards/modes.js";
 import { AjnetwebDoorbellCard } from "./cards/doorbell.js";
+import { AjnetwebApplianceCard } from "./cards/appliance.js";
 import { AjnetwebRoomCard, AjnetwebQuickScenes } from "./cards/legacy.js";
 import { generateDashboard, shouldRegenerate } from "./strategy/dashboard.js";
 import { AjnetwebStrategyEditor } from "./strategy/editor.js";
@@ -40,6 +41,7 @@ const CARDS = [
   ["ajnetweb-energy-card", AjnetwebEnergyCard, "AJ Netweb Energy", "Electricity used today, last 7 days, solar, cost and power now."],
   ["ajnetweb-modes-card", AjnetwebModesCard, "AJ Netweb House modes", "Home / Away / Night / Guests in one row; each mode runs its own actions."],
   ["ajnetweb-doorbell-card", AjnetwebDoorbellCard, "AJ Netweb Doorbell popup", "Invisible: shows a full-screen camera + Open door popup when the doorbell rings."],
+  ["ajnetweb-appliance-card", AjnetwebApplianceCard, "AJ Netweb Appliance", "Washing machine, dryer, dishwasher or 3D printer: progress ring, time left and when it is ready."],
   ["ajnetweb-weather-card", AjnetwebWeatherCard, "AJ Netweb Weather", "Current weather and a 5-day forecast with temperature bars."],
   ["ajnetweb-appearance-card", AjnetwebAppearanceCard, "AJ Netweb Appearance", "Lets each person choose their own theme, colour gradient and wallpaper."],
   ["ajnetweb-nav-card", AjnetwebNavCard, "AJ Netweb Navigation", "Floating glass navigation bar."],

@@ -11,13 +11,32 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.7.0 |
+| Dashboard Suite + UI kit | 3.14.0 |
 | Prayer & Adhan | 1.2.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## Appliance card (Dashboard Suite 3.14.0)
+
+**Asked for:** cards inspired by https://jlnbln.gumroad.com/ ("lets get all card and add you magic touch
+then its ours"); this one follows his free Washing Machine Cards (with a 3D printer version).
+
+**Done:**
+- New `ajnetweb-ui/src/cards/appliance.js` (`custom:ajnetweb-appliance-card`), documented in
+  `ajnetweb-ui/docs/03-cards-reference.md`. Status from any entity (brand state words, on/off, a timer) or
+  from power draw; progress from a % sensor or the timer; time left from minutes, a timestamp or the timer.
+- Sample villa: dryer, dishwasher and printer sensors for the preview.
+
+**Decisions:**
+- Our own code; the store's files carry no licence for commercial use and were not used.
+- Program steps the card can't say better itself (Rinse, Spin, ...) are shown next to "Washing".
+
+**Open:** not placed by the generator yet (could join "Today at home" or the status card).
 
 ---
 

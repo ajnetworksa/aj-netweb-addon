@@ -40,7 +40,10 @@ export const STRINGS = {
     house_mode: "House mode", mode_home: "Home", mode_away: "Away", mode_night: "Night", mode_guests: "Guests",
     this_room: "This room", someone_at: "Someone is at the {door}", open_door: "Open {door}",
     tap_again_open: "Tap again to open", door_opening: "Opening {door}…", dismiss: "Dismiss", live: "LIVE",
-    doorbell_no_open: "Open the door from the door station or the Intercom page.", other_rooms: "Other rooms", new_devices: "Devices without a room", new_devices_hint: "These show under **General**. Give each one a room (Settings → Devices → the device → ✏️ Area) and it moves to that room on every screen by itself.",
+    doorbell_no_open: "Open the door from the door station or the Intercom page.", other_rooms: "Other rooms", new_devices: "Devices without a room", appl_washer: "Washing machine", appl_dryer: "Dryer", appl_dishwasher: "Dishwasher", appl_printer: "3D printer",
+    appl_run_washer: "Washing", appl_run_dryer: "Drying", appl_run_dishwasher: "Washing", appl_run_printer: "Printing",
+    appl_done: "Finished", appl_idle: "Off", appl_ready_at: "ready {time}",
+    new_devices_hint: "These show under **General**. Give each one a room (Settings → Devices → the device → ✏️ Area) and it moves to that room on every screen by itself.",
   },
   ar: {
     morning: "صباح الخير", afternoon: "مساء الخير", evening: "مساء الخير", night: "تصبح على خير",
@@ -82,7 +85,10 @@ export const STRINGS = {
     house_mode: "وضع المنزل", mode_home: "في المنزل", mode_away: "خارج المنزل", mode_night: "الليل", mode_guests: "ضيوف",
     this_room: "هذه الغرفة", someone_at: "يوجد شخص عند {door}", open_door: "فتح {door}",
     tap_again_open: "اضغط مرة أخرى للفتح", door_opening: "جارٍ فتح {door}…", dismiss: "تجاهل", live: "مباشر",
-    doorbell_no_open: "افتح الباب من محطة الباب أو صفحة الإنتركم.", other_rooms: "غرف أخرى", new_devices: "أجهزة بدون غرفة", new_devices_hint: "تظهر هذه الأجهزة ضمن **عام**. حدّد غرفة لكل جهاز (الإعدادات ← الأجهزة ← الجهاز ← ✏️ المنطقة) وسينتقل إلى تلك الغرفة في كل الشاشات تلقائياً.",
+    doorbell_no_open: "افتح الباب من محطة الباب أو صفحة الإنتركم.", other_rooms: "غرف أخرى", new_devices: "أجهزة بدون غرفة", appl_washer: "غسالة الملابس", appl_dryer: "مجفف الملابس", appl_dishwasher: "غسالة الصحون", appl_printer: "طابعة ثلاثية الأبعاد",
+    appl_run_washer: "يغسل", appl_run_dryer: "يجفف", appl_run_dishwasher: "يغسل", appl_run_printer: "يطبع",
+    appl_done: "انتهى", appl_idle: "متوقف", appl_ready_at: "جاهز {time}",
+    new_devices_hint: "تظهر هذه الأجهزة ضمن **عام**. حدّد غرفة لكل جهاز (الإعدادات ← الأجهزة ← الجهاز ← ✏️ المنطقة) وسينتقل إلى تلك الغرفة في كل الشاشات تلقائياً.",
   },
 };
 

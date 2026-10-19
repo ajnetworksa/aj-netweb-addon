@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.14.0 - appliance card
+- **New `custom:ajnetweb-appliance-card`: washing machine, dryer, dishwasher or 3D printer at a glance.**
+  A ring around the appliance fills with the progress and the icon moves while it runs; the card says what
+  it is doing, the time left and the clock time it will be ready, and turns into a green tick when finished.
+  Works with brand integrations, a smart plug with power metering, or a plain timer. English and Arabic.
+- The preview takes `?cards=<JSON list>` to try any card on its own (with `options={"custom_dashboard":"x"}`).
+
 ## 3.7.0 - one look for every AJ Netweb add-on
 - **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone
   picks on the dashboard (⋯ → Appearance) also paint Dashboard Studio, CCTV Studio, Door Station, Room Access
