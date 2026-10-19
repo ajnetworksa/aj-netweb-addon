@@ -39,6 +39,15 @@ used as defaults for the very first project.
 
 Gate relays, door strikes and locks always ask for confirmation before acting.
 
+## House modes
+
+Studio → **House modes**: Home, Away, Night and Guests, each with its own actions (lights, AC, shades,
+music, alarm, a scene). **Apply to Home Assistant** creates `input_select.ajnetweb_house_mode`, one script per
+mode (`script.ajnetweb_mode_away`, named *Away mode*) and the automation `automation.ajnetweb_house_modes`,
+which runs a mode's actions whenever the mode changes. The scripts get the Alexa Matter Bridge's label, so
+"Alexa, turn on Away mode" works once Alexa has found the new devices. These items are managed by the Studio:
+change them there, not in Home Assistant's editors. Apply again after adding devices.
+
 ## Live dashboard (strategy)
 
 Since 3.0 the deployed dashboard only contains `strategy: {type: custom:ajnetweb, ...options}`.
