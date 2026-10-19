@@ -11,7 +11,7 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.8.0 |
+| Dashboard Suite + UI kit | 3.9.0 |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
@@ -20,6 +20,27 @@ Versions at the time of writing:
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
 
 ---
+
+## Notifications in the header (Dashboard Suite 3.9.0)
+
+**Asked for:** item 7 of the upgrade list: a notification centre in the dashboard (doorbell, alarm, water
+leak, gate left open) with history.
+
+**Done:**
+- `cards/notifications.js`: logbook-based list (doorbell rings, alarm changes, safety on, doors/gates opened),
+  grouped by day, new entries marked; `custom:ajnetweb-notifications-card`.
+- Header bell with a count of new entries; opens the list in the shared sheet (`openCardSheet` in
+  `cards/appearance.js`, which now also passes more-info on). Strategy fills the entities; `notifications: false`.
+- Preview: `logbook/get_events` mock.
+
+**Decisions:**
+- *HA's logbook, not our own store:* every user may read it, it covers time the dashboard was closed, and
+  nothing new is stored on the device.
+- *"New" per person per browser* (localStorage): no admin-only API is needed.
+- *Windows left out* of openings: too noisy; doors, gates and garages only.
+- *The "Right now" card stays* for what is wrong at this moment; the bell is for what happened.
+
+**Open:** "gate left open for N minutes" as its own entry (needs a duration rule).
 
 ## Electricity bill estimate and AC share (Dashboard Suite 3.8.0)
 

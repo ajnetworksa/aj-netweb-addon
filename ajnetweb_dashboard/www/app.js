@@ -121,6 +121,7 @@
     bind("fPersonal", (el) => (p.personal = el.checked), (el) => (el.checked = p.personal !== false), "change");
     bind("fWallpaper", (el) => (p.wallpaper = el.checked), (el) => (el.checked = !!p.wallpaper), "change");
     bind("fMenu", (el) => (p.menu = el.checked), (el) => (el.checked = p.menu !== false), "change");
+    bind("fNotifications", (el) => (p.notifications = el.checked), (el) => (el.checked = p.notifications !== false), "change");
     renderKiosk();
     bind("fCamsLive", (el) => (p.cameras_view_live = el.checked), (el) => (el.checked = !!p.cameras_view_live), "change");
 

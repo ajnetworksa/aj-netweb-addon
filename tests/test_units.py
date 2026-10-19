@@ -82,3 +82,13 @@ def test_energy_tariff_option_reaches_the_strategy(load_addon_module, monkeypatc
     assert option("dewa") == "dewa"
     assert option("none") == "none"
     assert option("<script>") is None
+
+
+def test_notifications_off_reaches_the_strategy(load_addon_module, monkeypatch):
+    engine_mod = load_addon_module("ajnetweb_dashboard", "dashboard_engine")
+    engine = engine_mod.DashboardEngine.__new__(engine_mod.DashboardEngine)
+    monkeypatch.setattr(engine, "_context", lambda: {}, raising=False)
+    monkeypatch.setattr(engine, "_music_assistant_entry", lambda: None, raising=False)
+    project = dict(engine_mod.DEFAULT_PROJECT)
+    assert "notifications" not in engine.generate(project)["strategy"]
+    assert engine.generate({**project, "notifications": False})["strategy"]["notifications"] is False
