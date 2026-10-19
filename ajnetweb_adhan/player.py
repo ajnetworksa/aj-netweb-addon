@@ -135,3 +135,25 @@ def play(url: str, path: str, targets: List[str], volume: float, pause: List[str
                     log.warning("resume %s: %s", eid, e)
         log.info("Played %s (%.0fs) on %s; paused %s", os.path.basename(path), length, results, paused)
         return results
+
+
+def play_media(url: str, targets: List[str], volume: float) -> Dict[str, str]:
+    """Start normal playback (not an announcement) and return; used for long recitations and streams."""
+    all_states = ha.states()
+    results: Dict[str, str] = {}
+    for eid in targets:
+        st = all_states.get(eid)
+        if not st or st.get("state") in ("unavailable", "unknown"):
+            results[eid] = "offline"
+            continue
+        sf = (st.get("attributes") or {}).get("supported_features") or 0
+        try:
+            if sf & FEATURE_VOLUME_SET:
+                ha.call_service("media_player", "volume_set", {"entity_id": eid, "volume_level": volume})
+            ha.call_service("media_player", "play_media",
+                            {"entity_id": eid, "media_content_id": url, "media_content_type": "music"})
+            results[eid] = "playing"
+        except ha.HAError as e:
+            results[eid] = f"error: {e}"
+            log.error("play on %s failed: %s", eid, e)
+    return results
