@@ -298,6 +298,20 @@ off (`appearance: true` on the header card). Details: [04](04-themes-branding.md
 
 Every AJ Netweb card also accepts `palette: <key>` to force a colour gradient on that card.
 
+### `custom:ajnetweb-doorbell-card` — doorbell popup (invisible)
+
+```yaml
+type: custom:ajnetweb-doorbell-card
+entity: sensor.ajnetweb_doorbell   # default; published by the Intercom add-on 1.7.0+
+camera: camera.gate                # optional: override the camera the add-on suggests
+sound: true                        # short chime
+```
+Shows nothing until the sensor turns `ringing`; then a full-screen popup opens over the page with the
+live camera (`camera_proxy_stream`, falling back to snapshots), **Open <door>** buttons (tap once to arm,
+again to press `input_button.ajnetweb_open_door_N`) and *Dismiss*. Each ring opens it once per screen;
+it closes when the sensor goes back to `idle`. The generated dashboard adds it to every page for the
+people allowed by the kiosk rule `doorbell` (default everyone).
+
 ### `custom:ajnetweb-nav-card` — floating navigation bar
 
 ```yaml

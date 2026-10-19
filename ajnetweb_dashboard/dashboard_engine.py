@@ -30,7 +30,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.5.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.6.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -75,7 +75,8 @@ DEFAULT_PROJECT = {
     "house_modes": house_modes.DEFAULTS,   # Home / Away / Night / Guests (Studio "House modes" tab)
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
-                       "settings": "admins", "studio": "admins", "exit_kiosk": "admins"}},
+                       "settings": "admins", "studio": "admins", "exit_kiosk": "admins"},
+              "doorbell": "all"},
 }
 
 
@@ -119,6 +120,9 @@ def _kiosk_options(kiosk) -> Optional[Dict[str, Any]]:
         rule = _kiosk_rule(kiosk.get(key))
         if rule is not None and rule != "none":
             out[key] = rule
+    rule = _kiosk_rule(kiosk.get("doorbell"))   # doorbell popup: default everyone
+    if rule is not None and rule != "all":
+        out["doorbell"] = rule
     menu = {k: r for k, r in ((k, _kiosk_rule((kiosk.get("menu") or {}).get(k))) for k in KIOSK_MENU_ITEMS)
             if r is not None}
     if menu:

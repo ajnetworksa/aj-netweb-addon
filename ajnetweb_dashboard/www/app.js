@@ -145,6 +145,7 @@
     ["menu.settings", "Menu: Home Assistant settings", "admins"],
     ["menu.studio", "Menu: Dashboard Studio", "admins"],
     ["menu.exit_kiosk", "Menu: exit kiosk mode", "admins"],
+    ["doorbell", "Doorbell popup (camera + open door, needs the Intercom add-on)", "all"],
   ];
   const WHO = [["all", "Everyone"], ["admins", "Admins only"], ["non_admins", "Everyone except admins"],
                ["none", "Nobody"], ["people", "Specific people…"]];

@@ -30,6 +30,7 @@
 //           Suite creates it with Studio → House modes). Room-scoped users never get it.
 //   kiosk: { hide_header, hide_sidebar,             rules -> kiosk_mode for the kiosk-mode plugin
 //            menu: { pages, appearance, profile, reload, settings, studio, exit_kiosk } }  rules per item
+//            doorbell: who gets the full-screen doorbell popup (default all; needs the Intercom add-on)
 //     rule = all | admins | non_admins | none | [user names / ids]   (see core/access.js)
 import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
@@ -471,6 +472,14 @@ export async function generateDashboard(config, hass) {
     // tablets and kiosk panels (HA header hidden), where it stays on at every width.
     main.forEach((v) => v.sections.push(section([withLang({ type: "custom:ajnetweb-nav-card", items,
       ...(menu ? { menu } : {}), ...(hideHeader ? {} : { hide_wide: true }), grid_options: { columns: "full" } })], 4)));
+  }
+  // doorbell popup (camera + Open door) on every page, for the people the kiosk rule allows
+  if (hass.states["sensor.ajnetweb_doorbell"] && allowed(kiosk.doorbell, hass, "all")) {
+    views.forEach((v) => {
+      const last = v.sections[v.sections.length - 1];
+      const watcher = withLang({ type: "custom:ajnetweb-doorbell-card", entity: "sensor.ajnetweb_doorbell", grid_options: { columns: "full" } });
+      if (last) last.cards.push(watcher); else v.sections.push(section([watcher], 4));
+    });
   }
   // dashboard-wide default colour for every AJ Netweb card (a person's own choice still wins)
   if (cfg.palette && PALETTES[cfg.palette]) {
