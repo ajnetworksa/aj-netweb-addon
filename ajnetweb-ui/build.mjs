@@ -1,8 +1,9 @@
-// Bundles src/ into one file and copies it into the Dashboard Suite add-on.
+// Bundles src/ into one file and copies it into the Dashboard Suite add-on, and builds the shared
+// add-on look (src/look/addon-look.js) into every add-on's www/ajnetweb-look.js.
 //   npm run build      one-off build
 //   npm run watch      rebuild on change
 import { build, context } from "esbuild";
-import { copyFileSync, existsSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, readdirSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)));
 // AJ Netweb licence public key (empty = developer build, licence not enforced). See licensing/README.md.
@@ -34,9 +35,35 @@ const options = {
   }],
 };
 
+// add-on pages: a small classic script (no module), one identical copy per add-on
+// (not Remote Access: its page and agent ship together and are changed only on request)
+const addons = readdirSync("..").filter((d) => d.startsWith("ajnetweb_") && d !== "ajnetweb_tunnel" && existsSync(`../${d}/www`));
+const lookOptions = {
+  entryPoints: ["src/look/addon-look.js"],
+  bundle: true,
+  format: "iife",
+  target: ["chrome90", "safari14", "firefox90"],
+  outfile: "dist/ajnetweb-look.js",
+  minify: true,
+  banner: { js: `/* AJ Netweb look - built from ajnetweb-ui/src/look/addon-look.js, do not edit */` },
+  plugins: [{
+    name: "copy-to-addons",
+    setup(b) {
+      b.onEnd((res) => {
+        if (res.errors.length) return;
+        addons.forEach((d) => copyFileSync("dist/ajnetweb-look.js", `../${d}/www/ajnetweb-look.js`));
+        console.log(`built dist/ajnetweb-look.js and copied to ${addons.join(", ")}`);
+      });
+    },
+  }],
+};
+
 if (process.argv.includes("--watch")) {
   const ctx = await context(options);
   await ctx.watch();
+  const lookCtx = await context(lookOptions);
+  await lookCtx.watch();
 } else {
   await build(options);
+  await build(lookOptions);
 }

@@ -1,5 +1,10 @@
 # Changelog - AJ Netweb Room & Guest Pass Studio
 
+## 1.4.0
+- The Studio follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
+  AJ Netweb add-on. Its own colour picker is hidden while it does, with a note saying where to change it.
+  The guest page is unchanged (guests have no Home Assistant login).
+
 ## 1.3.0
 - **The room matrix now drives the AJ Netweb dashboard live.** After *Save* the add-on publishes
   `sensor.ajnetweb_room_access`; the dashboard builds each restricted user's view with only their rooms

@@ -1,5 +1,10 @@
 # Changelog - AJ Netweb Intercom & Door Station Studio
 
+## 1.8.0
+- The Studio follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
+  AJ Netweb add-on. Its own colour picker is hidden while it does, with a note saying where to change it.
+  Opened outside Home Assistant (for example a kiosk tablet URL) it keeps its own look.
+
 ## 1.7.0
 - **Doorbell popup on the AJ Netweb dashboard.** On a ring the add-on publishes `sensor.ajnetweb_doorbell`
   (state `ringing` for 60 s; doors, snapshot and camera as attributes). Dashboard Suite 3.6.0 shows a

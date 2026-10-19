@@ -1,6 +1,6 @@
 {
   "name": "AJ Netweb Room & Guest Pass Studio",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "slug": "ajnetweb_sharing",
   "description": "Effortless Room & Area Sharing for Home Assistant. Visual user permission matrix, zero-app guest QR codes, temporary expiring room passes, and automated dashboard visibility.",
   "url": "https://github.com/ajnetworksa/aj-netweb-addon",

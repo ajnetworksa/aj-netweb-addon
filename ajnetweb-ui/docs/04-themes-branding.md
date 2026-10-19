@@ -104,6 +104,27 @@ palette: desert                 # optional default
 themes: [AJ Netweb Liquid Glass, AJ Netweb Desert Dusk, Villa Al Noor]   # optional limit
 ```
 
+### The add-on pages follow it too (one system)
+
+Dashboard Studio, CCTV Studio, Door Station, Room Access and Prayer & Adhan load `www/ajnetweb-look.js`.
+Opened from the Home Assistant sidebar, each page reads the logged-in person's appearance and paints
+itself with the same theme, colour and wallpaper as the dashboard:
+
+1. the person's own choice (when `personal` is on),
+2. else the dashboard's options (`theme`, `palette`, `wallpaper`, read from the AJ Netweb dashboard),
+3. else Home Assistant's own theme.
+
+While this applies, the add-on's own colour picker is hidden and a line says where to change it.
+Opened outside Home Assistant (a new tab, a kiosk URL, the guest page) a page keeps its own look.
+Coming back to the page after changing the appearance picks up the new look.
+
+For developers: the script is built from `ajnetweb-ui/src/look/addon-look.js` by `npm run build` and
+copied into every add-on (not Remote Access). A page maps its own CSS variables to the shared colours:
+`<script src="ajnetweb-look.js" data-vars='{"--bg":"bg","--card":"surface","--accent":"accent"}'></script>`.
+Colours: `bg surface surface2 hover text text2 muted border accent accent_hover accent_glow accent_soft`.
+Mark a page's own picker with `data-ajn-look-hide` and put an empty `data-ajn-look-note` element next to it.
+Rules that only make sense on dark backgrounds can be fixed for light themes under `html.ajn-look`.
+
 ---
 
 ## How a theme reaches the cards

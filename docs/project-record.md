@@ -11,13 +11,36 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.6.1 |
-| Prayer & Adhan | 1.1.0 |
-| Intercom & Door Station | 1.7.0 |
-| CCTV & NVR Studio | 1.3.0 |
-| Room & Guest Pass Studio | 1.3.0 |
+| Dashboard Suite + UI kit | 3.7.0 |
+| Prayer & Adhan | 1.2.0 |
+| Intercom & Door Station | 1.8.0 |
+| CCTV & NVR Studio | 1.4.0 |
+| Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## One look for every add-on (Dashboard Suite 3.7.0, Prayer 1.2.0, Intercom 1.8.0, CCTV 1.4.0, Room Access 1.4.0)
+
+**Asked for:** "once the user chooses the appearance it should affect the other add-ons also, like door or
+CCTV, so it will look one system".
+
+**Done:**
+- New `ajnetweb-ui/src/look/addon-look.js`, built to `ajnetweb_*/www/ajnetweb-look.js` (CI checks the copies).
+  Inside HA (ingress, same origin) it reads the person's `ajnetweb_appearance`, the dashboard's strategy
+  options and the theme list from the HA window, and sets each page's own CSS variables on `<body>`
+  (a per-page map in `data-vars`), plus the wallpaper.
+- The Studios' own colour pickers are hidden while it applies, with a note (English / Arabic).
+- A few fixed dark shades in CCTV / Intercom / Room Access fixed for light themes.
+
+**Decisions:**
+- Reading the HA window (`home-assistant` element's `hass`) is the only way an add-on page can know who
+  is logged in; it is wrapped so a page outside HA, or a future HA change, just keeps the add-on's own look.
+- Remote Access left out (its page ships with the agent; not changed without being asked).
+- The guest page of Room Access is not themed (guests are not HA users).
+
+**Open:** the CCTV / Intercom video areas stay black on light themes (on purpose, for video).
 
 ---
 

@@ -1,5 +1,14 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.7.0 - one look for every AJ Netweb add-on
+- **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone
+  picks on the dashboard (⋯ → Appearance) also paint Dashboard Studio, CCTV Studio, Door Station, Room Access
+  and Prayer & Adhan, so the whole system looks the same. With no personal choice they follow the dashboard's
+  own theme and colour, and otherwise Home Assistant's theme.
+  - Each add-on's own colour picker is hidden while this applies, with a line saying where to change it.
+  - Opened outside Home Assistant (a new tab, a kiosk URL) a page keeps its own look.
+- Built from one script in the UI kit (`ajnetweb-ui/src/look/addon-look.js` → `www/ajnetweb-look.js`).
+
 ## 3.6.1 - personal appearance always applies
 - **Fixed: a person's own theme and wallpaper were often ignored.** Home Assistant can build the dashboard
   before it knows who is logged in and which themes exist; the dashboard then fell back to the default

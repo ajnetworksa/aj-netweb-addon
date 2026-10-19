@@ -77,6 +77,7 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
 | New strategy option | header comment of `dashboard.js`, `DEFAULT_PROJECT` + `generate()` in `dashboard_engine.py`, Studio UI (`www/index.html` + `www/app.js`), `docs/02-customization-levels.md` |
 | Device classification (what counts as a light, gate, …) | `src/core/model.js` (keep in sync with the add-on's Python discovery) |
 | Themes | `ajnetweb_dashboard/themes.py`, `ajnetweb-ui/docs/04-themes-branding.md` |
+| Add-on pages following the dashboard look | `ajnetweb-ui/src/look/addon-look.js` (built into each add-on's `www/ajnetweb-look.js`), the `data-vars` map in each `www/index.html` |
 | Studio backend endpoints | `ajnetweb_dashboard/server.py` → `dashboard_engine.py` (validate every input) |
 
 ## Release checklist (every change that ships)
@@ -84,7 +85,8 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
 1. Bump the version in `ajnetweb-ui/package.json` (+ `package-lock.json`), `ajnetweb_dashboard/config.json`,
    `ADDON_VERSION` in `dashboard_engine.py` and the `?v=` in `ajnetweb-ui/README.md` (other add-ons: their
    own `config.json`).
-2. `npm run build` and commit **both** bundles (`dist/ajnetweb-ui.js`, `www/ajnetweb-card-suite.js`).
+2. `npm run build` and commit **both** bundles (`dist/ajnetweb-ui.js`, `www/ajnetweb-card-suite.js`) and the
+   `www/ajnetweb-look.js` copies in the add-ons.
 3. `CHANGELOG.md` of each changed add-on, and a section at the top of `docs/project-record.md`
    (Asked for / Done / Decisions / Open; update the version table).
 4. Docs: the playbook (`01`), options (`02`), cards (`03`) when they change.

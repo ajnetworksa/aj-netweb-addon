@@ -1,5 +1,9 @@
 # Changelog - AJ Netweb Prayer & Adhan
 
+## 1.2.0
+- The page follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
+  AJ Netweb add-on. Opened outside Home Assistant it keeps its own look.
+
 ## 1.1.1
 - Licence page: only asks for something when something is needed. With licensing not switched on, or when
   licensed through AJ Netweb Remote Access, it just shows the status (no licence key box or Activate button).
