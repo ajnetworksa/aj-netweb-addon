@@ -75,6 +75,9 @@ const hass = {
       return Object.fromEntries(msg.statistic_ids.map((id) => [id, [...Array(7)].map((_, d) => ({
         start: Date.parse(msg.start_time) + d * 86400000, change: base[id] * (d === 6 ? 0.55 : 0.8 + ((d * 37) % 5) / 10) }))]));
     }
+    // ?cards=<JSON list of card configs> replaces the sample "My cards" on Home, to try a card on its own
+    if (msg.type === "lovelace/config" && q("cards", "")) return { views: [
+      { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: JSON.parse(q("cards", "[]")) }] }] };
     if (msg.type === "lovelace/config") return { views: [   // a sample "My cards" dashboard
       { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: [{ type: "heading", heading: "Pool & garden" },
         { type: "custom:ajnetweb-device-card", entity: "light.living_room_ceiling", name: "Pool lights", grid_options: { columns: 6 } },

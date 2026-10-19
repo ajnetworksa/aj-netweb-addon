@@ -283,6 +283,22 @@ One row of chips; the current mode is highlighted. A tap selects the mode
 creates then runs that mode's actions, so the dashboard, Alexa and your automations behave the same.
 Hold opens the helper's details. Works with any `input_select`: unknown options are shown as they are.
 
+### `custom:ajnetweb-person-card` — who is home
+
+```yaml
+type: custom:ajnetweb-person-card
+entity: person.ahmed
+size: small                  # optional: small (default, half width) or big (full width, tinted, info chips)
+battery: sensor.ahmed_phone_battery_level   # optional: found by itself from the person's phone tracker; false hides it
+sensors: [sensor.ahmed_travel_time]         # optional, big only: extra chips (travel time, steps, ...)
+name: Baba                   # optional
+picture: /local/ahmed.jpg    # optional: else the person's own photo, else initials
+```
+Photo (or initials) with a ring in the presence colour: green at home, orange away, teal in a named zone
+(the zone's name is shown). Under the name: where and for how long ("Home · for 2 h 5 min"). The phone
+battery chip turns red at 20 % and shows a bolt while charging (`…_battery_state`). Tap opens HA's person
+dialog with the map; tapping a chip opens that sensor.
+
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 
 ```yaml

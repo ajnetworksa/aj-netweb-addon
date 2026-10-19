@@ -11,13 +11,34 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.7.0 |
+| Dashboard Suite + UI kit | 3.13.0 |
 | Prayer & Adhan | 1.2.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+
+---
+
+## Person card (Dashboard Suite 3.13.0)
+
+**Asked for:** "https://jlnbln.gumroad.com/ check the cards from here ... lets implement it here", then
+"lets get all card and add you magic touch then its ours".
+
+**Done:**
+- New `ajnetweb-ui/src/cards/person.js` (`custom:ajnetweb-person-card`), small and big sizes, documented in
+  `ajnetweb-ui/docs/03-cards-reference.md`. Phone battery found from `person.attributes.source`
+  (`sensor.<tracker>_battery_level` / `_battery`, charging from `_battery_state`).
+- Preview: `?cards=` replaces the sample "My cards"; sample villa has trackers, batteries and a zone.
+
+**Decisions:**
+- The store's items (Julian / jlnbln) carry no licence that allows commercial use, so nothing was copied:
+  the cards are our own code, with his designs used only as visual inspiration.
+- Version 3.13.0 because PRs #18-#22 already claim 3.8.0-3.12.0.
+
+**Open:** next from the same review: appliance card (washer / dryer / 3D printer), room card indicator
+icons, a Rounded-Bubble style, a Pastel Minimal theme. The person card is not placed by the generator yet.
 
 ---
 

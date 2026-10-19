@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.13.0 - person card
+- **New `custom:ajnetweb-person-card`: who is home.** A photo (or initials) with a ring in the presence
+  colour (green at home, orange away, teal in a named zone), where the person is and for how long, and their
+  phone battery, found by itself from the person's phone tracker. A `big` size adds a tinted panel and extra
+  chips (travel time, steps, ...). English and Arabic.
+- The preview takes `?cards=<JSON list>` to try any card on its own (with `options={"custom_dashboard":"x"}`).
+
 ## 3.7.0 - one look for every AJ Netweb add-on
 - **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone
   picks on the dashboard (⋯ → Appearance) also paint Dashboard Studio, CCTV Studio, Door Station, Room Access
