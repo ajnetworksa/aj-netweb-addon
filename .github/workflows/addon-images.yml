@@ -1,0 +1,154 @@
+# Builds every add-on as ready-made images and publishes a release when its version changes.
+#
+#   ghcr.io/ajnetworksa/{amd64,aarch64}-addon-<add-on>:<version>
+#
+# Channels: the `main` branch is the stable channel, the `beta` branch is the beta channel. Pilot sites add
+# the repository as  https://github.com/ajnetworksa/aj-netweb-addon#beta  and get versions before everyone else.
+# Promoting a beta = merging beta into main: the version and the image stay the same, so stable gets exactly
+# what the pilot sites ran. A version is built once and never overwritten; to change it, bump it.
+#
+# Remote Access is built with its agent compiled (AJN_COMPILE=true), see docs/remote-access-closed-source.md.
+# Full guide: docs/releasing.md.
+name: Add-on images
+
+on:
+  push:
+    branches: [main, beta]
+    paths: ["ajnetweb_*/config.json"]
+  workflow_dispatch:
+    inputs:
+      addons:
+        description: "Add-on folders to build, space-separated (blank = every add-on). Existing versions are skipped."
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: addon-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      addons: ${{ steps.plan.outputs.addons }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: plan
+        env:
+          INPUT: ${{ github.event.inputs.addons }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            if [ -n "$INPUT" ]; then
+              list=$(printf '%s\n' $INPUT | jq -R . | jq -cs .)
+            else
+              list=$(ls -d ajnetweb_*/ | tr -d / | jq -R . | jq -cs .)
+            fi
+          else
+            list=$(python3 tools/release.py changed --before "$BEFORE")
+          fi
+          echo "Add-ons to build: $list"
+          echo "addons=$list" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.addons != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJson(needs.plan.outputs.addons) }}
+        arch: [amd64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version, base image and build arguments
+        id: meta
+        env:
+          ADDON: ${{ matrix.addon }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          test -f "$ADDON/config.json" || { echo "::error::no add-on folder $ADDON"; exit 1; }
+          version=$(jq -r .version "$ADDON/config.json")
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$owner/$ARCH-addon-$ADDON" >> "$GITHUB_OUTPUT"
+          echo "base=$(jq -r --arg a "$ARCH" '.build_from[$a]' "$ADDON/build.json")" >> "$GITHUB_OUTPUT"
+          echo "platform=$([ "$ARCH" = aarch64 ] && echo linux/arm64 || echo linux/amd64)" >> "$GITHUB_OUTPUT"
+          {
+            echo "args<<EOF_ARGS"
+            jq -r '(.args // {}) | to_entries[] | "\(.key)=\(.value)"' "$ADDON/build.json"
+            echo "EOF_ARGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Skip versions that are already built
+        id: exists
+        run: |
+          if docker manifest inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}" >/dev/null 2>&1; then
+            echo "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }} already exists, not rebuilding."
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.exists.outputs.found != 'true'
+        uses: docker/setup-qemu-action@v3
+      - if: steps.exists.outputs.found != 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - if: steps.exists.outputs.found != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.addon }}
+          platforms: ${{ steps.meta.outputs.platform }}
+          push: true
+          build-args: |
+            BUILD_FROM=${{ steps.meta.outputs.base }}
+            BUILD_ARCH=${{ matrix.arch }}
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            AJN_COMPILE=true
+            ${{ steps.meta.outputs.args }}
+          tags: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+          labels: |
+            io.hass.type=addon
+            io.hass.arch=${{ matrix.arch }}
+            io.hass.version=${{ steps.meta.outputs.version }}
+
+      - name: Check that no Remote Access agent source is in the image
+        if: steps.exists.outputs.found != 'true' && matrix.addon == 'ajnetweb_tunnel'
+        run: |
+          docker run --rm --platform ${{ steps.meta.outputs.platform }} --entrypoint sh \
+            "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}" -c \
+            'ls /usr/lib/ajn; ! ls /usr/lib/ajn/*.py 2>/dev/null'
+
+  release:
+    needs: [plan, build]
+    if: github.ref == 'refs/heads/main' && needs.plan.outputs.addons != '[]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag and publish a GitHub release per add-on
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADDONS: ${{ needs.plan.outputs.addons }}
+        run: |
+          for addon in $(echo "$ADDONS" | jq -r '.[]'); do
+            version=$(jq -r .version "$addon/config.json")
+            name=$(jq -r .name "$addon/config.json")
+            tag="$addon-v$version"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag already released"; continue
+            fi
+            # The release notes are this version's CHANGELOG section.
+            awk -v v="$version" '/^## /{p = ($2 == v)} p' "$addon/CHANGELOG.md" | tail -n +2 > notes.md
+            gh release create "$tag" --target "$GITHUB_SHA" --title "$name $version" --notes-file notes.md
+          done
