@@ -82,7 +82,7 @@ export class AjnetwebPersonCard extends AjnBase {
 
   css() {
     return `
-      ha-card { padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+      .wrap { height: 100%; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
       .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
       .av { position: relative; flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center;
             background: var(--_grad); color: #fff; font-weight: 700; font-size: 17px; letter-spacing: .02em;
@@ -104,7 +104,8 @@ export class AjnetwebPersonCard extends AjnBase {
       .chip ha-icon { --mdc-icon-size: 16px; color: var(--_text2); }
       .chip.low, .chip.low ha-icon { color: rgb(${COLORS.red}); }
       /* big */
-      ha-card.big { padding: 16px; background:
+      .big .wrap { padding: 16px; }
+      ha-card.big { background:
         radial-gradient(130% 120% at 0% 0%, rgba(var(--c), .20) 0%, rgba(var(--c), 0) 60%), var(--_surface); }
       .big .av { width: 64px; height: 64px; font-size: 22px; }
       .big .name { font-size: 18px; }
@@ -129,7 +130,7 @@ export class AjnetwebPersonCard extends AjnBase {
         <ha-icon icon="${esc(s.attributes.icon || "mdi:information-outline")}"></ha-icon>${esc(formatState(this._hass, s))}</div>`).join("") : "";
     this.html(`
       <ha-card class="tap ${big ? "big" : ""} ${p.key}" style="--c:${p.color}" tabindex="0" role="button"
-        aria-label="${esc(name)}: ${esc(p.label)}">
+        aria-label="${esc(name)}: ${esc(p.label)}"><div class="wrap">
         <div class="top">
           <div class="av ${pic ? "pic" : ""}" ${pic ? `style="background-image:${esc(cssUrl(pic))}"` : ""}>${esc(initials)}
             <span class="badge"><ha-icon icon="${p.icon}"></ha-icon></span></div>
@@ -138,7 +139,7 @@ export class AjnetwebPersonCard extends AjnBase {
           ${!big && bat ? `<div class="chips">${bat}</div>` : ""}
         </div>
         ${big && (bat || extra) ? `<div class="chips">${bat}${extra}</div>` : ""}
-      </ha-card>`);
+      </div></ha-card>`);
     const card = this.shadowRoot.querySelector("ha-card");
     bindGestures(card, { onTap: () => this.moreInfo(c.entity), onHold: () => this.moreInfo(c.entity) });
     this.shadowRoot.querySelectorAll(".chip[data-entity]").forEach((el) => {
