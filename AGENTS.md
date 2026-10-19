@@ -82,9 +82,10 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
 
 ## Release checklist (every change that ships)
 
-1. Bump the version in `ajnetweb-ui/package.json` (+ `package-lock.json`), `ajnetweb_dashboard/config.json`,
-   `ADDON_VERSION` in `dashboard_engine.py` and the `?v=` in `ajnetweb-ui/README.md` (other add-ons: their
-   own `config.json`).
+1. Bump the version of every changed add-on with `python3 tools/release.py bump <add-on> <version> "<title>"`
+   (it updates `config.json`, the `CHANGELOG.md` heading and, for the Dashboard Suite, `package.json`,
+   `package-lock.json`, `ADDON_VERSION` and the README `?v=`). CI fails when a changed add-on keeps its
+   version. Branches, channels and images: [`docs/releasing.md`](docs/releasing.md).
 2. `npm run build` and commit **both** bundles (`dist/ajnetweb-ui.js`, `www/ajnetweb-card-suite.js`) and the
    `www/ajnetweb-look.js` copies in the add-ons.
 3. `CHANGELOG.md` of each changed add-on, and a section at the top of `docs/project-record.md`
