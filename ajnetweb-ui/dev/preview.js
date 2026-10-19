@@ -69,9 +69,15 @@ const hass = {
       [id, wave(id, parseFloat((hass.states[id] || {}).state) || 22, 1.4 + i * 0.3, i)]));
     if (msg.type === "energy/get_prefs") return { energy_sources: [
       { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_import", stat_cost: "sensor.grid_cost" }], flow_to: [{ stat_energy_to: "sensor.grid_export" }] },
-      { type: "solar", stat_energy_from: "sensor.solar_energy" }] };
+      { type: "solar", stat_energy_from: "sensor.solar_energy" }],
+      device_consumption: [{ stat_consumption: "sensor.majlis_ac_energy" }, { stat_consumption: "sensor.fridge_energy" }] };
     if (msg.type === "recorder/statistics_during_period") {
-      const base = { "sensor.grid_import": 28, "sensor.grid_cost": 5.2, "sensor.grid_export": 3, "sensor.solar_energy": 14 };
+      const base = { "sensor.grid_import": 28, "sensor.grid_cost": 5.2, "sensor.grid_export": 3, "sensor.solar_energy": 14,
+        "sensor.majlis_ac_energy": 17, "sensor.fridge_energy": 2 };
+      // ?cost=0: no cost sensor, so the card estimates the bill from the tariff
+      if (params.get("cost") === "0") base["sensor.grid_cost"] = 0;
+      if (msg.period === "month") return Object.fromEntries(msg.statistic_ids.map((id) => [id, [{
+        start: Date.parse(msg.start_time), change: base[id] * (new Date().getDate() - 0.5) }]]));
       return Object.fromEntries(msg.statistic_ids.map((id) => [id, [...Array(7)].map((_, d) => ({
         start: Date.parse(msg.start_time) + d * 86400000, change: base[id] * (d === 6 ? 0.55 : 0.8 + ((d * 37) % 5) / 10) }))]));
     }

@@ -114,6 +114,7 @@
     bind("fAdmin", (el) => (p.require_admin = el.checked), (el) => (el.checked = !!p.require_admin), "change");
     bind("fPanelLive", (el) => (p.panel_live_cameras = el.checked), (el) => (el.checked = p.panel_live_cameras !== false), "change");
     bind("fRoomTap", (el) => (p.room_tap = el.value), (el) => (el.value = p.room_tap || "popup"), "change");
+    bind("fTariff", (el) => (p.energy_tariff = el.value), (el) => (el.value = p.energy_tariff || "auto"), "change");
     bind("fHeaderImage", (el) => (p.header_image = el.value.trim()), (el) => (el.value = p.header_image || ""));
     bind("fNavbar", (el) => (p.navbar = el.checked), (el) => (el.checked = p.navbar !== false), "change");
     bind("fPalette", (el) => (p.palette = el.value), (el) => (el.value = p.palette || ""), "change");

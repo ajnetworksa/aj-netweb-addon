@@ -86,6 +86,7 @@ strategy:
   calendars: [calendar.family]        # agenda calendars (omit = all)
   energy: true                        # false = no energy card
   energy_power: sensor.house_power    # live power on the energy card (found automatically if omitted)
+  energy_tariff: auto                 # bill estimate: auto (SEC in Saudi Arabia) | sec | dewa | none
   house_modes:                        # Home / Away / Night / Guests chips (omit = shown when
     entity: input_select.ajnetweb_house_mode   #   this helper exists; false = never)
     names: { night: Sleep }
