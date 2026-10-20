@@ -11,6 +11,7 @@
 //   branding: { company, phone, email, website, notes }, admins: [user ids]
 //   prayer: true (prayer card when prayer times exist), music: true, music_players: [...],
 //   music_assistant_entry: <config entry id> (enables search/favourites for non-admin users)
+//   music_library: false (hide Music Assistant's own library on the Music page; shown when its add-on is installed)
 //   personal: true (each person may pick theme / colour / wallpaper, palette button in the header)
 //   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
 //   appearance_themes: [theme names] (limit what people can pick)
@@ -37,6 +38,7 @@ import { buildModel, idsOf, roomEntities, slug } from "../core/model.js";
 import { translate, langOf } from "../core/i18n.js";
 import { hasPrayerTimes } from "../cards/prayer.js";
 import { musicPlayers } from "../cards/music.js";
+import { musicAssistantAddon } from "../cards/music-library.js";
 import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.js";
 import { allowed } from "../core/access.js";
 import { licenseState } from "../core/license.js";
@@ -480,13 +482,16 @@ export async function generateDashboard(config, rawHass) {
   if (on("cameras") && all("cameras").length) {
     views.push(view(t("cameras"), "cameras", "mdi:cctv", [section(all("cameras").map((c) => camera(c, !!cfg.cameras_live)), 4)]));
   }
-  if (on("media") && (players.length || all("media").length)) {
-    // Music page: full player (search, favourites, rooms) + every speaker grouped by room
+  const maAddon = cfg.music !== false && cfg.music_library !== false ? musicAssistantAddon(hass) : null;
+  if (on("media") && (players.length || all("media").length || maAddon)) {
+    // Music page: full player (search, favourites, rooms), every speaker grouped by room,
+    // then Music Assistant's own library in the person's colours
     const secs = [];
     if (players.length) secs.push(section([musicCard({ variant: "full" })], 2));
     rooms.filter((r) => r.media.length).forEach((r) => secs.push(section([heading(r.name, r.icon, roomPath(r)),
       ...r.media.map((e) => withLang({ type: "custom:ajnetweb-music-card", entities: [e.entity_id], variant: "compact",
                                        grid_options: { columns: 12 } }))])));
+    if (maAddon) secs.push(section([withLang({ type: "custom:ajnetweb-music-library-card", grid_options: { columns: "full" } })], 4));
     views.push(view(t("music"), "media", "mdi:music", secs));
   }
   if (on("installer") && hass.user && hass.user.is_admin) views.push(await installerView(cfg, hass, t, model, view, section, heading));

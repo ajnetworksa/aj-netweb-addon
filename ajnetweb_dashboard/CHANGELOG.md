@@ -1,5 +1,18 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.17.0 - Music Assistant in each person's colours, Studio music setup
+- **Music Assistant inside the dashboard, in your own colours.** The Music page now ends with Music Assistant's
+  full app (library, playlists, radio, queue, its settings) in a *Music library* card. It is painted with the
+  theme and colour each person picked under ⋯ → Appearance, light or dark included, so it looks like the rest
+  of the dashboard. Full-screen button on phones and tablets. New card `custom:ajnetweb-music-library-card`;
+  strategy option `music_library: false` hides it. Shown only when the Music Assistant add-on is installed.
+- Music Assistant opened from the HA sidebar keeps its own look (it is another app; only light/dark can be
+  chosen there, in its own settings).
+- **Studio → Music** (new tab): checks each step live and does it for you: install and start the Music
+  Assistant add-on, connect it to Home Assistant (confirms HA's discovery prompt), count the speakers, and
+  install the YouTube Music helper add-on. A guide card per music service (Spotify, Apple Music, Tidal,
+  YouTube Music, Deezer, SoundCloud, radio, own files) says what account the client needs and how to add it.
+
 ## 3.8.0 - electricity bill estimate and AC share
 - **Energy card: this month and the bill.** Below the 7-day bars: kWh this month, the bill so far and where the
   month will end at this rate. It uses the cost sensor from Home Assistant's Energy settings when there is one;

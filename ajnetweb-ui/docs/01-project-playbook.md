@@ -60,10 +60,13 @@ The dashboard is built **from Areas**. Good areas = good dashboard.
 
 ## Step 3b — Music and prayer times (GCC standard)
 
-1. **Music:** install **Music Assistant** (Settings → Add-ons → Music Assistant, then the Music
-   Assistant integration). In Music Assistant add the client's services — YouTube Music, Spotify,
-   Apple Music, Tidal, radio — and their speakers (Sonos, Cast, AirPlay/HomePod, DLNA, HA players).
-   Give each speaker the right **area** in HA. The dashboard's music card picks them up automatically.
+1. **Music:** open **Dashboard Suite → Music** and follow the checks: *Install and start* Music Assistant,
+   *Connect* it to Home Assistant, then in Music Assistant add the client's speakers (Sonos, Cast,
+   AirPlay/HomePod, DLNA, HA players) and their services with **their own account** (the Music tab says what
+   each needs: Spotify/Apple Music/Tidal need a paid plan, YouTube Music needs Premium plus the helper add-on,
+   Radio Browser is free and has Quran stations). Give each speaker the right **area** in HA. The dashboard's
+   music cards pick them up automatically, and the Music page shows Music Assistant's library in each
+   person's own colours.
 2. **Prayer & Adhan:** install **AJ Netweb Prayer & Adhan** → Setup → *Umm Al-Qura* (or the
    client's method) → upload the adhan audio the client chose (and a Fajr adhan) → tick speakers →
    tick TVs to pause → **Test adhan** with the family present. Agree offsets with the local mosque.

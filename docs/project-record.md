@@ -11,13 +11,42 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.8.0 |
+| Dashboard Suite + UI kit | 3.17.0 (this PR; 3.9-3.16 in open PRs) |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
+
+---
+
+## Music Assistant in each person's colours, music setup (Dashboard Suite 3.17.0)
+
+**Asked for:** theme Music Assistant like the rest of the add-on, per user; Music Assistant is the music system;
+how to play music from it (Spotify, YouTube Music, others) and set up what can be set up from our add-on.
+
+**Done:**
+- `custom:ajnetweb-music-library-card`: Music Assistant's own app on the dashboard's Music page, repainted with
+  the person's appearance (theme, colour, light/dark). Full-screen button. Strategy option `music_library`.
+- Studio → Music tab (`music_setup.py`): live checks, install/start Music Assistant, connect it to HA,
+  speakers count, YouTube Music helper add-on, and a guide per music service.
+- Preview: `dev/fake-ma.html` stands in for Music Assistant (same colour variables); `?ma=0` hides it.
+
+**Decisions:**
+- *Theme through the dashboard, not the sidebar.* Music Assistant opens through HA ingress, which is the same
+  web address as the dashboard, so our card can add a stylesheet to it. It sets Music Assistant's own colour
+  variables (Vuetify `--v-theme-*`, Tailwind tokens) for both its modes. Nothing in Music Assistant changes;
+  opened from the sidebar it keeps its own look. Patching HA's sidebar frame would break on HA updates (rule 2).
+- *Ingress session the way HA does it:* `supervisor/api` `/addons/<slug>/info` and `/ingress/session`, which HA
+  allows for normal users because Music Assistant sets `panel_admin: false`; validated every minute.
+- *Music services are a guide, not automated:* every service needs the client's own login (OAuth, cookies),
+  and Music Assistant has no API we may use for that without the client's token.
+- *Recommended for GCC clients:* Spotify or Apple Music (easy logins) plus Radio Browser (Quran and local
+  stations, free). YouTube Music works but needs a cookie that expires and a helper add-on. Anghami is not supported.
+
+**Open:** check the repaint against a real Music Assistant (2.10) on a client system, phone and wall tablet; if
+Music Assistant renames its colour variables in a later release, update `musicAssistantCss()`.
 
 ---
 

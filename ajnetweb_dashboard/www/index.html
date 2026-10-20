@@ -35,6 +35,7 @@
       <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
       <button class="tab" data-tab="modes" role="tab">House modes</button>
+      <button class="tab" data-tab="music" role="tab">Music</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
@@ -264,6 +265,44 @@
               is possible but means anyone who can switch the mode (Alexa too) disarms the house.</li>
             <li>Shades means curtains and blinds only. Gates and garage doors are never moved by a mode.</li>
             <li>After adding devices, press <b>Apply</b> (or Deploy) again so the modes include them.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- MUSIC -->
+      <section class="panel" id="tab-music">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Music Assistant</h2>
+              <p class="desc">Music Assistant plays Spotify, YouTube Music, Apple Music, Tidal, radio and the client's own
+                files on every speaker, in sync. The dashboard's music cards and the <b>Music</b> page use it. Each step below
+                is checked live; the buttons do the step for you.</p>
+            </div>
+            <div class="head-actions"><button id="btnMusicRefresh" class="btn">Check again</button>
+              <a id="btnMusicOpen" class="btn primary" target="_top" hidden>Open Music Assistant</a></div>
+          </div>
+          <ul class="checks" id="musicSteps"><li class="muted">Checking…</li></ul>
+          <div class="toggles" style="margin-top:14px">
+            <label class="switch"><input type="checkbox" id="fMusicLibrary"><span></span>Show the Music Assistant library on the dashboard's Music page (in each person's own colours)</label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Music services</h2>
+          <p class="desc">The client adds their services in Music Assistant: <b>Settings → Music sources → Add</b>, with their
+            own account. Nothing can be pre-filled for them, because every service needs the client's own login.
+            Most clients do best with <b>Spotify</b> or <b>Apple Music</b> plus <b>Radio Browser</b> for Quran and local stations.</p>
+          <div class="provider-list" id="musicProviders"></div>
+          <div id="musicPo"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>Give every speaker the right <b>area</b> in Home Assistant, so it shows in its room on the dashboard.</li>
+            <li>Mark playlists and stations as <b>favourites</b> in Music Assistant: they show on the dashboard's music card.</li>
+            <li>Anghami and Amazon Music are not supported by Music Assistant. Clients who use them can cast from the app to a speaker instead.</li>
+            <li>The theme and colour each person picks on the dashboard also paint the Music Assistant library
+              on the Music page. Music Assistant opened from the sidebar keeps its own look (light or dark, chosen in its own settings).</li>
           </ul>
         </div>
       </section>

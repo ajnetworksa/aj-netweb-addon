@@ -61,6 +61,9 @@ const hass = {
   locale: { language: lang, time_format: "12" },
   config: { location_name: "Villa Al Noor", unit_system: { temperature: "°C" } },
   themes: { themes: registry, darkMode: modeQ === "dark" },
+  // Music Assistant add-on in the sidebar (?ma=0 hides it); its app is faked by dev/fake-ma.html
+  panels: q("ma", "1") === "0" ? {} : { d5369777_music_assistant: { component_name: "app", url_path: "d5369777_music_assistant",
+    title: "Music Assistant", config: { addon: "d5369777_music_assistant" } } },
   callWS: async (msg) => {
     if (msg.type === "frontend/get_user_data") return { value: userData };
     if (msg.type === "auth/current_user") return { ...userObj };
@@ -98,6 +101,11 @@ const hass = {
       return null;
     }
     if (msg.type === "config_entries/get") return [{ entry_id: "ma1", state: "loaded" }];
+    if (msg.type === "supervisor/api") {
+      if (msg.endpoint.endsWith("/info")) return { state: q("ma", "1") === "stopped" ? "stopped" : "started", ingress_url: "/fake-ma.html" };
+      if (msg.endpoint === "/ingress/session") return { session: "preview" };
+      return {};
+    }
     if (msg.type === "call_service" && msg.domain === "music_assistant") {
       console.log("music_assistant", msg.service, msg.service_data);
       const img = (h) => `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='hsl(${h},55%25,45%25)'/%3E%3C/svg%3E`;

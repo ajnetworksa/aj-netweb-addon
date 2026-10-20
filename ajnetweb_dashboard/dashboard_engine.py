@@ -30,7 +30,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.8.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.17.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -248,6 +248,7 @@ class DashboardEngine:
             "views": {k: v for k, v in (project.get("views") or {}).items() if v is False and k != "prayer"},
             "prayer": False if (project.get("views") or {}).get("prayer") is False else None,
             "music_assistant_entry": self._music_assistant_entry(),
+            "music_library": False if project.get("music_library") is False else None,
             "navbar": project.get("navbar", True),
             "personal": False if project.get("personal") is False else None,
             "palette": project.get("palette") or None,

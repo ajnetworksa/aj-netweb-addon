@@ -657,6 +657,50 @@
     renderModes();
   }
 
+  // ------------------------------------------------------------------ music
+  async function renderMusic() {
+    const p = state.project;
+    $("fMusicLibrary").checked = p.music_library !== false;
+    $("fMusicLibrary").onchange = () => { p.music_library = $("fMusicLibrary").checked; saveSoon(); };
+    const info = await api("api/music");
+    const list = $("musicSteps");
+    if (!info.ok) {
+      list.innerHTML = `<li><span class="dot bad">!</span><div>${esc(info.error || "Check failed")}</div></li>`;
+      return;
+    }
+    const ACT = { install: "Install and start", start: "Start", connect: "Connect" };
+    list.innerHTML = info.steps.map((st) => {
+      const cls = st.ok ? "ok" : st.action ? "warn" : "bad";
+      return `<li><span class="dot ${cls}">${st.ok ? "✓" : "!"}</span><div><b>${esc(st.label)}</b>
+        <div class="muted">${esc(st.detail || "")}</div>
+        ${st.action ? `<button class="btn small primary step-act" data-music="${esc(st.action)}">${esc(ACT[st.action] || st.action)}</button>` : ""}</div></li>`;
+    }).join("");
+    list.querySelectorAll("[data-music]").forEach((b) => b.addEventListener("click", () => musicAction(b, b.dataset.music)));
+    const ma = info.music_assistant || {};
+    const open = $("btnMusicOpen");
+    open.hidden = !ma.running;
+    if (ma.panel) open.href = ma.panel;
+    $("musicProviders").innerHTML = (info.providers || []).map((pr) => `<div class="provider">
+      <b>${esc(pr.name)}<span class="lvl ${pr.level === "advanced" ? "advanced" : ""}">${pr.level === "advanced" ? "Advanced" : "Easy"}</span></b>
+      <p class="acc">${esc(pr.account)}</p><p>${esc(pr.how)}</p></div>`).join("");
+    const po = info.po_token || {};
+    $("musicPo").innerHTML = `<ul class="checks"><li><span class="dot ${po.running ? "ok" : "warn"}">${po.running ? "✓" : "!"}</span>
+      <div><b>YouTube Music helper (YT Music PO Token Generator)</b><div class="muted">${po.running ? "Running" :
+        po.installed ? "Installed but not running" : "Only needed for YouTube Music"}</div>
+      ${po.running ? "" : `<button class="btn small step-act" data-po>${po.installed ? "Start" : "Install and start"}</button>`}</div></li></ul>`;
+    const b = $("musicPo").querySelector("[data-po]");
+    if (b) b.addEventListener("click", () => musicAction(b, "po"));
+  }
+
+  async function musicAction(btn, act) {
+    btn.disabled = true;
+    btn.textContent = act === "connect" ? "Connecting…" : "Working… (installing can take a few minutes)";
+    const res = act === "connect" ? await api("api/music/connect", {})
+      : await api("api/music/install", { addon: act === "po" ? "ytm_po_token_generator" : "music_assistant" });
+    toast(res.ok ? "Done" : res.error || "Failed");
+    renderMusic();
+  }
+
   // ------------------------------------------------------------------ tabs & init
   function activateTab(name) {
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
@@ -664,6 +708,7 @@
     if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
     if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
     if (name === "modes") renderModes();
+    if (name === "music") renderMusic();
   }
 
   async function init() {
@@ -672,6 +717,7 @@
     $("btnDeployTop").addEventListener("click", deploy);
     $("btnApplyLayout").addEventListener("click", applyLayout);
     $("btnModesApply").addEventListener("click", applyModes);
+    $("btnMusicRefresh").addEventListener("click", renderMusic);
     document.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("[data-pv]").forEach((x) => x.classList.toggle("on", x === b));
       state.pv = b.dataset.pv; loadPreview();

@@ -173,6 +173,19 @@ Music Assistant players (AirPlay, Chromecast, Sonos, Snapcast, DLNA, squeezelite
 Music Assistant syncs players of the **same type** together; to mix types (e.g. an AirPlay amp with a Cast
 speaker), create a *Sync group* / *Universal group* player once in Music Assistant — it then shows up as
 one more speaker. Multi-zone amplifiers appear as one player per zone, so each zone can be linked.
+
+### `custom:ajnetweb-music-library-card` — Music Assistant library
+
+```yaml
+type: custom:ajnetweb-music-library-card
+addon: d5369777_music_assistant       # optional: default is the Music Assistant add-on in the sidebar
+height: 720                           # optional, px (default: most of the screen)
+```
+Music Assistant's own app (library, playlists, radio, queue, its settings) inside the dashboard, painted in
+the person's appearance (theme, colour, light/dark from ⋯ → Appearance). Full-screen button at the top. Needs
+the Music Assistant **add-on** (it opens through HA ingress, the dashboard's own address; that is what lets
+the card restyle it). Music Assistant run in Docker elsewhere can't be restyled by a web page, and the card
+says the add-on is missing. The generated Music page shows it automatically (`music_library: false` hides it).
 Full variant: artwork, title/artist, live progress, shuffle / previous / play-pause / next / repeat,
 drag-to-set volume and mute, room chips to switch speakers, **Move music here** (Music Assistant
 `transfer_queue`), search across every provider you added to Music Assistant (YouTube Music,

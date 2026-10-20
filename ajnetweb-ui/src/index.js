@@ -8,6 +8,7 @@ import { AjnetwebActionsCard } from "./cards/actions.js";
 import { AjnetwebNavCard } from "./cards/nav.js";
 import { AjnetwebPrayerCard } from "./cards/prayer.js";
 import { AjnetwebMusicCard } from "./cards/music.js";
+import { AjnetwebMusicLibraryCard } from "./cards/music-library.js";
 import { AjnetwebAppearanceCard } from "./cards/appearance.js";
 import { AjnetwebWeatherCard } from "./cards/weather.js";
 import { AjnetwebRoomsCard } from "./cards/rooms.js";
@@ -33,6 +34,7 @@ const CARDS = [
   ["ajnetweb-actions-card", AjnetwebActionsCard, "AJ Netweb Actions", "Large buttons or scene chips with tap-again confirmation."],
   ["ajnetweb-prayer-card", AjnetwebPrayerCard, "AJ Netweb Prayer Times", "Next prayer countdown, today's times, Hijri date and adhan controls."],
   ["ajnetweb-music-card", AjnetwebMusicCard, "AJ Netweb Music", "Music player with Music Assistant search, favourites and room switching."],
+  ["ajnetweb-music-library-card", AjnetwebMusicLibraryCard, "AJ Netweb Music library", "Music Assistant's full library inside the dashboard, in each person's own colours."],
   ["ajnetweb-rooms-card", AjnetwebRoomsCard, "AJ Netweb Rooms", "All rooms with floor tabs; room tiles with quick buttons for lights, AC and shades."],
   ["ajnetweb-status-card", AjnetwebStatusCard, "AJ Netweb Right now", "Only what needs attention: open doors, alerts, timers, lights and AC on, low batteries."],
   ["ajnetweb-graph-card", AjnetwebGraphCard, "AJ Netweb Graph", "Temperature (or any sensor) history as smooth lines; one room or all rooms."],
