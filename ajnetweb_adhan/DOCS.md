@@ -39,6 +39,16 @@ Audio files live in `/config/www/ajnetweb_adhan/` and are served by Home Assista
 Event `ajnetweb_adhan_played` (`prayer`, `manual`, `speakers`) fires after each adhan — use it for
 automations such as dimming lights or closing curtains at Maghrib.
 
+## Iqamah, Friday and Quran after Fajr
+
+- **Iqamah:** in the Prayers tab set the minutes after each adhan. Phones get a reminder shortly before
+  (tab *Iqamah · Friday · Quran*), and an optional short iqamah audio plays on that prayer's speakers.
+- **Speakers per prayer:** the *Speakers* column in the Prayers tab; leave it on *Default* to use the Speakers tab.
+- **Friday:** choose whether the adhan plays at home for Jumu'ah, a separate audio, a reminder before
+  Jumu'ah (e.g. 45 minutes, time to leave for the mosque) and a Surat Al-Kahf reminder.
+- **Quran after Fajr:** pick an uploaded recitation or paste a Quran radio stream URL. It starts after the adhan
+  and dua have finished, as normal playback (stop it from the speaker or the dashboard).
+
 ## AC pre-cooling
 
 **AC pre-cooling** tab → *Add pre-cooling*: choose the prayers, how many minutes before, the ACs and the

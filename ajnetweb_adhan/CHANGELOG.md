@@ -1,5 +1,17 @@
 # Changelog - AJ Netweb Prayer & Adhan
 
+## 1.4.0 - iqamah, Jumu'ah, per-prayer speakers, Quran after Fajr
+- **Iqamah:** minutes after each adhan (Prayers tab). A phone reminder a few minutes before (5 by default) and an
+  optional short iqamah audio on that prayer's speakers. Iqamah times are in `sensor.ajnetweb_next_prayer`
+  (attribute `iqamah`).
+- **Speakers per prayer:** a prayer can use its own speakers (e.g. only the majlis for Fajr); "Default" keeps the
+  Speakers tab.
+- **Friday:** Dhuhr is called Jumu'ah on Fridays; choose whether the adhan plays at home, a separate Jumu'ah
+  audio, a phone reminder before Jumu'ah, and a Surat Al-Kahf reminder on Friday morning.
+- **Quran after Fajr:** a recitation file or a Quran radio stream starts on the speakers after the Fajr adhan
+  (and dua) as normal playback; *Play now* to try it.
+- New tab *Iqamah · Friday · Quran*. Uploads up to 60 MB (recitations).
+
 ## 1.3.0 - AC pre-cooling before prayers
 - **New tab "AC pre-cooling":** start chosen ACs a set time before a prayer, e.g. cool the majlis to 22° 30 minutes
   before Maghrib. Each rule picks its prayers, minutes before, ACs, mode and a summer temperature; a winter
