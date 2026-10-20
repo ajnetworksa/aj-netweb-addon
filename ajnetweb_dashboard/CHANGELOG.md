@@ -1,11 +1,83 @@
 # Changelog - AJ Netweb Dashboard Suite
 
-## 3.15.0 - room card indicators
+## 3.17.0 - room card indicators
 - **Room cards show more at a glance.** A green dot pulses on the room icon while someone is in the room
   (motion, occupancy or presence). New indicator icons for an unlocked lock, open shades, a running fan
   (spinning) and a robot vacuum at work, next to the existing alerts, open doors, AC and music.
 - **Own indicators:** `indicators:` on the room card adds any entity as an icon while it is active (a
   sensor shows its value), with its own icon, colour and active states; `indicators: false` hides them.
+
+## 3.16.0 - appliance card
+- **New `custom:ajnetweb-appliance-card`: washing machine, dryer, dishwasher or 3D printer at a glance.**
+  A ring around the appliance fills with the progress and the icon moves while it runs; the card says what
+  it is doing, the time left and the clock time it will be ready, and turns into a green tick when finished.
+  Works with brand integrations, a smart plug with power metering, or a plain timer. English and Arabic.
+- The preview takes `?cards=<JSON list>` to try any card on its own (with `options={"custom_dashboard":"x"}`).
+
+## 3.15.0 - person card
+- **New `custom:ajnetweb-person-card`: who is home.** A photo (or initials) with a ring in the presence
+  colour (green at home, orange away, teal in a named zone), where the person is and for how long, and their
+  phone battery, found by itself from the person's phone tracker. A `big` size adds a tinted panel and extra
+  chips (travel time, steps, ...). English and Arabic.
+- The preview takes `?cards=<JSON list>` to try any card on its own (with `options={"custom_dashboard":"x"}`).
+
+## 3.14.0 - Alarm pack
+- **Studio → Alarm tab.** Uses the alarm panel the villa already has in Home Assistant, or makes our own when
+  there is none: Home Assistant's built-in manual alarm with exit and entry delay and an optional disarm code
+  (written to `packages/ajnetweb_alarm.yaml`; HA must load packages and be restarted once).
+- **Sensors per mode** for our own alarm: doors and windows guard Away, Night and Home; motion guards Away.
+  Every sensor can be changed. The automation *AJ Netweb - Alarm sensors* sets the alarm off.
+- **When it goes off** (either alarm): sirens on, a critical alert on the chosen phones (sounds even on silent),
+  optionally every light on; sirens off again when the alarm stops (*AJ Netweb - Alarm alerts*).
+- **Arming from Alexa:** scripts *Alarm away / night / home* labelled for the Alexa Matter Bridge (only modes
+  the panel can arm without a code). There is never a disarm script.
+- The dashboard header shows the chosen alarm (strategy option `alarm`).
+
+## 3.12.0 - Water card
+- **Water card in *Today at home*:** tank levels (red when low), the booster pump, and each garden watering
+  zone with when it last watered and a **Run 10 min** button. Found by name (tank, pump, irrigation, zone,
+  sprinkler, drip, and the Arabic words); Arabic and English.
+- **Deploy creates `script.ajnetweb_water_run`** when the house has watering zones. The card's Run button uses
+  it, so the valve closes again on time inside Home Assistant even with no dashboard open.
+- Studio → Layout → *Today at home* has a **Water** entry. Projects saved with the old default
+  (agenda, energy, temperatures) get the water card automatically when the house has tanks or zones.
+
+## 3.11.0 - Studio: photo framing, save as scene, finger drag
+- **Room photos: frame before upload.** After picking a photo, drag it and zoom to choose what shows; it is
+  cropped to 4:3 and sent at up to 1600 px wide.
+- **Save as scene** (🎬 next to each room in Layout → Rooms): lists the room's lights, curtains, ACs, fans and
+  speakers with what each is doing now; name it, untick what shouldn't be in it, save. It becomes a normal HA
+  scene in `scenes.yaml`, put in that room, so it shows on the room page straight away.
+- **Reorder by finger on tablets and phones:** drag a row by its ⋮⋮ grip (before, only a mouse could drag;
+  ▲▼ still work).
+
+## 3.10.0 - Wall panel setup
+- **Studio → Wall panels tab.** Two QR codes for the Wall Panel page: one for a browser or Fully Kiosk Browser
+  (HA's address is filled in from its network settings and can be changed), one for the Home Assistant app.
+- **Apply wall panel profile** for tablets added through HA's Fully Kiosk Browser integration: sets the Wall
+  Panel as the start page, opens it, wakes the screen on motion, dims it after a while and keeps it from
+  switching off. Only the integration's own actions and entities are used; the result lists every step.
+
+## 3.9.0 - notifications in the header
+- **A bell in the dashboard header** with the number of new events since you last looked. Tap it for the list
+  of the last 48 hours, newest first, by day: doorbell rings, alarm armed / disarmed / triggered, water leaks,
+  smoke and gas, and doors, gates and garages opened (not windows). Tap an entry for its details.
+  - Read from Home Assistant's logbook, so it also shows what happened while the dashboard was closed.
+  - "New" is remembered per person on each phone or tablet. Arabic and English.
+  - Studio → Design → *Notifications bell in the header* turns it off (strategy option `notifications: false`).
+    The list is also a card:
+    `custom:ajnetweb-notifications-card`.
+
+## 3.8.0 - electricity bill estimate and AC share
+- **Energy card: this month and the bill.** Below the 7-day bars: kWh this month, the bill so far and where the
+  month will end at this rate. It uses the cost sensor from Home Assistant's Energy settings when there is one;
+  otherwise it estimates the bill from the residential tariff (VAT included, meter and fixed fees not):
+  - **SEC** (Saudi Arabia, used automatically when HA's country is SA): 0.18 SAR/kWh up to 6,000 kWh a month, 0.30 above, 15% VAT.
+  - **DEWA** (Dubai): 23/28/32/38 fils per kWh in 2,000 kWh steps, 6.5 fils fuel surcharge, 5% VAT.
+  - Studio → Design → *Electricity bill estimate* (Automatic / SEC / DEWA / Don't estimate); own tiers in card YAML.
+- **AC share today:** when AC meters are added under *Individual devices* in HA's Energy settings (names with
+  "AC", "split", "chiller", "مكيف"…), the card shows how much of today's electricity went to cooling. Or list
+  them in the card's `ac:` option.
 
 ## 3.7.0 - one look for every AJ Netweb add-on
 - **The add-on pages now follow each person's dashboard appearance.** The theme, colour and wallpaper someone

@@ -35,6 +35,8 @@
       <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
       <button class="tab" data-tab="modes" role="tab">House modes</button>
+      <button class="tab" data-tab="alarm" role="tab">Alarm</button>
+      <button class="tab" data-tab="panels" role="tab">Wall panels</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
@@ -155,6 +157,11 @@
             <label>Weather entity
               <select id="fWeather"><option value="">Automatic</option></select>
             </label>
+            <label>Electricity bill estimate (energy card)
+              <select id="fTariff"><option value="auto">Automatic (SEC in Saudi Arabia)</option>
+                <option value="sec">SEC, Saudi Arabia</option><option value="dewa">DEWA, Dubai</option>
+                <option value="none">Don't estimate</option></select>
+            </label>
             <label>Tapping a room
               <select id="fRoomTap"><option value="popup">Opens a sheet with its devices</option>
                 <option value="navigate">Opens the room page</option></select>
@@ -185,7 +192,8 @@
             (the display name, e.g. <code>Mama, panel-majlis</code>).
             Hiding Home Assistant's header / sidebar needs the <b>kiosk-mode</b> plugin (HACS) or
             Fully Kiosk's full-screen mode.</p>
-          <div class="toggles"><label class="switch"><input type="checkbox" id="fMenu"><span></span>⋯ More button in the bottom bar</label></div>
+          <div class="toggles"><label class="switch"><input type="checkbox" id="fMenu"><span></span>⋯ More button in the bottom bar</label>
+            <label class="switch"><input type="checkbox" id="fNotifications"><span></span>🔔 Notifications bell in the header</label></div>
           <div class="kiosk-rules" id="kioskRules"></div>
         </div>
 
@@ -263,6 +271,100 @@
         </div>
       </section>
 
+      <section class="panel" id="tab-alarm">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Alarm</h2>
+              <p class="desc">Uses the alarm panel the villa already has in Home Assistant, or makes one of our own from the
+                door, window and motion sensors. Either way: sirens and a loud alert on the chosen phones when it goes
+                off, and arming from Alexa (<i>"Alexa, turn on Alarm away"</i>). Disarming by voice is never possible.</p>
+            </div>
+            <div class="head-actions"><button id="btnAlarmApply" class="btn primary">Apply to Home Assistant</button></div>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="aEnabled"><span></span>Use the alarm pack</label>
+            <label class="switch"><input type="checkbox" id="aAlexa"><span></span>Arm from Alexa</label>
+            <label class="switch"><input type="checkbox" id="aLights"><span></span>All lights on when it goes off</label>
+          </div>
+          <div class="form-grid alarm-form">
+            <label>Alarm<select id="aSource"></select></label>
+            <label class="own-only">Disarm code (4-8 digits, empty = none)<input id="aCode" type="text" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+            <label class="own-only">Exit delay when arming Away (seconds)<input id="aExit" type="number" min="0" max="300" step="5"></label>
+            <label class="own-only">Entry delay to disarm (seconds)<input id="aEntry" type="number" min="0" max="300" step="5"></label>
+            <label>Siren for (minutes)<input id="aSiren" type="number" min="1" max="30" step="1"></label>
+          </div>
+          <p class="muted" id="alarmInfo"></p>
+          <div id="alarmResult"></div>
+        </div>
+        <div class="card own-only">
+          <h2>Sensors</h2>
+          <p class="desc">What sets the alarm off in each mode. Doors and windows guard every mode, motion only Away
+            (people walk around at night).</p>
+          <div id="alarmSensors" class="alarm-sensors muted">Scanning Home Assistant…</div>
+        </div>
+        <div class="card">
+          <h2>Sirens and phones</h2>
+          <div class="keep-list" id="alarmSirens"></div>
+          <div class="keep-list" id="alarmPhones"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>Our own alarm is Home Assistant's built-in <i>manual</i> alarm. Apply writes
+              <code>packages/ajnetweb_alarm.yaml</code>; Home Assistant must load packages
+              (<code>homeassistant: packages: !include_dir_named packages</code>) and be restarted once.</li>
+            <li>Phones get a critical alert that sounds even on silent (iPhone: allow critical alerts for the Home Assistant app).</li>
+            <li>House modes arm and disarm the same alarm (House modes tab).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-panels">
+        <div class="card">
+          <h2>Open the Wall Panel on a tablet</h2>
+          <p class="desc">Scan a code with the tablet's camera. The first opens the Wall Panel page in a browser or
+            Fully Kiosk Browser (use it as the <i>Start URL</i>); the second opens it in the Home Assistant app.</p>
+          <p class="muted" id="wpViewOff" hidden>The Wall Panel page is switched off in Design → Pages. Turn it on and
+            deploy, or the codes open a page that doesn't exist.</p>
+          <div class="form-grid">
+            <label>Home Assistant address as the tablet sees it
+              <input id="wpBase" type="url" placeholder="http://192.168.1.10:8123" maxlength="300">
+              <small class="muted">Taken from Settings → System → Network. Change it if the tablet uses another address.</small>
+            </label>
+          </div>
+          <div class="qr-row" id="wpQr"><p class="muted">Loading…</p></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Fully Kiosk tablets</h2>
+              <p class="desc">Tablets added through Home Assistant's <b>Fully Kiosk Browser</b> integration. <b>Apply</b>
+                sets the Wall Panel as the start page, opens it now, and sets the screen as below.</p>
+            </div>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="wpMotion"><span></span>Wake the screen when someone walks up (camera motion)</label>
+            <label class="switch"><input type="checkbox" id="wpKeepOn"><span></span>Never switch the screen fully off</label>
+          </div>
+          <div class="form-grid">
+            <label>Dim after (seconds, 0 = never)<input id="wpDimAfter" type="number" min="0" max="3600" step="10"></label>
+            <label>Brightness while dimmed (0–255)<input id="wpDimBright" type="number" min="0" max="255" step="1"></label>
+          </div>
+          <div id="wpTablets" class="muted">Looking for tablets…</div>
+          <div id="wpResult"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>To add a tablet: install Fully Kiosk Browser, turn on <i>Remote Administration</i> with a password,
+              then add the <b>Fully Kiosk Browser</b> integration in Home Assistant (it is usually found by itself).</li>
+            <li>Motion and dimming need a Fully Kiosk PLUS licence on the tablet. The start page works without one.</li>
+            <li>Log the tablet in as a normal (non-admin) user so the Installer page stays hidden. More in the Wall Panels guide.</li>
+          </ul>
+        </div>
+      </section>
+
       <!-- SUPPORT -->
       <section class="panel" id="tab-support">
         <div class="card">
@@ -321,6 +423,28 @@
     <div class="dialog-head"><h3>Generated configuration</h3>
       <div><button class="btn" id="btnCopy">Copy</button> <button class="btn" id="btnClosePreview">Close</button></div></div>
     <pre id="previewCode"></pre>
+  </dialog>
+
+  <dialog id="cropDialog" class="small">
+    <div class="dialog-head"><h3>Room photo</h3>
+      <div><button class="btn" id="btnCropCancel">Cancel</button> <button class="btn primary" id="btnCropSave">Use photo</button></div></div>
+    <div class="dialog-body">
+      <p class="muted">Drag the photo to choose what shows. Room cards show the middle of this frame.</p>
+      <canvas id="cropCanvas" width="800" height="600"></canvas>
+      <label class="crop-zoom">Zoom<input id="cropZoom" type="range" min="1" max="4" step="0.01" value="1"></label>
+    </div>
+  </dialog>
+
+  <dialog id="sceneDialog" class="small">
+    <div class="dialog-head"><h3 id="sceneTitle">Save as scene</h3>
+      <div><button class="btn" id="btnSceneCancel">Cancel</button> <button class="btn primary" id="btnSceneSave">Save scene</button></div></div>
+    <div class="dialog-body">
+      <p class="muted">Set the room the way the client likes it first (from the dashboard or the devices themselves),
+        then save. The scene remembers what the ticked devices are doing now and appears on the room's page.</p>
+      <label class="field">Scene name<input id="sceneName" type="text" maxlength="60" placeholder="Evening, Guests, Movie…"></label>
+      <div id="sceneList" class="scene-list muted">Reading the room…</div>
+      <div id="sceneResult"></div>
+    </div>
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>
