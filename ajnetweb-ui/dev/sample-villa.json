@@ -296,8 +296,10 @@
    "state": "home",
    "attributes": {
     "friendly_name": "Ahmed",
-    "entity_picture": null
-   }
+    "entity_picture": null,
+    "source": "device_tracker.ahmed_phone"
+   },
+   "last_changed": "2026-10-18T09:12:00+00:00"
   },
   "update.home_assistant_core_update": {
    "entity_id": "update.home_assistant_core_update",
@@ -431,12 +433,13 @@
    "entity_id": "person.ehab",
    "state": "not_home",
    "attributes": {
-    "friendly_name": "Ehab Latif"
+    "friendly_name": "Ehab Latif",
+    "source": "device_tracker.ehab_phone"
    }
   },
   "person.hana": {
    "entity_id": "person.hana",
-   "state": "home",
+   "state": "Office",
    "attributes": {
     "friendly_name": "Hana A"
    }
@@ -479,6 +482,40 @@
     "friendly_name": "Front Door Lock Battery",
     "device_class": "battery",
     "unit_of_measurement": "%"
+   }
+  },
+  "sensor.ahmed_phone_battery_level": {
+   "entity_id": "sensor.ahmed_phone_battery_level",
+   "state": "64",
+   "attributes": {
+    "friendly_name": "Ahmed phone battery",
+    "device_class": "battery",
+    "unit_of_measurement": "%"
+   }
+  },
+  "sensor.ahmed_phone_battery_state": {
+   "entity_id": "sensor.ahmed_phone_battery_state",
+   "state": "charging",
+   "attributes": {
+    "friendly_name": "Ahmed phone battery state"
+   }
+  },
+  "sensor.ehab_phone_battery_level": {
+   "entity_id": "sensor.ehab_phone_battery_level",
+   "state": "14",
+   "attributes": {
+    "friendly_name": "Ehab phone battery",
+    "device_class": "battery",
+    "unit_of_measurement": "%"
+   }
+  },
+  "sensor.ahmed_travel_time": {
+   "entity_id": "sensor.ahmed_travel_time",
+   "state": "18",
+   "attributes": {
+    "friendly_name": "Ahmed travel time",
+    "icon": "mdi:car-clock",
+    "unit_of_measurement": "min"
    }
   }
  },

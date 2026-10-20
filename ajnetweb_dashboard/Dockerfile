@@ -11,6 +11,9 @@ RUN apk add --no-cache \
     py3-yaml \
     curl
 
+# QR codes for the Studio "Wall panels" tab (pure Python)
+RUN pip3 install --no-cache-dir --break-system-packages segno==1.6.6
+
 WORKDIR /app
 
 COPY run.sh /run.sh
