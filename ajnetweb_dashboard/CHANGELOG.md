@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.18.0 - Bubble and Pastel themes
+- **New theme "AJ Netweb Bubble"** (light + dark): very round 32 px cards on a soft shadow, solid surfaces,
+  no blur, blue-violet accent. Friendly and fast on any tablet.
+- **New theme "AJ Netweb Pastel"** (dark): near-black and quiet with soft pastel accents (lavender, rose,
+  mint). Calm for bedrooms and night use.
+- Both appear in Studio, in each person's Appearance picker and on the add-on pages, like every other theme.
+
 ## 3.17.0 - room card indicators
 - **Room cards show more at a glance.** A green dot pulses on the room icon while someone is in the room
   (motion, occupancy or presence). New indicator icons for an unlocked lock, open shades, a running fan
