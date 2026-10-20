@@ -37,6 +37,7 @@
       <button class="tab" data-tab="modes" role="tab">House modes</button>
       <button class="tab" data-tab="alarm" role="tab">Alarm</button>
       <button class="tab" data-tab="panels" role="tab">Wall panels</button>
+      <button class="tab" data-tab="music" role="tab">Music</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
       <button class="tab" data-tab="blueprints" role="tab">Blueprints</button>
@@ -361,6 +362,46 @@
               then add the <b>Fully Kiosk Browser</b> integration in Home Assistant (it is usually found by itself).</li>
             <li>Motion and dimming need a Fully Kiosk PLUS licence on the tablet. The start page works without one.</li>
             <li>Log the tablet in as a normal (non-admin) user so the Installer page stays hidden. More in the Wall Panels guide.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- MUSIC -->
+      <section class="panel" id="tab-music">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Music Assistant</h2>
+              <p class="desc">Music Assistant plays Spotify, YouTube Music, Apple Music, Tidal, radio and the client's own
+                files on every speaker, in sync. The dashboard's music cards and the <b>Music</b> page use it. Each step below
+                is checked live; the buttons do the step for you.</p>
+            </div>
+            <div class="head-actions"><button id="btnMusicRefresh" class="btn">Check again</button>
+              <a id="btnMusicOpen" class="btn primary" target="_top" hidden>Open Music Assistant</a></div>
+          </div>
+          <ul class="checks" id="musicSteps"><li class="muted">Checking…</li></ul>
+          <div class="toggles" style="margin-top:14px">
+            <label class="switch"><input type="checkbox" id="fMusicLibrary"><span></span>Show the music library on the dashboard's Music page (favourites, playlists, radio, search)</label>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Music services</h2>
+          <p class="desc">The client adds their services in Music Assistant: <b>Settings → Music sources → Add</b>, with their
+            own account. Nothing can be pre-filled for them, because every service needs the client's own login.
+            Most clients do best with <b>Spotify</b> or <b>Apple Music</b> plus <b>Radio Browser</b> for Quran and local stations.</p>
+          <div class="provider-list" id="musicProviders"></div>
+          <div id="musicPo"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>Give every speaker the right <b>area</b> in Home Assistant, so it shows in its room on the dashboard.</li>
+            <li>Mark playlists and stations as <b>favourites</b> in Music Assistant: they show on the dashboard's music card.</li>
+            <li>Anghami and Amazon Music are not supported by Music Assistant. Clients who use them can cast from the app to a speaker instead.</li>
+            <li>Playing from the dashboard: <b>Music</b> page → pick the speaker under <i>Play on</i> → search or tap a
+              favourite, playlist or station. With the <i>Spotify Connect</i> plugin the speakers also show in the Spotify app.</li>
+            <li>The library is drawn in the dashboard's own design. Its <b>Music Assistant</b> button opens Music Assistant's
+              own app in each person's colours, for settings and music sources.</li>
           </ul>
         </div>
       </section>

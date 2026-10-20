@@ -13,6 +13,7 @@ from socketserver import ThreadingMixIn
 from dashboard_engine import ADDON_VERSION, DashboardEngine
 
 import ajn_license
+import music_setup
 
 LICENSE = ajn_license.License("dashboard", "AJ Netweb Dashboard Suite")
 
@@ -94,6 +95,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "/api/wall_panels": lambda: engine.wall_panels_info(self._query().get("base")),
             "/api/alarm": engine.alarm_info,
             "/api/room/now": lambda: engine.room_now(self._query().get("area")),
+            "/api/music": lambda: music_setup.status(engine.client),
         }
         if path in routes:
             self._guard(lambda: self._send_json(routes[path]()))
@@ -157,6 +159,10 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 engine.save_project(payload["project"]) if payload.get("project") else None)))
         elif path == "/api/wall_panels/apply":
             self._guard(lambda: respond(engine.wall_panels_apply(payload)))
+        elif path == "/api/music/install":
+            self._guard(lambda: respond(music_setup.install(engine.client, str(payload.get("addon") or ""))))
+        elif path == "/api/music/connect":
+            self._guard(lambda: respond(music_setup.connect(engine.client)))
         elif path == "/api/blueprints/install":
             self._guard(lambda: respond(engine.install_bundled_blueprints()))
         elif path == "/api/install_resources":

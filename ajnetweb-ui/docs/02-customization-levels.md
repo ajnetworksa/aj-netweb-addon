@@ -116,6 +116,7 @@ strategy:
   music: true                         # music card on Home + Music page
   music_players: []                   # limit which speakers the music card offers
   music_assistant_entry: 01J...       # lets non-admin users search Music Assistant (Studio sets it)
+  music_library: false                # hide the music library on the Music page (Studio → Music)
   personal: true                      # palette button: each person picks theme / colour / wallpaper
   palette: desert                     # default colour gradient (ocean aurora sunset desert emerald
                                       #   royal rose arctic coral graphite)

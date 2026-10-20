@@ -266,3 +266,12 @@ dialog.small { width: min(560px, 94vw); }
 .asrow label { display: flex; justify-content: center; }
 .asrow small { color: var(--text-2); }
 #alarmPhones { margin-top: 14px; }
+/* Music tab */
+.provider-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 12px 0; }
+.provider { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); }
+.provider b { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.provider .lvl { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface); color: var(--text-2); }
+.provider .lvl.advanced { color: var(--warn); }
+.provider p { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.provider p.acc { color: var(--text); }
+.checks .step-act { margin-top: 6px; }

@@ -1,5 +1,22 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.19.0 - Music Assistant in each person's colours, Studio music setup
+- **Music library in the dashboard's own design.** The Music page now ends with a *Music library* card built
+  like the rest of the dashboard: speaker chips (*Play on*), a search box (Spotify, YouTube Music, radio… whatever
+  is added in Music Assistant) and tabs for Favourites, Playlists, Radio, Albums, Artists and Songs as tiles.
+  Tap a song or station to play it on the chosen speaker; albums, playlists and artists open their songs
+  (*Play all*, or one song). New card `custom:ajnetweb-music-browser-card`; strategy option
+  `music_library: false` hides it.
+- **Music Assistant button:** opens Music Assistant's own app (settings, music sources, queue) full screen
+  inside the dashboard, painted with the person's theme and colour (light/dark included). Also available as
+  its own card, `custom:ajnetweb-music-library-card`.
+- Music Assistant opened from the HA sidebar keeps its own look (it is another app; only light/dark can be
+  chosen there, in its own settings).
+- **Studio → Music** (new tab): checks each step live and does it for you: install and start the Music
+  Assistant add-on, connect it to Home Assistant (confirms HA's discovery prompt), count the speakers, and
+  install the YouTube Music helper add-on. A guide card per music service (Spotify, Apple Music, Tidal,
+  YouTube Music, Deezer, SoundCloud, radio, own files) says what account the client needs and how to add it.
+
 ## 3.18.0 - Bubble and Pastel themes
 - **New theme "AJ Netweb Bubble"** (light + dark): very round 32 px cards on a soft shadow, solid surfaces,
   no blur, blue-violet accent. Friendly and fast on any tablet.
