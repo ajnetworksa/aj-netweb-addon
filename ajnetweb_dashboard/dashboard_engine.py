@@ -21,7 +21,11 @@ import shutil
 import time
 from typing import Any, Dict, List, Optional
 
+import alarm
 import house_modes
+import scenes
+import water
+import wall_panels
 from discovery import Discovery
 from ha_client import HAClient, HAError, version_tuple
 from themes import install_themes, theme_catalog, theme_name, themes_include_status
@@ -30,7 +34,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.14.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.16.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -64,15 +68,19 @@ DEFAULT_PROJECT = {
     "palette": "",
     "wallpaper": False,
     "menu": True,
+    "notifications": True,     # bell with the notification list in the header
     "layout": {},              # {"home": {"order": [...], "hidden": [...]}, "panel": {...}}  (Studio "Layout" tab)
     "top_cards": ["weather", "prayer", "media"],
-    "insights": ["calendar", "energy", "temperature"],   # "Today at home" band
+    "insights": ["calendar", "energy", "temperature", "water"],   # "Today at home" band
+    "energy_tariff": "auto",   # bill estimate on the energy card: auto (SEC in Saudi Arabia) | sec | dewa | none
     "room_order": [],
     "room_style": "tile",
     "cameras": [],             # chosen cameras in order (empty = all)
     "home_cameras": 4,
     "custom_dashboard": "",    # "My cards" dashboard url_path once created
     "house_modes": house_modes.DEFAULTS,   # Home / Away / Night / Guests (Studio "House modes" tab)
+    "wall_panel_profile": wall_panels.DEFAULT_PROFILE,
+    "alarm": alarm.DEFAULTS,   # Studio "Alarm" tab: own alarm or existing panel, alerts, Alexa arming   # Studio "Wall panels" tab (Fully Kiosk tablets)
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
                        "settings": "admins", "studio": "admins", "exit_kiosk": "admins"},
@@ -81,7 +89,9 @@ DEFAULT_PROJECT = {
 
 
 LAYOUT_BANDS = ("top", "modes", "scenes", "access", "favorites", "rooms", "climate", "insights", "cameras", "custom")
-INSIGHTS = ("calendar", "energy", "temperature")
+INSIGHTS = ("calendar", "energy", "temperature", "water")
+LEGACY_INSIGHTS = ["calendar", "energy", "temperature"]   # the default before 3.12.0: still means "all"
+TARIFFS = ("sec", "dewa", "none")
 
 
 def _clean_layout(layout) -> Optional[Dict[str, Any]]:
@@ -251,17 +261,21 @@ class DashboardEngine:
             "palette": project.get("palette") or None,
             "wallpaper": True if project.get("wallpaper") else None,
             "menu": False if project.get("menu") is False else None,
+            "notifications": False if project.get("notifications") is False else None,
             "layout": _clean_layout(project.get("layout")),
             "top_cards": project.get("top_cards") if isinstance(project.get("top_cards"), list)
                          and project.get("top_cards") != ["weather", "prayer", "media"] else None,
             "insights": [k for k in project["insights"] if k in INSIGHTS]
-                        if isinstance(project.get("insights"), list) and project.get("insights") != list(INSIGHTS) else None,
+                        if isinstance(project.get("insights"), list)
+                        and project.get("insights") not in (list(INSIGHTS), LEGACY_INSIGHTS) else None,
+            "energy_tariff": project.get("energy_tariff") if project.get("energy_tariff") in TARIFFS else None,
             "room_order": [a for a in (project.get("room_order") or []) if isinstance(a, str)] or None,
             "room_style": "photo" if project.get("room_style") == "photo" else None,
             "cameras": [c for c in (project.get("cameras") or []) if isinstance(c, str) and c.startswith("camera.")] or None,
             "home_cameras": int(project["home_cameras"]) if str(project.get("home_cameras", "")).isdigit()
                             and int(project["home_cameras"]) != 4 else None,
             "custom_dashboard": project.get("custom_dashboard") or None,
+            "alarm": self._alarm_option(project),
             "kiosk": _kiosk_options(project.get("kiosk")),
             # off is stored as false, otherwise the strategy would still show a helper it finds
             "house_modes": house_modes.strategy_option(house_modes.merge_defaults(project.get("house_modes"))) or False,
@@ -276,6 +290,14 @@ class DashboardEngine:
         options = {k: v for k, v in options.items()
                    if v not in (None, [], {}, "") or (k in ("top_cards", "insights") and v == [])}
         return {"strategy": options}
+
+    @staticmethod
+    def _alarm_option(project: Dict[str, Any]) -> Optional[str]:
+        """The panel the header shows: the alarm pack's choice, when it is on and not "automatic"."""
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        if not cfg["enabled"] or cfg["source"] == "auto":
+            return None
+        return alarm.OWN_ENTITY if cfg["source"] == "own" else (cfg["panel"] or None)
 
     # ------------------------------------------------------------------ health
     def health(self) -> Dict[str, Any]:
@@ -448,6 +470,9 @@ class DashboardEngine:
                 s.call("lovelace/config/save", url_path=url_path, config=config)
                 steps.append({"step": "Dashboard saved", "ok": True,
                               "detail": "live layout (AJ Netweb UI strategy) - updates itself when devices change"})
+            step = water.ensure_script(self.client)
+            if step:
+                steps.append(step)
         except Exception as e:
             log.error("Deploy failed: %s", e)
             return {"ok": False, "error": str(e), "steps": steps}
@@ -476,6 +501,71 @@ class DashboardEngine:
         return {"ok": True, "config": cfg, "targets": {k: len(v) for k, v in plan["targets"].items()},
                 "current": st.get("state") if isinstance(st, dict) else None,
                 "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
+
+    # ------------------------------------------------------------------ alarm pack
+    def alarm_info(self) -> Dict[str, Any]:
+        """Studio tab: the settings, sensors with their arm modes, and what was found in HA."""
+        project = self.load_project()
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        model = self.discover(project)
+        states = self.client.rest_get("/core/api/states", []) or []
+        services = self.client.rest_get("/core/api/services", []) or []
+        p = alarm.plan(cfg, model, states, services)
+        by_id = {s.get("entity_id"): s for s in states}
+        name = lambda eid: ((by_id.get(eid) or {}).get("attributes") or {}).get("friendly_name") or eid  # noqa: E731
+        return {"ok": True, "config": cfg, "sensors": alarm.sensors(cfg, model),
+                "panels": [{"entity_id": e, "name": name(e)} for e in p["found"]["panels"]],
+                "sirens": [{"entity_id": e, "name": name(e)} for e in p["found"]["sirens"]],
+                "phones": [{"service": e, "name": e.split("mobile_app_", 1)[-1].replace("_", " ")} for e in p["found"]["phones"]],
+                "using": {"own": p["own"], "panel": p["panel"],
+                          "state": (by_id.get(p["panel"]) or {}).get("state") if p["panel"] else None},
+                "packages_ok": alarm.packages_enabled(self.config_dir),
+                "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
+
+    def apply_alarm(self, project: Dict[str, Any] = None) -> Dict[str, Any]:
+        project = project or self.load_project()
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        if not cfg["enabled"]:
+            return {"ok": False, "error": "Turn the alarm pack on first", "steps": []}
+        model = self.discover(project)
+        if model.get("errors"):
+            return {"ok": False, "error": "; ".join(model["errors"]), "steps": []}
+        return alarm.apply(self.client, cfg, model, self.config_dir)
+
+    # ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk profile)
+    def _ha_address(self) -> str:
+        cfg = self.client.rest_get("/core/api/config", {}) if self.client.connected else {}
+        cfg = cfg if isinstance(cfg, dict) else {}
+        return cfg.get("internal_url") or cfg.get("external_url") or ""
+
+    def wall_panels_info(self, base_url: str = None) -> Dict[str, Any]:
+        """Studio "Wall panels" tab: QR codes for the Wall Panel page and the Fully Kiosk tablets HA knows."""
+        project = self.load_project()
+        base = (base_url or "").strip() or self._ha_address()
+        if len(base) > 300:
+            return {"ok": False, "error": "Address is too long"}
+        urls = wall_panels.panel_urls(base, project["url_path"])
+        qr = {}
+        for kind, text in urls.items():
+            if text:
+                try:
+                    qr[kind] = wall_panels.qr_svg(text)
+                except RuntimeError as e:
+                    qr["error"] = str(e)
+        tablets = wall_panels.list_tablets(self.client) if self.client.connected else []
+        return {"ok": True, "base_url": base, "urls": urls, "qr": qr, "tablets": tablets,
+                "panel_view": (project.get("views") or {}).get("panel", True) is not False,
+                "profile": wall_panels.clean_profile(project.get("wall_panel_profile"))}
+
+    def wall_panels_apply(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = payload if isinstance(payload, dict) else {}
+        device_id = str(payload.get("device_id") or "")
+        if not re.fullmatch(r"[0-9a-zA-Z_-]{1,64}", device_id):
+            return {"ok": False, "error": "Pick a tablet first", "steps": []}
+        profile = wall_panels.clean_profile(payload.get("profile"))
+        self.save_project({"wall_panel_profile": profile})
+        url = str(payload.get("url") or "").strip()[:300]
+        return wall_panels.apply(self.client, device_id, url, profile)
 
     # ------------------------------------------------------------------ rooms: rename / photo (no HA settings needed)
     def room_update(self, area_id: str, name: str = None, photo: str = None) -> Dict[str, Any]:
@@ -509,6 +599,25 @@ class DashboardEngine:
             log.error("Room update failed: %s", e)
             return {"ok": False, "error": str(e)}
         return {"ok": True, **fields}
+
+    # ------------------------------------------------------------------ rooms: save what a room does now as a scene
+    def room_now(self, area_id: str) -> Dict[str, Any]:
+        if not re.fullmatch(r"[a-z0-9_]{1,64}", area_id or ""):
+            return {"ok": False, "error": "invalid room"}
+        return {"ok": True, "entities": scenes.room_now(self.client, self.discover_raw(), area_id)}
+
+    def save_scene(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        payload = payload if isinstance(payload, dict) else {}
+        area_id = str(payload.get("area_id") or "")
+        if not re.fullmatch(r"[a-z0-9_]{1,64}", area_id):
+            return {"ok": False, "error": "invalid room"}
+        name = str(payload.get("name") or "").strip()
+        if not 1 <= len(name) <= 60:
+            return {"ok": False, "error": "Scene name must be 1-60 characters"}
+        icon = str(payload.get("icon") or "")
+        icon = icon if re.fullmatch(r"mdi:[a-z0-9-]{1,60}", icon) else ""
+        ids = [str(e) for e in (payload.get("entities") or []) if isinstance(e, str)][:100]
+        return scenes.save(self.client, self.discover_raw(), area_id, name, ids, icon)
 
     # ------------------------------------------------------------------ "My cards"
     MY_CARDS_URL = "ajnetweb-cards"

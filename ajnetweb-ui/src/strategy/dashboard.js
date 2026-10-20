@@ -4,7 +4,7 @@
 //
 // Options (all optional):
 //   title, language (en|ar), theme (HA theme name applied to every view), header_image
-//   exclude_entities: [], hidden_areas: [], favorites: [], weather, alarm
+//   exclude_entities: [], hidden_areas: [], favorites: [], weather, alarm (header alarm; Studio Alarm tab sets it)
 //   views: { panel, lights, climate, security, cameras, media, installer }   (true/false)
 //   navbar: true, room_tap: popup|navigate, panel_live_cameras: true, cameras_live: false
 //   shortcuts: [{ name, icon, navigation_path }]   e.g. intercom / CCTV add-on panels
@@ -18,8 +18,12 @@
 //   layout: { home: { order: [band ids], hidden: [band ids] }, panel: {...} }   bands: top modes scenes access
 //           favorites rooms climate insights cameras custom          (Studio "Layout" tab, drag and drop)
 //   top_cards: [weather, prayer, media]   room_order: [area ids]   cameras: [ids]   home_cameras: 4
-//   insights: [calendar, energy, temperature]   cards of the "Today at home" band (Home / Wall Panel)
+//   insights: [calendar, energy, temperature, water]   cards of the "Today at home" band (Home / Wall Panel)
+//   water: { tanks: [], pump, zones: [], minutes: 10, low: 20 } | false   water card ("water" insight); by default
+//           tank level sensors, the booster pump and watering valves/switches are found by their names
 //   calendars: [calendar ids] (default: all)   energy: false   energy_power: sensor.house_power (live power)
+//   notifications: false                      no bell (notification list) in the header
+//   energy_tariff: auto | sec | dewa | none   bill estimate on the energy card (auto = SEC when HA's country is SA)
 //   custom_dashboard: <url path> "My cards" - a normal dashboard edited with HA's visual editor; its first
 //           view is merged into Home / Wall Panel ("custom" band), its other views become extra pages
 //   room_access: { <user id or name>: { areas: [area ids], home: area id } }   rooms a non-admin user (or a
@@ -40,6 +44,7 @@ import { PALETTES, loadAppearance, paletteWallpaper } from "../core/appearance.j
 import { allowed } from "../core/access.js";
 import { licenseState } from "../core/license.js";
 import { energySources } from "../cards/energy.js";
+import { waterEntities } from "../cards/water.js";
 import { MODE_ENTITY } from "../cards/modes.js";
 
 const ALARM_BITS = [[1, "armed_home"], [2, "armed_away"], [4, "armed_night"], [32, "armed_vacation"], [16, "armed_custom_bypass"]];
@@ -219,6 +224,19 @@ export async function generateDashboard(config, rawHass) {
              ...(Array.isArray(m.confirm) ? { confirm: m.confirm } : {}) };
   })();
 
+  // the header bell: doorbell rings, alarm changes, leaks/smoke/gas, doors, gates and garages (not windows)
+  const notifications = (() => {
+    if (cfg.notifications === false) return null;
+    const doors = ids("openings").filter((id) => {
+      const a = (hass.states[id] || {}).attributes || {};
+      return ["door", "garage_door"].includes(a.device_class) || /gate|بوابة/i.test(`${id} ${a.friendly_name || ""}`);
+    });
+    const n = { ...(hass.states["sensor.ajnetweb_doorbell"] ? { doorbell: "sensor.ajnetweb_doorbell" } : {}),
+                ...(ids("alarms").length ? { alarms: ids("alarms") } : {}),
+                ...(ids("safety").length ? { safety: ids("safety") } : {}), ...(doors.length ? { openings: doors } : {}) };
+    return Object.keys(n).length ? n : null;
+  })();
+
   const header = (variant, extra = {}) => {
     const chips = [];
     if (ids("lights").length) chips.push({ icon: "mdi:lightbulb-on", entities: ids("lights"), active: ["on"],
@@ -237,6 +255,7 @@ export async function generateDashboard(config, rawHass) {
       ...(weather ? { weather } : {}), ...(alarm ? { alarm, alarm_navigation_path: path("security") } : {}),
       ...(model.house.persons.length ? { persons: model.house.persons.slice(0, 6) } : {}),
       ...(cfg.header_image ? { image: cfg.header_image } : {}),
+      ...(notifications ? { notifications } : {}),
       // with the ⋯ menu the picker lives there; the header button is for dashboards without the bar
       ...(canAppearance && !menuOn ? { appearance: true } : {}), ...(cfg.wallpaper ? { wallpaper: true } : {}),
       ...(cfg.appearance_themes ? { appearance_themes: cfg.appearance_themes } : {}),
@@ -297,12 +316,25 @@ export async function generateDashboard(config, rawHass) {
     return a.device_class === "power" && /grid|main|total|house|home|consumption|import/.test(id);
   });
   const insightCards = () => {
-    const pick = Array.isArray(cfg.insights) ? cfg.insights : ["calendar", "energy", "temperature"];
+    const pick = Array.isArray(cfg.insights) ? cfg.insights : ["calendar", "energy", "temperature", "water"];
     const make = {
       calendar: () => (calendars.length ? withLang({ type: "custom:ajnetweb-calendar-card", entities: calendars, days: 7, max: 5 }) : null),
       energy: () => (energy || cfg.energy_entities ? withLang({ type: "custom:ajnetweb-energy-card",
-        ...(powerSensor ? { power: powerSensor } : {}), ...(cfg.energy_entities ? { entities: cfg.energy_entities } : {}) }) : null),
+        ...(powerSensor ? { power: powerSensor } : {}), ...(cfg.energy_entities ? { entities: cfg.energy_entities } : {}),
+        ...(cfg.energy_tariff ? { tariff: cfg.energy_tariff } : {}) }) : null),
       temperature: () => tempGraph(tempRooms),
+      water: () => {
+        if (cfg.water === false) return null;
+        const own = cfg.water && typeof cfg.water === "object" ? cfg.water : {};
+        const found = waterEntities(hass);
+        const excluded = new Set(cfg.exclude_entities || []);
+        const keep = (list) => (list || []).filter((e) => !excluded.has(typeof e === "string" ? e : e && e.entity));
+        const pump = own.pump || (!excluded.has(found.pump) && found.pump);
+        const w = { tanks: keep(own.tanks || found.tanks), pump, zones: keep(own.zones || found.zones) };
+        if (!w.tanks.length && !w.zones.length) return null;
+        return withLang({ type: "custom:ajnetweb-water-card", tanks: w.tanks, zones: w.zones, ...(w.pump ? { pump: w.pump } : {}),
+          ...(own.minutes ? { minutes: own.minutes } : {}), ...(own.low ? { low: own.low } : {}) });
+      },
     };
     return pick.map((k) => make[k] && make[k]()).filter(Boolean).map((c) => { delete c.grid_options; return c; });
   };
