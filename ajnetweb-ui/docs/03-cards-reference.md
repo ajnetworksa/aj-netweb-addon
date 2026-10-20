@@ -57,7 +57,20 @@ entities:                    # optional — default: everything in the area, gro
   lights: [light.majlis_chandelier, switch.majlis_spot_lights]
   climates: [climate.majlis_ac]
   scenes: [scene.majlis_guests]
+indicators:                  # optional: extra indicator icons, shown while the entity is active
+  - binary_sensor.majlis_window          # any on / open / unlocked / playing … state; a sensor shows its value
+  - entity: switch.majlis_incense
+    icon: mdi:smoke
+    color: purple                        # amber (default), blue, orange, red, green, purple, teal, indigo, pink, grey
+    active: [on]                         # optional: which states count as active
+# indicators: false          # hides every indicator
 ```
+
+**Indicators:** a green dot pulses on the room icon while someone is there (motion, occupancy or presence
+sensor). Small icons on the card show what needs a look or is running: alerts (red), open doors and
+windows, an unlocked lock, the AC with its set temperature, open shades, a running fan (spinning), a robot
+vacuum at work, music playing, then the `indicators` you add. The tile style leaves out what its quick
+buttons already show.
 
 Groups used in `entities` (and in the room sheet, in this order): `access, lights, climates, fans,
 covers, media, switches, vacuums, valves, cameras, temperature, humidity, air, power, openings,
@@ -264,10 +277,53 @@ type: custom:ajnetweb-energy-card
 power: sensor.house_power        # optional: live power (W / kW)
 days: 7
 entities: [sensor.main_meter]    # only if HA's Energy dashboard is NOT set up: meters to add up
+tariff: auto                     # bill estimate: auto (SEC when HA's country is SA) | sec | dewa | none
+                                 # or own tiers: { tiers: [[6000, 0.18], [null, 0.30]], per_kwh: 0, vat: 0.15, currency: SAR }
+ac: [sensor.majlis_ac_energy]    # optional: AC meters; default = Energy "individual devices" named like an AC
 ```
 Reads HA's Energy settings (grid import/export, solar, cost) and the daily totals from long-term
 statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
-and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
+and cost today. Underneath: this month's kWh, the bill so far and the projected month end (from the cost
+sensor, or estimated from the tariff), and the AC share of today's use when AC meters exist. Tap opens HA's
+Energy page. **Set up Settings → Dashboards → Energy first.** Tariff estimates leave out meter and fixed fees.
+
+### `custom:ajnetweb-notifications-card` — what happened at home
+
+```yaml
+type: custom:ajnetweb-notifications-card
+doorbell: sensor.ajnetweb_doorbell           # rings (Intercom add-on)
+alarms: [alarm_control_panel.house]          # armed / disarmed / triggered
+safety: [binary_sensor.kitchen_leak]         # leak, smoke, gas going on
+openings: [binary_sensor.front_door_contact] # doors and gates opened
+hours: 48
+max: 60
+```
+The last 48 hours from HA's logbook, newest first and grouped by day; new entries since the person last
+looked are marked. The strategy puts it behind a bell in the header (with a count of new entries) and fills
+the lists itself: doors, gates and garages but not windows.
+
+### `custom:ajnetweb-water-card` — tanks, pump and garden watering
+
+Part of *Today at home* (`water` insight) when tank sensors or watering zones are found by name: level
+sensors in % whose name has *tank* / *خزان*, a switch with *pump* / *مضخة*, and valves or switches with
+*irrigation*, *sprinkler*, *drip*, *garden*, *lawn*, *zone* / *ري*, *رشاش*, *تنقيط*, *حديقة* (never main
+shut-off, leak or gas valves). Tanks below `low` % turn red. **Run 10 min** calls
+`script.ajnetweb_water_run`, which Studio **Deploy** creates when the house has watering zones; it closes the
+valve again inside HA, so watering stops on time even with no dashboard open. Without the script the button
+is a plain Start / Stop.
+
+```yaml
+type: custom:ajnetweb-water-card
+tanks:
+  - sensor.roof_tank_level
+  - { entity: sensor.ground_tank_level, name: Ground tank, capacity: 5000 }   # litres -> "≈ 3,200 L"
+pump: switch.booster_pump
+zones: [valve.front_lawn, switch.drip_line_palms]
+minutes: 10          # Run length (1-120)
+low: 20              # red below this %
+```
+Pair it with the *Water Tank & Booster Pump Watchdog* blueprint (Studio → Blueprints) for low-level alerts and
+pump dry-run cut-off.
 
 ### `custom:ajnetweb-modes-card` — house modes
 
@@ -282,6 +338,39 @@ One row of chips; the current mode is highlighted. A tap selects the mode
 (`input_select.select_option`); the *AJ Netweb - House modes* automation that Studio → **House modes**
 creates then runs that mode's actions, so the dashboard, Alexa and your automations behave the same.
 Hold opens the helper's details. Works with any `input_select`: unknown options are shown as they are.
+
+### `custom:ajnetweb-person-card` — who is home
+
+```yaml
+type: custom:ajnetweb-person-card
+entity: person.ahmed
+size: small                  # optional: small (default, half width) or big (full width, tinted, info chips)
+battery: sensor.ahmed_phone_battery_level   # optional: found by itself from the person's phone tracker; false hides it
+sensors: [sensor.ahmed_travel_time]         # optional, big only: extra chips (travel time, steps, ...)
+name: Baba                   # optional
+picture: /local/ahmed.jpg    # optional: else the person's own photo, else initials
+```
+Photo (or initials) with a ring in the presence colour: green at home, orange away, teal in a named zone
+(the zone's name is shown). Under the name: where and for how long ("Home · for 2 h 5 min"). The phone
+battery chip turns red at 20 % and shows a bolt while charging (`…_battery_state`). Tap opens HA's person
+dialog with the map; tapping a chip opens that sensor.
+### `custom:ajnetweb-appliance-card` — washing machine, dryer, dishwasher, 3D printer
+
+```yaml
+type: custom:ajnetweb-appliance-card
+entity: sensor.washer_status          # what it is doing (sensor, binary_sensor, switch or a timer)
+kind: washer                          # optional: washer | dryer | dishwasher | printer (else guessed from the name)
+progress: sensor.washer_progress      # optional: 0-100 %
+remaining: sensor.washer_remaining    # optional: minutes left, or a finish-time timestamp
+power: sensor.washer_power            # optional: W; with no status entity, running = above `threshold`
+threshold: 5                          # optional, W
+name: Washer                          # optional
+```
+A ring around the appliance fills with the progress; the icon moves while it runs. The text says what it is
+doing (the integration's own step, e.g. "Rinse", next to it) and the time left with the clock time it will
+be ready. Finished turns the icon into a green tick. Works with brand integrations (Home Connect, LG
+ThinQ, SmartThings, Miele, Bambu Lab, OctoPrint, ...), a smart plug with power metering, or a plain
+`timer`. Tap = details of the status entity, hold = the power sensor.
 
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 

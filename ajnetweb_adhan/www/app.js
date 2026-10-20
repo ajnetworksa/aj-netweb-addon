@@ -6,6 +6,7 @@
   const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
   let S = null; // last status
   let saveTimer = null;
+  let SPK = []; // media players, for the per-prayer and Quran speaker pickers
 
   async function api(path, body, raw) {
     const opts = body === undefined ? {} : raw ? { method: "POST", body, headers: raw }
@@ -64,15 +65,41 @@
       <td>${esc(nm(k))} <span class="muted small">${fmt(S.times[k])}</span></td>
       <td><input type="checkbox" data-en="${k}" ${p[k].enabled ? "checked" : ""}></td>
       <td><input type="number" min="-30" max="30" data-off="${k}" value="${p[k].offset || 0}"></td>
-      <td><input type="number" min="0" max="100" placeholder="default" data-vol="${k}" value="${p[k].volume != null ? Math.round(p[k].volume * 100) : ""}"></td></tr>`).join("");
+      <td><input type="number" min="0" max="100" placeholder="default" data-vol="${k}" value="${p[k].volume != null ? Math.round(p[k].volume * 100) : ""}"></td>
+      <td><input type="number" min="0" max="60" data-iq="${k}" value="${p[k].iqamah || 0}"></td>
+      <td><details class="spk"><summary>${(p[k].speakers || []).length ? `${p[k].speakers.length} chosen` : "Default"}</summary><div>${SPK.map((sp) =>
+        `<label><input type="checkbox" data-pspk="${k}" value="${esc(sp.entity_id)}" ${(p[k].speakers || []).includes(sp.entity_id) ? "checked" : ""}> ${esc(sp.name)}</label>`).join("")}</div></details></td></tr>`).join("");
     const upd = (k, patch) => saveSoon({ prayers: { [k]: Object.assign({}, S.settings.prayers[k], patch) } });
     $("prayers").querySelectorAll("[data-en]").forEach((e) => e.onchange = () => upd(e.dataset.en, { enabled: e.checked }));
     $("prayers").querySelectorAll("[data-off]").forEach((e) => e.onchange = () => upd(e.dataset.off, { offset: Number(e.value) || 0 }));
     $("prayers").querySelectorAll("[data-vol]").forEach((e) => e.onchange = () => upd(e.dataset.vol, { volume: e.value === "" ? null : Number(e.value) / 100 }));
+    $("prayers").querySelectorAll("[data-iq]").forEach((e) => e.onchange = () => upd(e.dataset.iq, { iqamah: Number(e.value) || 0 }));
+    $("prayers").querySelectorAll("[data-pspk]").forEach((e) => e.onchange = () => {
+      const k = e.dataset.pspk;
+      const list = [...$("prayers").querySelectorAll(`[data-pspk="${k}"]:checked`)].map((x) => x.value);
+      e.closest("details").querySelector("summary").textContent = list.length ? `${list.length} chosen` : "Default";
+      upd(k, { speakers: list });
+    });
     const s = S.settings;
     $("reminder").value = s.reminder_minutes; $("suhoor").value = s.suhoor_minutes; $("hijriAdj").value = s.hijri_adjust;
     $("lang").value = s.language; $("notifyAt").checked = s.notify_at_adhan; $("onlyHome").checked = s.only_when_home;
   }
+
+  function renderMore() {
+    const s = S.settings, j = s.jumuah, q = s.quran_after_fajr;
+    const opts = (sel) => `<option value="">— none —</option>` + S.files.map((f) => `<option ${f === sel ? "selected" : ""}>${esc(f)}</option>`).join("");
+    $("iqLead").value = s.iqamah_lead; $("iqFile").innerHTML = opts(s.iqamah_file);
+    $("jumAdhan").checked = j.adhan; $("jumFile").innerHTML = opts(j.file); $("jumRem").value = j.reminder_minutes;
+    $("kahf").checked = j.kahf_reminder; $("kahfTime").value = j.kahf_time;
+    $("qEnabled").checked = q.enabled; $("qFile").innerHTML = opts(q.file); $("qUrl").value = q.url;
+    $("qDelay").value = q.delay_minutes; $("qVol").value = q.volume != null ? Math.round(q.volume * 100) : "";
+    $("qSpeakers").innerHTML = SPK.map((sp) => `<label><input type="checkbox" value="${esc(sp.entity_id)}" ${q.speakers.includes(sp.entity_id) ? "checked" : ""}> ${esc(sp.name)}</label>`).join("")
+      || '<span class="muted small">No media players found.</span>';
+    $("qSpeakers").querySelectorAll("input").forEach((cb) => cb.onchange = () =>
+      saveQuran({ speakers: [...$("qSpeakers").querySelectorAll("input:checked")].map((x) => x.value) }));
+  }
+  const saveJumuah = (patch) => saveSoon({ jumuah: Object.assign({}, S.settings.jumuah, patch) });
+  const saveQuran = (patch) => saveSoon({ quran_after_fajr: Object.assign({}, S.settings.quran_after_fajr, patch) });
 
   function renderAudio() {
     const opts = (sel) => `<option value="">— none —</option>` + S.files.map((f) => `<option ${f === sel ? "selected" : ""}>${esc(f)}</option>`).join("");
@@ -98,10 +125,88 @@
     $("helpers").innerHTML = Object.entries(S.helpers).map(([k, v]) => `<div><code>${esc(v)}</code></div>`).join("") || "Not created yet";
   }
 
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  let climates = [];
+
+  function savePrecool() { saveSoon({ precool: JSON.parse(JSON.stringify(S.settings.precool)) }); }
+
+  async function renderPrecool() {
+    const r = await api("api/climates");
+    climates = r.climates || [];
+    const pc = S.settings.precool;
+    $("pcEnabled").checked = pc.enabled;
+    $("pcSeason").textContent = r.season ? `(now: ${r.season})` : "";
+    $("pcMonths").innerHTML = MONTHS.map((m, i) =>
+      `<label class="small"><input type="checkbox" data-month="${i + 1}" ${pc.summer_months.includes(i + 1) ? "checked" : ""}> ${m}</label>`).join("");
+    $("pcMonths").querySelectorAll("[data-month]").forEach((cb) => cb.onchange = () => {
+      S.settings.precool.summer_months = [...$("pcMonths").querySelectorAll("[data-month]:checked")].map((x) => Number(x.dataset.month));
+      savePrecool();
+    });
+    renderRules();
+  }
+
+  function renderRules() {
+    const pc = S.settings.precool;
+    $("pcRules").innerHTML = pc.rules.map((rule, i) => `<div class="card" data-rule="${i}">
+      <div class="row"><input type="text" data-k="name" value="${esc(rule.name)}" style="flex:1;min-width:160px">
+        <label class="small"><input type="checkbox" data-k="enabled" ${rule.enabled ? "checked" : ""}> On</label></div>
+      <div class="grid" style="margin-top:12px">
+        <label class="f">Minutes before<input type="number" min="0" max="180" data-k="minutes" value="${rule.minutes}"></label>
+        <label class="f">Mode<select data-k="hvac_mode">${["cool", "heat", "heat_cool", "auto"].map((m) =>
+          `<option ${m === rule.hvac_mode ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+        <label class="f">Summer temperature °<input type="number" min="16" max="30" step="0.5" data-k="summer_temp" value="${rule.summer_temp}"></label>
+        <label class="f">Winter temperature ° (blank = rest)<input type="number" min="16" max="30" step="0.5" data-k="winter_temp" value="${rule.winter_temp ?? ""}"></label>
+      </div>
+      <div style="margin-top:12px"><div class="small" style="font-weight:600">Before</div><div class="chips">${PRAYERS.map((p) =>
+        `<label><input type="checkbox" data-prayer="${p}" ${rule.prayers.includes(p) ? "checked" : ""}> ${esc(nm(p))}</label>`).join("")}</div></div>
+      <div style="margin-top:12px"><div class="small" style="font-weight:600">ACs</div><div class="chips">${climates.map((c) =>
+        `<label><input type="checkbox" data-climate="${esc(c.entity_id)}" ${rule.climates.includes(c.entity_id) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")
+        || '<span class="muted small">No climate entities found.</span>'}</div></div>
+      <div class="row" style="margin-top:12px">
+        <div class="chips"><label><input type="checkbox" data-k="only_when_home" ${rule.only_when_home ? "checked" : ""}> Only when someone is home</label>
+          <label><input type="checkbox" data-k="ramadan_only" ${rule.ramadan_only ? "checked" : ""}> Only in Ramadan</label></div>
+        <div><button class="btn small" data-test>Run now</button> <button class="btn small" data-del>Delete</button></div></div>
+    </div>`).join("") || '<div class="card muted">No pre-cooling yet.</div>';
+
+    // Look the rule up on every change: the page reloads its status every minute.
+    $("pcRules").querySelectorAll("[data-rule]").forEach((card) => {
+      const idx = Number(card.dataset.rule);
+      const cur = () => S.settings.precool.rules[idx];
+      card.querySelectorAll("[data-k]").forEach((el) => el.onchange = () => {
+        const k = el.dataset.k;
+        const rule = cur();
+        if (el.type === "checkbox") rule[k] = el.checked;
+        else if (k === "winter_temp") rule[k] = el.value === "" ? null : Number(el.value);
+        else if (el.type === "number") rule[k] = Number(el.value) || 0;
+        else rule[k] = el.value;
+        savePrecool();
+      });
+      card.querySelectorAll("[data-prayer]").forEach((el) => el.onchange = () => {
+        cur().prayers = [...card.querySelectorAll("[data-prayer]:checked")].map((x) => x.dataset.prayer); savePrecool();
+      });
+      card.querySelectorAll("[data-climate]").forEach((el) => el.onchange = () => {
+        cur().climates = [...card.querySelectorAll("[data-climate]:checked")].map((x) => x.dataset.climate); savePrecool();
+      });
+      card.querySelector("[data-del]").onclick = () => {
+        if (!confirm(`Delete ${cur().name}?`)) return;
+        S.settings.precool.rules.splice(idx, 1); savePrecool(); renderRules();
+      };
+      card.querySelector("[data-test]").onclick = async () => {
+        clearTimeout(saveTimer);
+        await api("api/settings", { precool: JSON.parse(JSON.stringify(S.settings.precool)) });
+        const res = await api("api/precool/test", { id: cur().id });
+        const out = res.entry && res.entry.result;
+        toast(!res.ok ? res.error || "Failed" : typeof out === "string" ? out
+          : Object.entries(out || {}).map(([e, m]) => `${e.replace("climate.", "")}: ${m}`).join(", ") || "Done");
+      };
+    });
+  }
+
   async function renderHistory() {
     const r = await api("api/history");
     $("history").innerHTML = (r.history || []).map((h) => `<div class="sp" style="grid-template-columns:1fr auto">
-      <div><b>${esc(nm(h.prayer))}</b> ${h.manual ? '<span class="tag">test</span>' : ""}<div class="muted small">${new Date(h.at).toLocaleString()}</div></div>
+      <div><b>${h.kind === "precool" ? `❄ ${esc(h.rule)} · before ${esc(nm(h.prayer))}` : h.kind === "quran" ? "📖 Quran after Fajr"
+        : h.kind === "iqamah" ? `Iqamah · ${esc(nm(h.prayer))}` : esc(nm(h.prayer))}</b> ${h.manual ? '<span class="tag">test</span>' : ""}<div class="muted small">${new Date(h.at).toLocaleString()}</div></div>
       <div class="small muted">${esc(typeof h.result === "string" ? h.result : Object.entries(h.result || {}).map(([e, m]) => `${e}: ${m}`).join(", "))}</div></div>`).join("")
       || '<div class="muted">Nothing played yet.</div>';
   }
@@ -110,7 +215,8 @@
     const r = await api("api/status");
     if (!r.ok) { toast(r.error || "Could not load"); return; }
     S = r;
-    renderToday(); renderPrayers(); renderAudio(); renderSetup();
+    if (!SPK.length) SPK = (await api("api/speakers")).speakers || [];
+    renderToday(); renderPrayers(); renderMore(); renderAudio(); renderSetup();
   }
 
   document.querySelectorAll(".tab").forEach((t) => t.onclick = () => {
@@ -118,7 +224,35 @@
     document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("active", p.id === "tab-" + t.dataset.tab));
     if (t.dataset.tab === "speakers") renderSpeakers();
     if (t.dataset.tab === "history") renderHistory();
+    if (t.dataset.tab === "precool") renderPrecool();
   });
+  $("iqLead").onchange = () => saveSoon({ iqamah_lead: Number($("iqLead").value) || 0 });
+  $("iqFile").onchange = () => saveSoon({ iqamah_file: $("iqFile").value });
+  $("jumAdhan").onchange = () => saveJumuah({ adhan: $("jumAdhan").checked });
+  $("jumFile").onchange = () => saveJumuah({ file: $("jumFile").value });
+  $("jumRem").onchange = () => saveJumuah({ reminder_minutes: Number($("jumRem").value) || 0 });
+  $("kahf").onchange = () => saveJumuah({ kahf_reminder: $("kahf").checked });
+  $("kahfTime").onchange = () => saveJumuah({ kahf_time: $("kahfTime").value || "09:00" });
+  $("qEnabled").onchange = () => saveQuran({ enabled: $("qEnabled").checked });
+  $("qFile").onchange = () => saveQuran({ file: $("qFile").value });
+  $("qUrl").onchange = () => saveQuran({ url: $("qUrl").value.trim() });
+  $("qDelay").onchange = () => saveQuran({ delay_minutes: Number($("qDelay").value) || 0 });
+  $("qVol").onchange = () => saveQuran({ volume: $("qVol").value === "" ? null : Number($("qVol").value) / 100 });
+  $("qTest").onclick = async () => {
+    clearTimeout(saveTimer);
+    await api("api/settings", { quran_after_fajr: S.settings.quran_after_fajr });
+    const r = await api("api/quran/test", {});
+    const out = r.entry && r.entry.result;
+    toast(!r.ok ? r.error || "Failed" : typeof out === "string" ? out : Object.entries(out || {}).map(([e, m]) => `${e.replace("media_player.", "")}: ${m}`).join(", "));
+  };
+  $("pcEnabled").onchange = () => { S.settings.precool.enabled = $("pcEnabled").checked; savePrecool(); };
+  $("pcAdd").onclick = () => {
+    const pc = S.settings.precool;
+    pc.rules.push({ id: "r" + Date.now().toString(36), name: `Pre-cool ${pc.rules.length + 1}`, enabled: true,
+      prayers: ["maghrib"], minutes: 30, climates: [], hvac_mode: "cool", summer_temp: 22, winter_temp: null,
+      only_when_home: false, ramadan_only: false });
+    savePrecool(); renderRules();
+  };
   $("volume").onchange = () => saveSoon({ volume: Number($("volume").value) / 100 });
   $("reminder").onchange = () => saveSoon({ reminder_minutes: Number($("reminder").value) || 0 });
   $("suhoor").onchange = () => saveSoon({ suhoor_minutes: Number($("suhoor").value) || 0 });

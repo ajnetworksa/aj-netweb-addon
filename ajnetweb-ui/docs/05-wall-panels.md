@@ -3,6 +3,20 @@
 The generated dashboard has a **Wall Panel** page at `/<dashboard-url>/tablet`: big clock, live
 cameras first, scenes, access and rooms. Phones use `/<dashboard-url>/home`.
 
+## Quick setup from the Studio (Wall panels tab)
+
+Studio → **Wall panels** shows two QR codes for the Wall Panel page:
+- **Browser / Fully Kiosk**: `http://<ha-address>/<dashboard-url>/tablet`. The address is taken from HA's
+  network settings; change it in the field if the tablet reaches HA another way. Scan it on the tablet, or
+  type it as Fully Kiosk's Start URL.
+- **Home Assistant app**: `homeassistant://navigate/<dashboard-url>/tablet` opens the page in the Companion app.
+
+Tablets already added through HA's **Fully Kiosk Browser** integration are listed below the codes.
+**Apply wall panel profile** sets the Start URL, loads the page now, and sets motion wake, dim after N seconds
+at a low brightness, and screen-off timer 0 (never off). Motion and dimming need Fully Kiosk PLUS; the steps
+the tablet doesn't support are listed as failed and the rest still apply. The settings you pick are saved
+for the next tablet.
+
 ## Option A — Home Assistant Companion app (simplest)
 
 1. Install the Companion app, log in with a dedicated **non-admin** user per panel
@@ -25,7 +39,8 @@ cameras first, scenes, access and rooms. Phones use `/<dashboard-url>/home`.
    - Remote admin: on, so you can reload the page from your office.
    - Advanced web settings: *Enable JavaScript interface* on, so the doorbell popup can wake the screen.
    - Web content: *Autoplay audio* on, so the doorbell chime plays.
-4. Optional: integrate Fully Kiosk in HA (built-in integration) to control brightness/screen from automations.
+4. Add the Fully Kiosk Browser integration in HA (built-in) so the Studio can set the start page and screen
+   for you (see *Quick setup* above) and automations can control brightness and the screen.
 
 ## Kiosk lock: hide HA's header and sidebar, keep a ⋯ menu
 
