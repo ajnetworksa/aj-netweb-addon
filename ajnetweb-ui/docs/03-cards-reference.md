@@ -264,10 +264,53 @@ type: custom:ajnetweb-energy-card
 power: sensor.house_power        # optional: live power (W / kW)
 days: 7
 entities: [sensor.main_meter]    # only if HA's Energy dashboard is NOT set up: meters to add up
+tariff: auto                     # bill estimate: auto (SEC when HA's country is SA) | sec | dewa | none
+                                 # or own tiers: { tiers: [[6000, 0.18], [null, 0.30]], per_kwh: 0, vat: 0.15, currency: SAR }
+ac: [sensor.majlis_ac_energy]    # optional: AC meters; default = Energy "individual devices" named like an AC
 ```
 Reads HA's Energy settings (grid import/export, solar, cost) and the daily totals from long-term
 statistics, so it matches HA's Energy page: kWh used today vs yesterday, 7-day bars, solar, exported
-and cost today. Tap opens HA's Energy page. **Set up Settings → Dashboards → Energy first.**
+and cost today. Underneath: this month's kWh, the bill so far and the projected month end (from the cost
+sensor, or estimated from the tariff), and the AC share of today's use when AC meters exist. Tap opens HA's
+Energy page. **Set up Settings → Dashboards → Energy first.** Tariff estimates leave out meter and fixed fees.
+
+### `custom:ajnetweb-notifications-card` — what happened at home
+
+```yaml
+type: custom:ajnetweb-notifications-card
+doorbell: sensor.ajnetweb_doorbell           # rings (Intercom add-on)
+alarms: [alarm_control_panel.house]          # armed / disarmed / triggered
+safety: [binary_sensor.kitchen_leak]         # leak, smoke, gas going on
+openings: [binary_sensor.front_door_contact] # doors and gates opened
+hours: 48
+max: 60
+```
+The last 48 hours from HA's logbook, newest first and grouped by day; new entries since the person last
+looked are marked. The strategy puts it behind a bell in the header (with a count of new entries) and fills
+the lists itself: doors, gates and garages but not windows.
+
+### `custom:ajnetweb-water-card` — tanks, pump and garden watering
+
+Part of *Today at home* (`water` insight) when tank sensors or watering zones are found by name: level
+sensors in % whose name has *tank* / *خزان*, a switch with *pump* / *مضخة*, and valves or switches with
+*irrigation*, *sprinkler*, *drip*, *garden*, *lawn*, *zone* / *ري*, *رشاش*, *تنقيط*, *حديقة* (never main
+shut-off, leak or gas valves). Tanks below `low` % turn red. **Run 10 min** calls
+`script.ajnetweb_water_run`, which Studio **Deploy** creates when the house has watering zones; it closes the
+valve again inside HA, so watering stops on time even with no dashboard open. Without the script the button
+is a plain Start / Stop.
+
+```yaml
+type: custom:ajnetweb-water-card
+tanks:
+  - sensor.roof_tank_level
+  - { entity: sensor.ground_tank_level, name: Ground tank, capacity: 5000 }   # litres -> "≈ 3,200 L"
+pump: switch.booster_pump
+zones: [valve.front_lawn, switch.drip_line_palms]
+minutes: 10          # Run length (1-120)
+low: 20              # red below this %
+```
+Pair it with the *Water Tank & Booster Pump Watchdog* blueprint (Studio → Blueprints) for low-level alerts and
+pump dry-run cut-off.
 
 ### `custom:ajnetweb-modes-card` — house modes
 

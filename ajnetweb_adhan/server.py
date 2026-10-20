@@ -10,6 +10,7 @@ AJ Netweb Prayer & Adhan - scheduler + ingress studio.
     input_boolean.aj_netweb_adhan_mute_next  skip only the next adhan
     input_button.aj_netweb_adhan_play_now      play the adhan now (test)
     input_button.aj_netweb_adhan_stop       stop playback
+    input_boolean.aj_netweb_precool         AC pre-cooling before prayers on/off (precool.py)
 """
 
 import json
@@ -26,6 +27,7 @@ from socketserver import ThreadingMixIn
 import ha
 import player
 import prayer
+import precool
 
 import ajn_license
 
@@ -40,7 +42,7 @@ SETTINGS_FILE = "/data/settings.json"
 HISTORY_FILE = "/data/history.json"
 AUDIO_DIR = os.path.join(ha.resolve_config_dir(), "www", "ajnetweb_adhan")
 AUDIO_EXT = (".mp3", ".m4a", ".aac", ".ogg", ".wav")
-MAX_UPLOAD = 20 * 1024 * 1024
+MAX_UPLOAD = 60 * 1024 * 1024  # long enough for a recitation
 ALLOWED_CLIENTS = {"172.30.32.2", "127.0.0.1", "::1"}
 SENSOR = "sensor.ajnetweb_next_prayer"
 
@@ -49,6 +51,7 @@ HELPERS = {
     "mute_next": ("input_boolean", "aj_netweb_adhan_mute_next", "AJ Netweb Adhan mute next", "mdi:volume-off"),
     "play": ("input_button", "aj_netweb_adhan_play_now", "AJ Netweb Adhan play now", "mdi:play-circle"),
     "stop": ("input_button", "aj_netweb_adhan_stop", "AJ Netweb Adhan stop", "mdi:stop-circle"),
+    "precool": ("input_boolean", "aj_netweb_precool", "AJ Netweb AC pre-cooling", "mdi:snowflake-thermometer"),
 }
 
 DEFAULTS = {
@@ -60,13 +63,19 @@ DEFAULTS = {
     "default_file": "",
     "fajr_file": "",
     "dua_file": "",
-    "prayers": {p: {"enabled": True, "offset": 0, "volume": None} for p in prayer.PRAYERS},
+    # speakers: [] = the default speakers above; iqamah: minutes after the adhan (0 = no iqamah reminder)
+    "prayers": {p: {"enabled": True, "offset": 0, "volume": None, "speakers": [], "iqamah": 0} for p in prayer.PRAYERS},
+    "iqamah_lead": 5,          # phone reminder this many minutes before the iqamah
+    "iqamah_file": "",         # optional short audio played on the prayer's speakers at the iqamah
+    "jumuah": {"adhan": True, "file": "", "reminder_minutes": 0, "kahf_reminder": False, "kahf_time": "09:00"},
+    "quran_after_fajr": {"enabled": False, "file": "", "url": "", "delay_minutes": 5, "volume": None, "speakers": []},
     "only_when_home": False,
     "reminder_minutes": 0,
     "notify_at_adhan": False,
     "suhoor_minutes": 0,
     "hijri_adjust": 0,
     "resume_delay": 3,
+    "precool": precool.DEFAULTS,
 }
 
 _settings_lock = threading.Lock()
@@ -95,11 +104,32 @@ def save_settings(changes: dict) -> dict:
         for key in ("speakers", "pause_players"):
             if key in changes:
                 s[key] = [e for e in changes[key] if isinstance(e, str) and e.startswith("media_player.")]
+        for key, cfg in s["prayers"].items():
+            cfg["speakers"] = media_players(cfg.get("speakers"))
+            cfg["iqamah"] = int(min(60, max(0, _int(cfg.get("iqamah")))))
+        q = s["quran_after_fajr"]
+        q["speakers"] = media_players(q.get("speakers"))
+        q["url"] = q["url"].strip() if isinstance(q.get("url"), str) and re.match(r"https?://\S+$", q["url"].strip()) else ""
+        if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(s["jumuah"].get("kahf_time") or "")):
+            s["jumuah"]["kahf_time"] = "09:00"
+        if "precool" in changes:
+            s["precool"] = precool.sanitize(s["precool"])
         tmp = SETTINGS_FILE + ".tmp"
         with open(tmp, "w") as f:
             json.dump(s, f, indent=2, ensure_ascii=False)
         os.replace(tmp, SETTINGS_FILE)
         return s
+
+
+def _int(v, default=0):
+    try:
+        return int(float(v))
+    except (TypeError, ValueError):
+        return default
+
+
+def media_players(lst) -> list:
+    return [e for e in lst or [] if isinstance(e, str) and e.startswith("media_player.")]
 
 
 def add_history(entry: dict):
@@ -122,7 +152,7 @@ def ensure_helpers():
                 item = next((i for i in existing if i.get("id") == object_id or i.get("name") == name), None)
                 if not item:
                     item = ws.call(f"{domain}/create", name=name, icon=icon,
-                                   **({"initial": key == "master"} if domain == "input_boolean" else {}))
+                                   **({"initial": key in ("master", "precool")} if domain == "input_boolean" else {}))
                 STATE["helpers"][key] = f"{domain}.{item.get('id', object_id)}"
         log.info("Helpers: %s", STATE["helpers"])
     except Exception as e:
@@ -140,10 +170,26 @@ def audio_url(fname: str) -> str:
     return f"{ha.ha_base_url()}/local/ajnetweb_adhan/{urllib.parse.quote(fname)}"
 
 
+def is_friday(when: datetime = None) -> bool:
+    return (when or datetime.now(timezone.utc)).astimezone().weekday() == 4
+
+
+def prayer_name(key: str, lang: str, when: datetime = None) -> str:
+    if key == "dhuhr" and is_friday(when):
+        return "الجمعة" if lang == "ar" else "Jumu'ah"
+    return prayer.NAMES.get(lang, prayer.NAMES["en"]).get(key, key)
+
+
 def file_for(key: str, s: dict) -> str:
     if key == "fajr" and s.get("fajr_file"):
         return s["fajr_file"]
+    if key == "dhuhr" and is_friday() and (s.get("jumuah") or {}).get("file"):
+        return s["jumuah"]["file"]
     return s.get("default_file") or ""
+
+
+def speakers_for(key: str, s: dict) -> list:
+    return (s["prayers"].get(key) or {}).get("speakers") or s.get("speakers") or []
 
 
 def notify_phones(title: str, message: str):
@@ -165,7 +211,7 @@ def run_adhan(key: str, manual: bool = False):
         return
     s = load_settings()
     lang = s.get("language", "ar")
-    name = prayer.NAMES.get(lang, prayer.NAMES["en"]).get(key, key)
+    name = prayer_name(key, lang)
     fname = file_for(key, s)
     path = os.path.join(AUDIO_DIR, fname) if fname else ""
     entry = {"prayer": key, "at": datetime.now(timezone.utc).isoformat(), "manual": manual}
@@ -174,7 +220,7 @@ def run_adhan(key: str, manual: bool = False):
         add_history(entry)
         log.warning("Adhan %s skipped: no audio file", key)
         return entry
-    targets = s.get("speakers") or []
+    targets = speakers_for(key, s)
     if not targets:
         entry["result"] = "no speakers selected"
         add_history(entry)
@@ -198,6 +244,81 @@ def run_adhan(key: str, manual: bool = False):
         STATE["last"] = entry
         add_history(entry)
         publish()
+    return entry
+
+
+def run_iqamah(key: str):
+    """Play the short iqamah audio on the prayer's speakers (the phone reminder is sent by tick)."""
+    s = load_settings()
+    fname = s.get("iqamah_file") or ""
+    path = os.path.join(AUDIO_DIR, fname)
+    entry = {"kind": "iqamah", "prayer": key, "at": datetime.now(timezone.utc).isoformat()}
+    targets = speakers_for(key, s)
+    if not fname or not os.path.exists(path) or not targets:
+        return
+    p = s["prayers"].get(key, {})
+    vol = p.get("volume") if p.get("volume") is not None else s.get("volume", 0.45)
+    entry["result"] = player.play(audio_url(fname), path, targets, float(vol), s.get("pause_players") or [])
+    add_history(entry)
+
+
+def run_quran(manual: bool = False):
+    """Quran after Fajr: start a recitation file or a stream on the speakers (normal playback, not an announcement)."""
+    s = load_settings()
+    q = s.get("quran_after_fajr") or {}
+    entry = {"kind": "quran", "prayer": "fajr", "at": datetime.now(timezone.utc).isoformat(), "manual": manual}
+    if q.get("file") and os.path.exists(os.path.join(AUDIO_DIR, q["file"])):
+        url = audio_url(q["file"])
+    elif q.get("url"):
+        url = q["url"]
+    else:
+        entry["result"] = "no recitation file or stream chosen"
+        add_history(entry)
+        return entry
+    targets = q.get("speakers") or speakers_for("fajr", s)
+    if not targets:
+        entry["result"] = "no speakers selected"
+        add_history(entry)
+        return entry
+    vol = q.get("volume") if q.get("volume") is not None else s.get("volume", 0.45)
+    if not manual:  # let the Fajr adhan and dua finish first
+        time.sleep(2)
+        for _ in range(450):
+            if not STATE["playing"]:
+                break
+            time.sleep(2)
+    entry["result"] = player.play_media(url, targets, float(vol))
+    add_history(entry)
+    return entry
+
+
+def run_precool(rule: dict, key: str, manual: bool = False):
+    """Start the ACs of one pre-cooling rule (see precool.py for when an AC is left alone)."""
+    s = load_settings()
+    all_states = ha.states()
+    pc = s.get("precool") or {}
+    season = precool.season(pc, datetime.now().month)
+    entry = {"kind": "precool", "rule": rule.get("name"), "prayer": key,
+             "at": datetime.now(timezone.utc).isoformat(), "manual": manual}
+    temp = precool.target_temp(rule, season)
+    if temp is None:
+        entry["result"] = f"rests in {season}"
+        add_history(entry)
+        return entry
+    result = {}
+    for eid in rule.get("climates") or []:
+        data, why = precool.plan(rule, temp, all_states.get(eid))
+        if data:
+            try:
+                ha.call_service("climate", "set_temperature", {"entity_id": eid, **data})
+            except ha.HAError as e:
+                why = f"failed: {e}"
+        result[eid] = why
+    entry["result"] = result
+    add_history(entry)
+    ha.fire_event("ajnetweb_precool_started", {"rule": rule.get("id"), "prayer": key, "manual": manual,
+                                                "result": result})
+    log.info("Pre-cooling %s before %s: %s", rule.get("name"), key, result)
     return entry
 
 
@@ -229,7 +350,9 @@ def tick():
         if not t or not cfg.get("enabled", True):
             continue
         at = t + timedelta(minutes=int(cfg.get("offset") or 0))
-        name = prayer.NAMES.get(lang, prayer.NAMES["en"]).get(key, key)
+        name = prayer_name(key, lang, at)
+        friday_dhuhr = key == "dhuhr" and is_friday(at)
+        jum = s.get("jumuah") or {}
         rem = int(s.get("reminder_minutes") or 0)
         if rem and enabled and due(f"reminder-{key}", at - timedelta(minutes=rem)):
             notify_phones(f"🕌 {name}", (f"الأذان بعد {rem} دقيقة" if lang == "ar" else f"Adhan in {rem} minutes"))
@@ -238,6 +361,25 @@ def tick():
             if due("suhoor", at - timedelta(minutes=sm)):
                 notify_phones("🌙 السحور" if lang == "ar" else "🌙 Suhoor",
                               f"الفجر بعد {sm} دقيقة" if lang == "ar" else f"Fajr in {sm} minutes")
+        jrem = _int(jum.get("reminder_minutes"))
+        if friday_dhuhr and jrem and enabled and due("jumuah-reminder", at - timedelta(minutes=jrem)):
+            notify_phones("🕌 الجمعة" if lang == "ar" else "🕌 Jumu'ah",
+                          f"صلاة الجمعة بعد {jrem} دقيقة" if lang == "ar" else f"Jumu'ah prayer in {jrem} minutes")
+        iq = _int(cfg.get("iqamah"))
+        if iq and enabled and not friday_dhuhr and not (s.get("only_when_home") and not someone_home):
+            iq_at = at + timedelta(minutes=iq)
+            lead = _int(s.get("iqamah_lead"), 5)
+            if lead and due(f"iqamah-reminder-{key}", iq_at - timedelta(minutes=lead)):
+                notify_phones(f"🕌 {name}", f"الإقامة بعد {lead} دقائق" if lang == "ar" else f"Iqamah in {lead} minutes")
+            if due(f"iqamah-{key}", iq_at):
+                threading.Thread(target=run_iqamah, args=(key,), daemon=True).start()
+        q = s.get("quran_after_fajr") or {}
+        if key == "fajr" and q.get("enabled") and enabled and not (s.get("only_when_home") and not someone_home):
+            if due("quran", at + timedelta(minutes=_int(q.get("delay_minutes"), 5))):
+                threading.Thread(target=run_quran, daemon=True).start()
+        if friday_dhuhr and not jum.get("adhan", True):
+            due(key, at)  # mark as handled: no adhan for Jumu'ah at home
+            continue
         if due(key, at):
             if not enabled:
                 add_history({"prayer": key, "at": now.isoformat(), "result": "skipped (switched off)"})
@@ -248,6 +390,26 @@ def tick():
                 add_history({"prayer": key, "at": now.isoformat(), "result": "skipped (nobody home)"})
             else:
                 threading.Thread(target=run_adhan, args=(key,), daemon=True).start()
+    jum = s.get("jumuah") or {}
+    if jum.get("kahf_reminder") and enabled:
+        local = now.astimezone()
+        hh, mm = (int(x) for x in str(jum.get("kahf_time") or "09:00").split(":"))
+        kahf_at = local.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if local.weekday() == 4 and due("kahf", kahf_at):
+            notify_phones("📖 سورة الكهف" if lang == "ar" else "📖 Surat Al-Kahf",
+                          "لا تنسوا قراءة سورة الكهف" if lang == "ar" else "A reminder to read Surat Al-Kahf today")
+    pc = s.get("precool") or {}
+    if pc.get("rules") and helper_on("precool", all_states):
+        season = precool.season(pc, datetime.now().month)
+        for rule, key, at in precool.starts(pc, STATE["times"]):
+            if not due(f"precool-{rule['id']}-{key}", at):
+                continue
+            why = precool.skip_reason(rule, season, bool(hij.get("ramadan")), someone_home)
+            if why:
+                add_history({"kind": "precool", "rule": rule["name"], "prayer": key, "at": now.isoformat(),
+                             "result": f"skipped ({why})"})
+            else:
+                threading.Thread(target=run_precool, args=(rule, key), daemon=True).start()
     # forget old tags
     STATE["fired"] = {t for t in STATE["fired"] if t.split("@")[1] > (now - timedelta(days=2)).isoformat()}
     publish(hij)
@@ -265,6 +427,9 @@ def publish(hij: dict = None):
         "hijri": hij, "ramadan": bool(hij.get("ramadan")), "playing": STATE["playing"],
         "enabled": s.get("enabled", True), "helpers": STATE["helpers"],
         "last_adhan": STATE["last"]["at"] if STATE["last"] else None,
+        "iqamah": {k: (STATE["times"][k] + timedelta(minutes=_int(c.get("offset")) + _int(c.get("iqamah")))).isoformat()
+                   for k, c in s["prayers"].items() if _int(c.get("iqamah")) and STATE["times"].get(k)},
+        "friday": is_friday(),
     }
     try:
         ha.set_state(SENSOR, key or "none", attrs)
@@ -342,6 +507,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._guard(self._status)
         if p == "/api/speakers":
             return self._guard(lambda: {"ok": True, "speakers": player.speakers(ha.states())})
+        if p == "/api/climates":
+            return self._guard(self._climates)
         if p == "/api/history":
             return self._guard(lambda: {"ok": True, "history": json.load(open(HISTORY_FILE)) if os.path.exists(HISTORY_FILE) else []})
         if p.startswith("/api/"):
@@ -363,6 +530,17 @@ class Handler(SimpleHTTPRequestHandler):
             "names": prayer.NAMES,
         }
 
+    def _climates(self):
+        out = []
+        for eid, st in sorted(ha.states().items()):
+            if eid.startswith("climate."):
+                a = st.get("attributes") or {}
+                out.append({"entity_id": eid, "name": a.get("friendly_name") or eid, "state": st.get("state"),
+                            "hvac_modes": a.get("hvac_modes") or [], "temperature": a.get("temperature"),
+                            "current_temperature": a.get("current_temperature")})
+        s = load_settings()
+        return {"ok": True, "climates": out, "season": precool.season(s["precool"], datetime.now().month)}
+
     def do_POST(self):
         if not self._ok():
             return
@@ -379,6 +557,13 @@ class Handler(SimpleHTTPRequestHandler):
             key = body.get("prayer") or "dhuhr"
             threading.Thread(target=run_adhan, args=(key, True), daemon=True).start()
             return self._json({"ok": True})
+        if p == "/api/quran/test":
+            return self._guard(lambda: {"ok": True, "entry": run_quran(True)})
+        if p == "/api/precool/test":
+            rule = next((r for r in load_settings()["precool"]["rules"] if r["id"] == body.get("id")), None)
+            if not rule:
+                return self._json({"ok": False, "error": "unknown rule"}, 404)
+            return self._guard(lambda: {"ok": True, "entry": run_precool(rule, (rule["prayers"] or ["maghrib"])[0], True)})
         if p == "/api/stop":
             player.stop()
             return self._json({"ok": True})
@@ -396,7 +581,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _upload(self, length: int):
         if length <= 0 or length > MAX_UPLOAD:
-            return {"ok": False, "error": "File must be between 1 byte and 20 MB"}
+            return {"ok": False, "error": "File must be between 1 byte and 60 MB"}
         raw = urllib.parse.unquote(self.headers.get("X-Filename") or "adhan.mp3")
         name = re.sub(r"[^A-Za-z0-9._\-]+", "_", os.path.basename(raw)).strip("._") or "adhan.mp3"
         if not name.lower().endswith(AUDIO_EXT):

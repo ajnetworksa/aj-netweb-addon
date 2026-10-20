@@ -1,5 +1,26 @@
 # Changelog - AJ Netweb Prayer & Adhan
 
+## 1.4.0 - iqamah, Jumu'ah, per-prayer speakers, Quran after Fajr
+- **Iqamah:** minutes after each adhan (Prayers tab). A phone reminder a few minutes before (5 by default) and an
+  optional short iqamah audio on that prayer's speakers. Iqamah times are in `sensor.ajnetweb_next_prayer`
+  (attribute `iqamah`).
+- **Speakers per prayer:** a prayer can use its own speakers (e.g. only the majlis for Fajr); "Default" keeps the
+  Speakers tab.
+- **Friday:** Dhuhr is called Jumu'ah on Fridays; choose whether the adhan plays at home, a separate Jumu'ah
+  audio, a phone reminder before Jumu'ah, and a Surat Al-Kahf reminder on Friday morning.
+- **Quran after Fajr:** a recitation file or a Quran radio stream starts on the speakers after the Fajr adhan
+  (and dua) as normal playback; *Play now* to try it.
+- New tab *Iqamah · Friday · Quran*. Uploads up to 60 MB (recitations).
+
+## 1.3.0 - AC pre-cooling before prayers
+- **New tab "AC pre-cooling":** start chosen ACs a set time before a prayer, e.g. cool the majlis to 22° 30 minutes
+  before Maghrib. Each rule picks its prayers, minutes before, ACs, mode and a summer temperature; a winter
+  temperature is optional (without one the rule rests in winter). Summer months are set once (April–October by
+  default). Options: only when someone is home, only in Ramadan (cool the majlis before iftar).
+- The family's choices win: an AC that is already set cooler, or running as fan or dry, is left alone.
+- New helper `input_boolean.aj_netweb_precool` switches all pre-cooling on or off (dashboard, voice, automations).
+  Event `ajnetweb_precool_started` after each run; runs show in History. *Run now* tries a rule straight away.
+
 ## 1.2.0
 - The page follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
   AJ Netweb add-on. Opened outside Home Assistant it keeps its own look.

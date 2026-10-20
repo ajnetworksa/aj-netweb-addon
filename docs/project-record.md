@@ -11,17 +11,17 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.13.0 |
-| Prayer & Adhan | 1.2.0 |
+| Dashboard Suite + UI kit | 3.15.0 |
+| Prayer & Adhan | 1.4.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
-| Alexa Matter Bridge | 1.1.0 (branch `ccr-ae46138d-oshmey` in `alexa_bridge`, no PR yet) |
+| Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
 
 ---
 
-## Person card (Dashboard Suite 3.13.0)
+## Person card (Dashboard Suite 3.15.0)
 
 **Asked for:** "https://jlnbln.gumroad.com/ check the cards from here ... lets implement it here", then
 "lets get all card and add you magic touch then its ours".
@@ -35,10 +35,199 @@ Versions at the time of writing:
 **Decisions:**
 - The store's items (Julian / jlnbln) carry no licence that allows commercial use, so nothing was copied:
   the cards are our own code, with his designs used only as visual inspiration.
-- Version 3.13.0 because PRs #18-#22 already claim 3.8.0-3.12.0.
+- Version 3.15.0: the upgrade PRs took 3.8.0-3.14.0 on main first.
 
 **Open:** next from the same review: appliance card (washer / dryer / 3D printer), room card indicator
 icons, a Rounded-Bubble style, a Pastel Minimal theme. The person card is not placed by the generator yet.
+
+---
+
+## Alarm pack (Dashboard Suite 3.14.0) and voice through Alexa (Alexa bridge 1.2.0)
+
+**Asked for:** items 8 and 12 of the upgrade list: an alarm pack with Alexa arming, and voice control through
+Alexa instead of a local Arabic voice assistant.
+
+**Done:**
+- `ajnetweb_dashboard/alarm.py` + Studio tab *Alarm*: existing panel or our own (HA `manual` platform as a YAML
+  package), sensors per arm mode, alerts automation (sirens, critical push, lights), arming scripts
+  `script.ajnetweb_alarm_arm_<mode>` labelled for Alexa. Endpoints `GET /api/alarm`, `POST /api/alarm/apply`;
+  project key `alarm`; strategy option `alarm` when a source is chosen. Tests in `tests/test_alarm.py`.
+- `alexa_bridge` 1.2.0: *Voice commands* section (house modes, scenes, ACs, pre-cooling, adhan, alarm arming)
+  with the sentence to say; the untouched old default excluded list no longer blocks scripts and scenes.
+
+**Decisions:**
+- *"Both" sources* (Mukto's card defaulted to the recommended option): villas with a panel keep it; others get ours.
+- *HA's manual alarm in a package*, not a template helper: documented, stable, supports code and delays.
+- *No disarm by voice or script*, ever. Arming scripts only for modes the panel arms without a code.
+- *Matter has no alarm, mode-select or "play" device for Alexa*, so modes, scenes, arming and adhan controls
+  reach Alexa as switches.
+
+**Open:** house modes still arm the first alarm found; when a villa has two panels, pick it in House modes.
+
+## Water card (Dashboard Suite 3.12.0)
+
+**Asked for:** item 11 of the upgrade list: water tank and irrigation card (the watchdog blueprint already
+existed, the dashboard showed nothing).
+
+**Done:**
+- `cards/water.js`: tanks (level gauge, litres when a capacity is set), booster pump, watering zones with last
+  watered and Run / Stop; `waterEntities()` finds them by name. New `water` insight (default on) and strategy
+  option `water`.
+- `ajnetweb_dashboard/water.py`: the timed watering script (open, wait, close; parallel, 1-120 min), created
+  by Deploy when zones exist. Tests in `tests/test_water.py`; preview mocks (`?water=0` hides them).
+
+**Decisions:**
+- *Timer inside HA, not in the browser:* a closed tablet or phone must never leave a valve open.
+- *Found by name*, like the AC share: HA has no device class for tank level or irrigation.
+- *Main shut-off, leak and gas valves are never zones.*
+- *The old insights default still means "all"*, so existing projects get the new card when it applies.
+
+**Open:** schedules (watering days and times) are left to HA automations or the irrigation controller's app.
+
+## Studio: photo framing, save as scene, finger drag (Dashboard Suite 3.11.0)
+
+**Asked for:** item 10 of the upgrade list: Studio upgrades (photo upload and crop, scene capture, drag to
+reorder rooms).
+
+**Done:**
+- Photo upload and mouse drag already existed. Added a crop dialog (4:3, drag + zoom, 400-1600 px JPEG) and
+  pointer-event drag on the ⋮⋮ grip for touch screens in every sortable list.
+- `ajnetweb_dashboard/scenes.py`: what a scene stores per domain (light brightness and colour, cover position,
+  climate mode and setpoint, fan speed, speaker volume), save through `/api/config/scene/config/<id>` (the
+  scene editor's API), then put the new entity in the room's area. Endpoints `GET /api/room/now?area=` and
+  `POST /api/room/scene`. Tests in `tests/test_scenes.py`.
+
+**Decisions:**
+- *Real HA scenes in scenes.yaml*, not our own store: they work from automations, Alexa and HA's scene editor.
+- *Scene ids `ajnetweb_<area>_<name>`*: saving the same name in the same room again updates it.
+- *Speakers and switches are unticked by default*; unavailable devices can't be ticked.
+- *Gates and garage doors are never offered* (they are in the access group, not covers).
+
+**Open:** nothing.
+
+## Wall panel setup (Dashboard Suite 3.10.0)
+
+**Asked for:** item 9 of the upgrade list: set up a wall tablet by QR code instead of typing URLs.
+
+**Done:**
+- `ajnetweb_dashboard/wall_panels.py`: Wall Panel URLs (browser and `homeassistant://navigate/...`), QR codes
+  as SVG (segno, installed in the image), Fully Kiosk tablets from the registries, and the profile calls
+  (`fully_kiosk.set_config` startURL, `fully_kiosk.load_url`, motion switch, screensaver timer and
+  brightness, screen-off timer 0).
+- Studio tab *Wall panels*; endpoints `GET /api/wall_panels?base=` and `POST /api/wall_panels/apply`;
+  project key `wall_panel_profile`. Tests in `tests/test_wall_panels.py`.
+
+**Decisions:**
+- *HA's Fully Kiosk integration, not Fully's own provisioning QR*: its actions are public and update-proof,
+  and the installer sees each step's result. Fully's settings-file keys are not documented well enough.
+- *QR codes are made in the add-on*, not in the browser bundle, so nothing is added to the card suite.
+- *The address defaults to HA's internal URL* (then external); the installer can override it per scan.
+
+**Open:** confirm on a real tablet that `startURL` is the key Fully accepts through `set_config`.
+
+## Notifications in the header (Dashboard Suite 3.9.0)
+
+**Asked for:** item 7 of the upgrade list: a notification centre in the dashboard (doorbell, alarm, water
+leak, gate left open) with history.
+
+**Done:**
+- `cards/notifications.js`: logbook-based list (doorbell rings, alarm changes, safety on, doors/gates opened),
+  grouped by day, new entries marked; `custom:ajnetweb-notifications-card`.
+- Header bell with a count of new entries; opens the list in the shared sheet (`openCardSheet` in
+  `cards/appearance.js`, which now also passes more-info on). Strategy fills the entities; `notifications: false`.
+- Preview: `logbook/get_events` mock.
+
+**Decisions:**
+- *HA's logbook, not our own store:* every user may read it, it covers time the dashboard was closed, and
+  nothing new is stored on the device.
+- *"New" per person per browser* (localStorage): no admin-only API is needed.
+- *Windows left out* of openings: too noisy; doors, gates and garages only.
+- *The "Right now" card stays* for what is wrong at this moment; the bell is for what happened.
+
+**Open:** "gate left open for N minutes" as its own entry (needs a duration rule).
+
+---
+
+## Iqamah, Jumu'ah, per-prayer speakers, Quran after Fajr (Prayer & Adhan 1.4.0)
+
+**Asked for:** item 5 of the upgrade list: per-zone adhan, Iqamah reminder, Friday Jumu'ah settings, Quran after Fajr.
+
+**Done:**
+- Per-prayer `speakers` and `iqamah` minutes; `iqamah_lead` phone reminder and optional `iqamah_file`.
+- `jumuah`: adhan at home on/off, own audio, reminder before, Surat Al-Kahf reminder; Dhuhr named Jumu'ah on Fridays.
+- `quran_after_fajr`: file or http(s) stream, delay, volume, speakers; waits for the adhan and dua to finish and
+  uses normal `play_media` (not an announcement).
+- Settings are cleaned on save (media players only, bounded iqamah, http(s) URLs, HH:MM time); tests in
+  `tests/test_adhan_settings.py`.
+
+**Decisions:** no iqamah on Fridays (the khutbah sets the time); Friday follows the add-on's local time zone.
+
+**Open:** show the iqamah time on the dashboard prayer card.
+
+---
+
+## Electricity bill estimate and AC share (Dashboard Suite 3.8.0)
+
+**Asked for:** item 6 of the upgrade list: an energy card for SEC/DEWA bills with the AC share.
+
+**Done:**
+- Energy card: kWh this month, bill so far and projected month end (cost sensor if HA has one, otherwise a
+  tiered tariff estimate), and the AC share of today's use from AC meters.
+- Tariffs `sec` and `dewa` (`TARIFFS` in `cards/energy.js`), `auto` = SEC when HA's country is SA; own tiers in YAML.
+- Strategy option `energy_tariff`, Studio select, preview `?cost=0` to see the estimate.
+
+**Decisions:**
+- *HA's cost sensor wins* over our estimate: it can carry the client's exact tariff.
+- *No auto tariff in the UAE*: Dubai, Abu Dhabi and Sharjah have different utilities; the installer picks.
+- *Estimates exclude meter and fixed fees* (they depend on the breaker size); the label says "est.".
+
+**Open:** check the tariff figures against a current SEC and DEWA bill; ADDC/SEWA presets if needed.
+
+---
+
+## AC pre-cooling before prayers (Prayer & Adhan 1.3.0)
+
+**Asked for:** item 4 of the upgrade list: "cool the majlis 30 minutes before Maghrib", summer/winter profiles.
+
+**Done:**
+- `ajnetweb_adhan/precool.py`: rules (prayers, minutes before, ACs, mode, summer and optional winter
+  temperature, only when home, only in Ramadan), summer months, and the per-AC decision.
+- The scheduler starts each rule before its prayers with `climate.set_temperature` (mode + temperature);
+  helper `input_boolean.aj_netweb_precool`, event `ajnetweb_precool_started`, runs and skips in History.
+- Studio tab *AC pre-cooling* with *Run now*; tests in `tests/test_precool.py`.
+
+**Decisions:**
+- *In the Prayer & Adhan add-on*, because it already has the prayer times and a scheduler.
+- *Never override the family:* an AC already cooler, or in fan/dry, is left alone; pre-cooling never turns an AC off.
+- *Independent of the adhan switch*, so a family can pre-cool without playing the adhan.
+
+**Open:** a toggle for `input_boolean.aj_netweb_precool` on the dashboard prayer card; expose it to Alexa
+with the other house controls.
+
+---
+
+## Release automation and beta/stable channels (no add-on version change)
+
+**Asked for:** item 1 of the upgrade list: release automation with beta/stable channels and ready-made images.
+
+**Done:**
+- `.github/workflows/addon-images.yml` replaces `remote-access-image.yml` and covers every add-on: when a
+  version changes on `main` or `beta` it builds amd64 + aarch64 images to `ghcr.io/ajnetworksa/{arch}-addon-<add-on>`
+  (Remote Access compiled, as before). On `main` it also tags `<add-on>-v<version>` and publishes a GitHub
+  release with the changelog section.
+- `tools/release.py bump` sets the version everywhere it lives and opens the changelog entry.
+- CI *versions* job: a pull request that changes an add-on without bumping its version fails.
+- `docs/releasing.md`: the flow, the two channels and how to switch an add-on to the images.
+
+**Decisions:**
+- *Channels are branches* (`main` stable, `beta` via `…/aj-netweb-addon#beta`), so pilot sites just use a
+  different repository URL and promotion is a merge.
+- *A version is built once and never overwritten*, so stable gets the exact image pilot sites tested.
+- *No `image` line added yet*: Home Assistant would fail to install until the images exist and are public.
+
+**Open:**
+- Create the `beta` branch, run the workflow once, make the packages public, then add `image` to each
+  add-on's `config.json` (one add-on first).
 
 ---
 
