@@ -1,5 +1,17 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.14.0 - Alarm pack
+- **Studio → Alarm tab.** Uses the alarm panel the villa already has in Home Assistant, or makes our own when
+  there is none: Home Assistant's built-in manual alarm with exit and entry delay and an optional disarm code
+  (written to `packages/ajnetweb_alarm.yaml`; HA must load packages and be restarted once).
+- **Sensors per mode** for our own alarm: doors and windows guard Away, Night and Home; motion guards Away.
+  Every sensor can be changed. The automation *AJ Netweb - Alarm sensors* sets the alarm off.
+- **When it goes off** (either alarm): sirens on, a critical alert on the chosen phones (sounds even on silent),
+  optionally every light on; sirens off again when the alarm stops (*AJ Netweb - Alarm alerts*).
+- **Arming from Alexa:** scripts *Alarm away / night / home* labelled for the Alexa Matter Bridge (only modes
+  the panel can arm without a code). There is never a disarm script.
+- The dashboard header shows the chosen alarm (strategy option `alarm`).
+
 ## 3.12.0 - Water card
 - **Water card in *Today at home*:** tank levels (red when low), the booster pump, and each garden watering
   zone with when it last watered and a **Run 10 min** button. Found by name (tank, pump, irrigation, zone,

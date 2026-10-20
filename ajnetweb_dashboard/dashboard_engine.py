@@ -21,6 +21,7 @@ import shutil
 import time
 from typing import Any, Dict, List, Optional
 
+import alarm
 import house_modes
 import scenes
 import water
@@ -33,7 +34,7 @@ MIN_HA_VERSION = "2024.11"
 
 log = logging.getLogger("dashboard.engine")
 
-ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.12.0")
+ADDON_VERSION = os.environ.get("ADDON_VERSION", "3.14.0")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOCAL_CARD_SUITE = os.path.join(BASE_DIR, "www", "ajnetweb-card-suite.js")
 LOCAL_BLUEPRINTS_DIR = os.path.join(BASE_DIR, "blueprints")
@@ -78,7 +79,8 @@ DEFAULT_PROJECT = {
     "home_cameras": 4,
     "custom_dashboard": "",    # "My cards" dashboard url_path once created
     "house_modes": house_modes.DEFAULTS,   # Home / Away / Night / Guests (Studio "House modes" tab)
-    "wall_panel_profile": wall_panels.DEFAULT_PROFILE,   # Studio "Wall panels" tab (Fully Kiosk tablets)
+    "wall_panel_profile": wall_panels.DEFAULT_PROFILE,
+    "alarm": alarm.DEFAULTS,   # Studio "Alarm" tab: own alarm or existing panel, alerts, Alexa arming   # Studio "Wall panels" tab (Fully Kiosk tablets)
     "kiosk": {"hide_header": "none", "hide_sidebar": "none",
               "menu": {"pages": "all", "appearance": "all", "profile": "all", "reload": "all",
                        "settings": "admins", "studio": "admins", "exit_kiosk": "admins"},
@@ -273,6 +275,7 @@ class DashboardEngine:
             "home_cameras": int(project["home_cameras"]) if str(project.get("home_cameras", "")).isdigit()
                             and int(project["home_cameras"]) != 4 else None,
             "custom_dashboard": project.get("custom_dashboard") or None,
+            "alarm": self._alarm_option(project),
             "kiosk": _kiosk_options(project.get("kiosk")),
             # off is stored as false, otherwise the strategy would still show a helper it finds
             "house_modes": house_modes.strategy_option(house_modes.merge_defaults(project.get("house_modes"))) or False,
@@ -287,6 +290,14 @@ class DashboardEngine:
         options = {k: v for k, v in options.items()
                    if v not in (None, [], {}, "") or (k in ("top_cards", "insights") and v == [])}
         return {"strategy": options}
+
+    @staticmethod
+    def _alarm_option(project: Dict[str, Any]) -> Optional[str]:
+        """The panel the header shows: the alarm pack's choice, when it is on and not "automatic"."""
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        if not cfg["enabled"] or cfg["source"] == "auto":
+            return None
+        return alarm.OWN_ENTITY if cfg["source"] == "own" else (cfg["panel"] or None)
 
     # ------------------------------------------------------------------ health
     def health(self) -> Dict[str, Any]:
@@ -490,6 +501,36 @@ class DashboardEngine:
         return {"ok": True, "config": cfg, "targets": {k: len(v) for k, v in plan["targets"].items()},
                 "current": st.get("state") if isinstance(st, dict) else None,
                 "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
+
+    # ------------------------------------------------------------------ alarm pack
+    def alarm_info(self) -> Dict[str, Any]:
+        """Studio tab: the settings, sensors with their arm modes, and what was found in HA."""
+        project = self.load_project()
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        model = self.discover(project)
+        states = self.client.rest_get("/core/api/states", []) or []
+        services = self.client.rest_get("/core/api/services", []) or []
+        p = alarm.plan(cfg, model, states, services)
+        by_id = {s.get("entity_id"): s for s in states}
+        name = lambda eid: ((by_id.get(eid) or {}).get("attributes") or {}).get("friendly_name") or eid  # noqa: E731
+        return {"ok": True, "config": cfg, "sensors": alarm.sensors(cfg, model),
+                "panels": [{"entity_id": e, "name": name(e)} for e in p["found"]["panels"]],
+                "sirens": [{"entity_id": e, "name": name(e)} for e in p["found"]["sirens"]],
+                "phones": [{"service": e, "name": e.split("mobile_app_", 1)[-1].replace("_", " ")} for e in p["found"]["phones"]],
+                "using": {"own": p["own"], "panel": p["panel"],
+                          "state": (by_id.get(p["panel"]) or {}).get("state") if p["panel"] else None},
+                "packages_ok": alarm.packages_enabled(self.config_dir),
+                "alexa": house_modes.alexa_label(self.client) if self.client.connected else {"installed": False}}
+
+    def apply_alarm(self, project: Dict[str, Any] = None) -> Dict[str, Any]:
+        project = project or self.load_project()
+        cfg = alarm.merge_defaults(project.get("alarm"))
+        if not cfg["enabled"]:
+            return {"ok": False, "error": "Turn the alarm pack on first", "steps": []}
+        model = self.discover(project)
+        if model.get("errors"):
+            return {"ok": False, "error": "; ".join(model["errors"]), "steps": []}
+        return alarm.apply(self.client, cfg, model, self.config_dir)
 
     # ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk profile)
     def _ha_address(self) -> str:

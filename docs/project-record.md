@@ -11,15 +11,37 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.12.0 |
+| Dashboard Suite + UI kit | 3.14.0 |
 | Prayer & Adhan | 1.3.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
-| Alexa Matter Bridge | 1.1.0 (`alexa_bridge` PR #4, not merged yet) |
+| Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
 
 ---
+
+## Alarm pack (Dashboard Suite 3.14.0) and voice through Alexa (Alexa bridge 1.2.0)
+
+**Asked for:** items 8 and 12 of the upgrade list: an alarm pack with Alexa arming, and voice control through
+Alexa instead of a local Arabic voice assistant.
+
+**Done:**
+- `ajnetweb_dashboard/alarm.py` + Studio tab *Alarm*: existing panel or our own (HA `manual` platform as a YAML
+  package), sensors per arm mode, alerts automation (sirens, critical push, lights), arming scripts
+  `script.ajnetweb_alarm_arm_<mode>` labelled for Alexa. Endpoints `GET /api/alarm`, `POST /api/alarm/apply`;
+  project key `alarm`; strategy option `alarm` when a source is chosen. Tests in `tests/test_alarm.py`.
+- `alexa_bridge` 1.2.0: *Voice commands* section (house modes, scenes, ACs, pre-cooling, adhan, alarm arming)
+  with the sentence to say; the untouched old default excluded list no longer blocks scripts and scenes.
+
+**Decisions:**
+- *"Both" sources* (Mukto's card defaulted to the recommended option): villas with a panel keep it; others get ours.
+- *HA's manual alarm in a package*, not a template helper: documented, stable, supports code and delays.
+- *No disarm by voice or script*, ever. Arming scripts only for modes the panel arms without a code.
+- *Matter has no alarm, mode-select or "play" device for Alexa*, so modes, scenes, arming and adhan controls
+  reach Alexa as switches.
+
+**Open:** house modes still arm the first alarm found; when a villa has two panels, pick it in House modes.
 
 ## Water card (Dashboard Suite 3.12.0)
 

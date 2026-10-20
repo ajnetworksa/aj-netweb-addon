@@ -35,6 +35,7 @@
       <button class="tab" data-tab="layout" role="tab">Layout</button>
       <button class="tab" data-tab="rooms" role="tab">Rooms &amp; Devices</button>
       <button class="tab" data-tab="modes" role="tab">House modes</button>
+      <button class="tab" data-tab="alarm" role="tab">Alarm</button>
       <button class="tab" data-tab="panels" role="tab">Wall panels</button>
       <button class="tab" data-tab="support" role="tab">Support Info</button>
       <button class="tab" data-tab="deploy" role="tab">Deploy &amp; Backups</button>
@@ -266,6 +267,55 @@
               is possible but means anyone who can switch the mode (Alexa too) disarms the house.</li>
             <li>Shades means curtains and blinds only. Gates and garage doors are never moved by a mode.</li>
             <li>After adding devices, press <b>Apply</b> (or Deploy) again so the modes include them.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel" id="tab-alarm">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Alarm</h2>
+              <p class="desc">Uses the alarm panel the villa already has in Home Assistant, or makes one of our own from the
+                door, window and motion sensors. Either way: sirens and a loud alert on the chosen phones when it goes
+                off, and arming from Alexa (<i>"Alexa, turn on Alarm away"</i>). Disarming by voice is never possible.</p>
+            </div>
+            <div class="head-actions"><button id="btnAlarmApply" class="btn primary">Apply to Home Assistant</button></div>
+          </div>
+          <div class="toggles">
+            <label class="switch"><input type="checkbox" id="aEnabled"><span></span>Use the alarm pack</label>
+            <label class="switch"><input type="checkbox" id="aAlexa"><span></span>Arm from Alexa</label>
+            <label class="switch"><input type="checkbox" id="aLights"><span></span>All lights on when it goes off</label>
+          </div>
+          <div class="form-grid alarm-form">
+            <label>Alarm<select id="aSource"></select></label>
+            <label class="own-only">Disarm code (4-8 digits, empty = none)<input id="aCode" type="text" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+            <label class="own-only">Exit delay when arming Away (seconds)<input id="aExit" type="number" min="0" max="300" step="5"></label>
+            <label class="own-only">Entry delay to disarm (seconds)<input id="aEntry" type="number" min="0" max="300" step="5"></label>
+            <label>Siren for (minutes)<input id="aSiren" type="number" min="1" max="30" step="1"></label>
+          </div>
+          <p class="muted" id="alarmInfo"></p>
+          <div id="alarmResult"></div>
+        </div>
+        <div class="card own-only">
+          <h2>Sensors</h2>
+          <p class="desc">What sets the alarm off in each mode. Doors and windows guard every mode, motion only Away
+            (people walk around at night).</p>
+          <div id="alarmSensors" class="alarm-sensors muted">Scanning Home Assistant…</div>
+        </div>
+        <div class="card">
+          <h2>Sirens and phones</h2>
+          <div class="keep-list" id="alarmSirens"></div>
+          <div class="keep-list" id="alarmPhones"></div>
+        </div>
+        <div class="card">
+          <h2>Good to know</h2>
+          <ul class="steps">
+            <li>Our own alarm is Home Assistant's built-in <i>manual</i> alarm. Apply writes
+              <code>packages/ajnetweb_alarm.yaml</code>; Home Assistant must load packages
+              (<code>homeassistant: packages: !include_dir_named packages</code>) and be restarted once.</li>
+            <li>Phones get a critical alert that sounds even on silent (iPhone: allow critical alerts for the Home Assistant app).</li>
+            <li>House modes arm and disarm the same alarm (House modes tab).</li>
           </ul>
         </div>
       </section>

@@ -92,6 +92,7 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             "/api/preview": lambda: {"ok": True, "config": engine.generate()},
             "/api/house_modes": engine.house_modes_info,
             "/api/wall_panels": lambda: engine.wall_panels_info(self._query().get("base")),
+            "/api/alarm": engine.alarm_info,
             "/api/room/now": lambda: engine.room_now(self._query().get("area")),
         }
         if path in routes:
@@ -139,6 +140,9 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             self._guard(lambda: self._send_json({"ok": True, "project": engine.save_project(payload)}))
         elif path == "/api/room":
             self._guard(lambda: respond(engine.room_update(payload.get("area_id"), payload.get("name"), payload.get("photo"))))
+        elif path == "/api/alarm/apply":
+            self._guard(lambda: respond(engine.apply_alarm(
+                engine.save_project(payload["project"]) if payload.get("project") else None)))
         elif path == "/api/room/scene":
             self._guard(lambda: respond(engine.save_scene(payload)))
         elif path == "/api/my_cards":
