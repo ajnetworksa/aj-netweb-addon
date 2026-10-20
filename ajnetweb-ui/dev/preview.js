@@ -37,6 +37,21 @@ data.states["sensor.house_power"] = { entity_id: "sensor.house_power", state: "3
 // house modes helper (the Dashboard Suite creates it with Studio → House modes); ?modes=0 hides it
 if (q("modes", "1") !== "0") data.states["input_select.ajnetweb_house_mode"] = { entity_id: "input_select.ajnetweb_house_mode", state: "home",
   attributes: { friendly_name: "House mode", options: ["home", "away", "night", "guests"], icon: "mdi:home-switch" } };
+// water: tanks, booster pump, watering zones and the Studio's watering timer script; ?water=0 hides them
+if (q("water", "1") !== "0") {
+  const ago = (h) => new Date(Date.now() - h * 3600000).toISOString();
+  const add = (id, state, attributes, area, h = 1) => {
+    data.states[id] = { entity_id: id, state, last_changed: ago(h), attributes };
+    if (area) data.entities[id] = { entity_id: id, area_id: area, entity_category: null, labels: [] };
+  };
+  add("sensor.roof_tank_level", "64", { friendly_name: "Roof tank", unit_of_measurement: "%" }, "entrance");
+  add("sensor.ground_tank_level", "17", { friendly_name: "Ground tank", unit_of_measurement: "%" }, "entrance");
+  add("switch.booster_pump", "on", { friendly_name: "Booster pump" }, "entrance");
+  add("valve.front_lawn", "closed", { friendly_name: "Front lawn", device_class: "water" }, "entrance", 5);
+  add("switch.drip_line_palms", "on", { friendly_name: "Drip line palms" }, "entrance", 0.2);
+  add("valve.backyard_sprinklers", "closed", { friendly_name: "Backyard sprinklers", device_class: "water" }, "entrance", 30);
+  add("script.ajnetweb_water_run", "off", { friendly_name: "AJ Netweb - Water a zone" });
+}
 data.states["calendar.family"] = { entity_id: "calendar.family", state: "off", last_changed: "x", attributes: { friendly_name: "Family" } };
 data.states["calendar.school"] = { entity_id: "calendar.school", state: "off", last_changed: "x", attributes: { friendly_name: "School" } };
 const day0 = new Date(); day0.setHours(0, 0, 0, 0);
@@ -70,6 +85,14 @@ const hass = {
     if (msg.type === "frontend/get_themes") return { themes: registry, default_theme: "default", default_dark_theme: null };
     if (msg.type === "history/history_during_period") return Object.fromEntries(msg.entity_ids.map((id, i) =>
       [id, wave(id, parseFloat((hass.states[id] || {}).state) || 22, 1.4 + i * 0.3, i)]));
+    if (msg.type === "logbook/get_events") {   // a few things that "happened" for the notifications bell
+      const ago = (min) => Date.now() / 1000 - min * 60;
+      const ids = msg.entity_ids || [];
+      return [[ids.find((i) => i.startsWith("alarm_control_panel.")), "armed_away", 30], [ids.find((i) => i.startsWith("alarm_control_panel.")), "disarmed", 400],
+        [ids.find((i) => i.startsWith("binary_sensor.")), "on", 95], [ids.find((i) => i.startsWith("binary_sensor.")), "off", 90],
+        ["sensor.ajnetweb_doorbell", "ringing", 12], [ids.find((i) => i.startsWith("binary_sensor.")), "on", 60 * 26]]
+        .filter(([id]) => id && ids.includes(id)).map(([entity_id, state, min]) => ({ entity_id, state, when: ago(min) }));
+    }
     if (msg.type === "energy/get_prefs") return { energy_sources: [
       { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_import", stat_cost: "sensor.grid_cost" }], flow_to: [{ stat_energy_to: "sensor.grid_export" }] },
       { type: "solar", stat_energy_from: "sensor.solar_energy" }],
@@ -84,6 +107,9 @@ const hass = {
       return Object.fromEntries(msg.statistic_ids.map((id) => [id, [...Array(7)].map((_, d) => ({
         start: Date.parse(msg.start_time) + d * 86400000, change: base[id] * (d === 6 ? 0.55 : 0.8 + ((d * 37) % 5) / 10) }))]));
     }
+    // ?cards=<JSON list of card configs> replaces the sample "My cards" on Home, to try a card on its own
+    if (msg.type === "lovelace/config" && q("cards", "")) return { views: [
+      { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: JSON.parse(q("cards", "[]")) }] }] };
     if (msg.type === "lovelace/config") return { views: [   // a sample "My cards" dashboard
       { title: "On Home", sections: [{ type: "grid", column_span: 4, cards: [{ type: "heading", heading: "Pool & garden" },
         { type: "custom:ajnetweb-device-card", entity: "light.living_room_ceiling", name: "Pool lights", grid_options: { columns: 6 } },
@@ -140,12 +166,17 @@ const hass = {
       document.querySelectorAll("*").forEach((el) => { if (el.setConfig && el._hass) el.hass = { ...hass }; });
       return;
     }
+    // watering timer script: open the zone the card asked for
+    if (domain === "script" && d.variables && d.variables.zone) d = { entity_id: d.variables.zone };
+    if (domain === "script" && d.entity_id) service = String(d.entity_id).startsWith("valve.") ? "open_valve" : "turn_on";
     [].concat(d.entity_id || []).forEach((id) => {
       const st = hass.states[id];
       if (!st) return;
       const ns = { ...st, attributes: { ...st.attributes } };
       if (service === "toggle") ns.state = st.state === "on" ? "off" : "on";
       if (service === "turn_on") ns.state = "on";
+      if (service === "open_valve") ns.state = "open";
+      if (service === "close_valve") ns.state = "closed";
       if (service === "turn_off") ns.state = "off";
       if (service === "select_option") ns.state = d.option;
       if (d.brightness_pct != null) { ns.state = "on"; ns.attributes.brightness = Math.round(d.brightness_pct * 2.55); }

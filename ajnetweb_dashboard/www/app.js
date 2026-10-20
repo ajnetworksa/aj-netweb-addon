@@ -121,6 +121,7 @@
     bind("fPersonal", (el) => (p.personal = el.checked), (el) => (el.checked = p.personal !== false), "change");
     bind("fWallpaper", (el) => (p.wallpaper = el.checked), (el) => (el.checked = !!p.wallpaper), "change");
     bind("fMenu", (el) => (p.menu = el.checked), (el) => (el.checked = p.menu !== false), "change");
+    bind("fNotifications", (el) => (p.notifications = el.checked), (el) => (el.checked = p.notifications !== false), "change");
     renderKiosk();
     bind("fCamsLive", (el) => (p.cameras_view_live = el.checked), (el) => (el.checked = !!p.cameras_view_live), "change");
 
@@ -386,7 +387,7 @@
     favorites: ["⭐", "Favourites", "Devices you starred in Rooms & Devices"],
     rooms: ["🏠", "Rooms", "Room tiles with floor tabs"],
     climate: ["❄️", "Climate", "AC controls"],
-    insights: ["📊", "Today at home", "Agenda, energy today, room temperatures (24 h graph)"],
+    insights: ["📊", "Today at home", "Agenda, energy today, room temperatures (24 h graph), water"],
     cameras: ["📹", "Cameras", "Large pictures; gate/garage buttons on the picture"],
     custom: ["🧩", "My cards", "Your own cards from the My cards dashboard"],
   };
@@ -396,7 +397,8 @@
   };
   const INSIGHTS = { calendar: ["📅", "Agenda", "Next events from the HA calendars"],
     energy: ["⚡", "Energy", "Used today and the last 7 days (from HA's Energy settings)"],
-    temperature: ["🌡️", "Room temperatures", "Every room's temperature over 24 h"] };
+    temperature: ["🌡️", "Room temperatures", "Every room's temperature over 24 h"],
+    water: ["💧", "Water", "Tank levels, booster pump, garden watering (found by name: tank, pump, irrigation, zone)"] };
   const TOP = { weather: ["🌤️", "Weather forecast"], prayer: ["🕌", "Prayer times"], media: ["🎵", "Music / Right now"] };
 
   // A list that can be reordered by drag and drop (mouse) or ▲▼ (touch), each row with an on/off box.
@@ -423,6 +425,36 @@
         const list = rows.slice(); const [m] = list.splice(from, 1); list.splice(to, 0, m); from = null; commit(list);
       });
     });
+    // fingers and pens: native drag and drop doesn't work on touch screens, so drag by the grip with pointer events
+    box.querySelectorAll(".srow .grip").forEach((grip) => grip.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      const row = grip.closest(".srow");
+      const start = +row.dataset.i;
+      let to = start;
+      row.classList.add("touch-drag");
+      grip.setPointerCapture(e.pointerId);
+      const y0 = e.clientY;
+      const move = (ev) => {
+        row.style.transform = `translateY(${ev.clientY - y0}px)`;
+        const el = [...box.querySelectorAll(".srow")].find((r) => {
+          if (r === row) return false;
+          const b = r.getBoundingClientRect();
+          return ev.clientY >= b.top && ev.clientY <= b.bottom;
+        });
+        box.querySelectorAll(".srow.over").forEach((r) => r.classList.remove("over"));
+        if (el) { el.classList.add("over"); to = +el.dataset.i; }
+      };
+      const end = () => {
+        grip.removeEventListener("pointermove", move);
+        row.classList.remove("touch-drag"); row.style.transform = "";
+        if (to === start) return box.querySelectorAll(".srow.over").forEach((r) => r.classList.remove("over"));
+        const list = rows.slice(); const [m] = list.splice(start, 1); list.splice(to, 0, m); commit(list);
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", end, { once: true });
+      grip.addEventListener("pointercancel", end, { once: true });
+    }));
     box.querySelectorAll("[data-up],[data-dn]").forEach((b) => b.addEventListener("click", () => {
       const i = +(b.dataset.up ?? b.dataset.dn); const j = b.dataset.up !== undefined ? i - 1 : i + 1;
       if (j < 0 || j >= rows.length) return;
@@ -457,7 +489,8 @@
     sortable($("lyTop"), topOrder.map((k) => ({ id: k, icon: TOP[k][0], title: TOP[k][1], on: topOn.includes(k) })), (list) => {
       p.top_cards = list.filter((r) => r.on).map((r) => r.id); saveSoon();
     });
-    const insOn = Array.isArray(p.insights) ? p.insights : Object.keys(INSIGHTS);
+    // the old default (before Water existed) still means "all of them"
+    const insOn = Array.isArray(p.insights) && p.insights.join() !== "calendar,energy,temperature" ? p.insights : Object.keys(INSIGHTS);
     const insOrder = [...insOn.filter((k) => INSIGHTS[k]), ...Object.keys(INSIGHTS).filter((k) => !insOn.includes(k))];
     sortable($("lyInsights"), insOrder.map((k) => ({ id: k, icon: INSIGHTS[k][0], title: INSIGHTS[k][1], sub: INSIGHTS[k][2], on: insOn.includes(k) })), (list) => {
       p.insights = list.filter((r) => r.on).map((r) => r.id); saveSoon();
@@ -496,9 +529,9 @@
     const ord = p.room_order || [];
     const sorted = areas.map((a, i) => [a, ord.includes(a.id) ? ord.indexOf(a.id) : 1000 + i]).sort((x, y) => x[1] - y[1]).map(([a]) => a);
     sortable($("lyRooms"), sorted.map((a) => ({ id: a.id, icon: a.picture ? `<img src="${esc(a.picture)}" alt="">` : "🚪", title: a.name,
-      on: true, fixed: floors[a.floor_id] || "No floor", actions: [["rename", "✏️", "Rename room"], ["photo", "📷", "Upload room photo"]] })),
+      on: true, fixed: floors[a.floor_id] || "No floor", actions: [["rename", "✏️", "Rename room"], ["photo", "📷", "Upload room photo"], ["scene", "🎬", "Save what the room does now as a scene"]] })),
       (list) => { p.room_order = list.map((r) => r.id); saveSoon(); },
-      (act, row) => (act === "rename" ? renameRoom(row) : pickPhoto(row)));
+      (act, row) => (act === "rename" ? renameRoom(row) : act === "scene" ? saveScene(row) : pickPhoto(row)));
     const cams = state.layout.areas.flatMap((a) => (a.cameras || []).map((c) => Object.assign({ area: a.name }, c)));
     const chosen = p.cameras && p.cameras.length ? p.cameras : cams.map((c) => c.entity_id);
     const camRows = [...chosen.map((id) => cams.find((c) => c.entity_id === id)).filter(Boolean), ...cams.filter((c) => !chosen.includes(c.entity_id))];
@@ -517,7 +550,7 @@
     renderLayoutRooms(); renderRooms();
   }
 
-  // pick a photo, shrink it in the browser (max 1600 px, JPEG) and set it as the HA area picture
+  // pick a photo, let the installer frame it (4:3, drag + zoom), send it as a JPEG of at most 1600 x 1200
   function pickPhoto(row) {
     const input = document.createElement("input");
     input.type = "file"; input.accept = "image/*";
@@ -525,24 +558,89 @@
       const file = input.files && input.files[0];
       if (!file) return;
       const img = new Image();
-      img.onload = async () => {
-        const k = Math.min(1, 1600 / Math.max(img.width, img.height));
-        const c = document.createElement("canvas");
-        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(img.src);
-        toast("Uploading photo…");
-        const r = await api("api/room", { area_id: row.id, photo: c.toDataURL("image/jpeg", 0.85) });
-        if (!r.ok) return toast(r.error || "Upload failed");
-        const a = state.layout.areas.find((x) => x.id === row.id);
-        if (a) a.picture = r.picture;
-        toast("Photo set - it shows on the photo room cards and room sheets");
-        renderLayoutRooms();
-      };
+      img.onload = () => { URL.revokeObjectURL(img.src); cropPhoto(row, img); };
       img.onerror = () => toast("That file is not an image");
       img.src = URL.createObjectURL(file);
     };
     input.click();
+  }
+
+  function cropPhoto(row, img) {
+    const dlg = $("cropDialog"), cv = $("cropCanvas"), ctx = cv.getContext("2d"), zoom = $("cropZoom");
+    const W = cv.width, H = cv.height;
+    const base = Math.max(W / img.width, H / img.height);   // zoom 1 = the photo just covers the frame
+    const view = { z: 1, x: 0, y: 0 };                       // x/y: offset of the photo centre from the frame centre
+    const clamp = () => {
+      const s = base * view.z, mx = Math.max(0, (img.width * s - W) / 2), my = Math.max(0, (img.height * s - H) / 2);
+      view.x = Math.max(-mx, Math.min(mx, view.x)); view.y = Math.max(-my, Math.min(my, view.y));
+    };
+    const draw = (c, w, h) => {
+      const s = base * view.z * (w / W), iw = img.width * s, ih = img.height * s;
+      c.fillStyle = "#111"; c.fillRect(0, 0, w, h);
+      c.drawImage(img, (w - iw) / 2 + view.x * (w / W), (h - ih) / 2 + view.y * (h / H), iw, ih);
+    };
+    const paint = () => { clamp(); draw(ctx, W, H); };
+    zoom.value = 1;
+    zoom.oninput = () => { view.z = +zoom.value; paint(); };
+    let drag = null;
+    cv.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = (e) => {
+      if (!drag) return;
+      const k = W / cv.getBoundingClientRect().width;
+      view.x = drag.vx + (e.clientX - drag.x) * k; view.y = drag.vy + (e.clientY - drag.y) * k; paint();
+    };
+    cv.onpointerup = cv.onpointercancel = () => { drag = null; };
+    cv.onwheel = (e) => { e.preventDefault(); zoom.value = view.z = Math.max(1, Math.min(4, view.z * (e.deltaY < 0 ? 1.08 : 0.93))); paint(); };
+    $("btnCropCancel").onclick = () => dlg.close();
+    $("btnCropSave").onclick = async () => {
+      const out = document.createElement("canvas");   // as many pixels as the frame covers in the original, 400-1600 wide
+      out.width = Math.round(Math.max(400, Math.min(1600, W / (base * view.z))));
+      out.height = Math.round(out.width * H / W);
+      draw(out.getContext("2d"), out.width, out.height);
+      $("btnCropSave").disabled = true;
+      toast("Uploading photo…");
+      const r = await api("api/room", { area_id: row.id, photo: out.toDataURL("image/jpeg", 0.85) });
+      $("btnCropSave").disabled = false;
+      if (!r.ok) return toast(r.error || "Upload failed");
+      dlg.close();
+      const a = state.layout.areas.find((x) => x.id === row.id);
+      if (a) a.picture = r.picture;
+      toast("Photo set - it shows on the photo room cards and room sheets");
+      renderLayoutRooms();
+    };
+    paint();
+    dlg.showModal();
+  }
+
+  // save what a room's devices are doing now as a normal HA scene in that room
+  async function saveScene(row) {
+    const dlg = $("sceneDialog");
+    $("sceneTitle").textContent = `Save ${row.title} as a scene`;
+    $("sceneName").value = "";
+    $("sceneResult").innerHTML = "";
+    $("sceneList").classList.add("muted");
+    $("sceneList").textContent = "Reading the room…";
+    $("btnSceneCancel").onclick = () => dlg.close();
+    dlg.showModal();
+    const res = await api(`api/room/now?area=${encodeURIComponent(row.id)}`);
+    const list = res.entities || [];
+    $("sceneList").classList.toggle("muted", !list.length);
+    $("sceneList").innerHTML = list.length ? list.map((e) => `<label><input type="checkbox" value="${esc(e.entity_id)}"
+        ${e.now === "unavailable" ? "disabled" : e.group === "media" || e.group === "switches" ? "" : "checked"}>
+        ${esc(e.name)}<small>${esc(e.now)}</small></label>`).join("")
+      : esc(res.error || "This room has no lights, curtains, ACs, fans or speakers.");
+    $("btnSceneSave").onclick = async () => {
+      const name = $("sceneName").value.trim();
+      const ids = [...$("sceneList").querySelectorAll("input:checked")].map((cb) => cb.value);
+      if (!name) return toast("Give the scene a name");
+      if (!ids.length) return toast("Tick at least one device");
+      $("btnSceneSave").disabled = true;
+      const r = await api("api/room/scene", { area_id: row.id, name, entities: ids });
+      $("btnSceneSave").disabled = false;
+      if (!r.ok) { $("sceneResult").innerHTML = `<div class="result bad">${esc(r.error || "Could not save the scene")}</div>`; return; }
+      dlg.close();
+      toast(`Scene "${name}" saved with ${r.count} devices - it shows on the room page`);
+    };
   }
 
   function loadPreview() {
@@ -657,6 +755,133 @@
     renderModes();
   }
 
+  // ------------------------------------------------------------------ alarm pack
+  const ARM = [["away", "Away"], ["night", "Night"], ["home", "Home"]];
+  function alarmCfg() {
+    const p = state.project;
+    p.alarm = p.alarm || {};
+    p.alarm.sensors = p.alarm.sensors || {};
+    return p.alarm;
+  }
+
+  async function renderAlarm() {
+    const info = await api("api/alarm");
+    if (!info.ok) { $("alarmInfo").textContent = info.error || "Could not read Home Assistant."; return; }
+    const a = alarmCfg();
+    Object.keys(info.config).forEach((k) => { if (a[k] === undefined) a[k] = info.config[k]; });
+    $("aEnabled").checked = !!a.enabled;
+    $("aAlexa").checked = a.alexa !== false;
+    $("aLights").checked = !!a.lights_on;
+    $("aSource").innerHTML = `<option value="auto">Automatic (${info.panels.length ? "the panel in Home Assistant" : "our own - no panel found"})</option>
+      <option value="own">Our own alarm (door, window and motion sensors)</option>` +
+      info.panels.map((pn) => `<option value="panel:${esc(pn.entity_id)}">${esc(pn.name)}</option>`).join("");
+    $("aSource").value = a.source === "panel" && a.panel ? `panel:${a.panel}` : a.source === "own" ? "own" : "auto";
+    $("aCode").value = a.code || "";
+    $("aExit").value = a.exit_delay; $("aEntry").value = a.entry_delay; $("aSiren").value = a.siren_minutes;
+    const own = () => $("aSource").value === "own" || ($("aSource").value === "auto" && !info.panels.length);
+    $("tab-alarm").classList.toggle("own-off", !own());
+    const set = (key, val) => { alarmCfg()[key] = val; saveSoon(); };
+    $("aEnabled").onchange = () => set("enabled", $("aEnabled").checked);
+    $("aAlexa").onchange = () => set("alexa", $("aAlexa").checked);
+    $("aLights").onchange = () => set("lights_on", $("aLights").checked);
+    $("aSource").onchange = () => {
+      const v = $("aSource").value;
+      alarmCfg().source = v.startsWith("panel:") ? "panel" : v;
+      alarmCfg().panel = v.startsWith("panel:") ? v.slice(6) : "";
+      $("tab-alarm").classList.toggle("own-off", !own()); saveSoon();
+    };
+    $("aCode").oninput = () => { const v = $("aCode").value.replace(/\D/g, ""); $("aCode").value = v; if (!v || v.length >= 4) set("code", v); };
+    [["aExit", "exit_delay"], ["aEntry", "entry_delay"], ["aSiren", "siren_minutes"]].forEach(([id, key]) => {
+      $(id).onchange = () => set(key, Number($(id).value));
+    });
+    const u = info.using || {};
+    $("alarmInfo").textContent = (u.own ? `Our own alarm (${u.panel})` : u.panel ? `Using ${u.panel}` : "No alarm panel found.") +
+      (u.state ? ` - now ${u.state}.` : u.own ? " - not created yet; Apply, then restart Home Assistant once." : "") +
+      (u.own && !info.packages_ok ? " Home Assistant doesn't load packages yet (see Good to know)." : "") +
+      (info.alexa && info.alexa.installed ? " Alexa Matter Bridge found." : "");
+    $("alarmSensors").classList.toggle("muted", !info.sensors.length);
+    $("alarmSensors").innerHTML = info.sensors.length ? `<div class="asrow head"><span>Sensor</span>${ARM.map(([, l]) => `<span style="text-align:center">${l}</span>`).join("")}</div>` +
+      info.sensors.map((x) => `<div class="asrow"><span>${esc(x.name)} <small>${x.kind === "motion" ? "motion" : "door / window"}</small></span>
+        ${ARM.map(([m]) => `<label><input type="checkbox" data-as="${esc(x.entity_id)}" data-m="${m}" ${x.modes.includes(m) ? "checked" : ""}></label>`).join("")}</div>`).join("")
+      : "No door, window or motion sensors found.";
+    $("alarmSensors").querySelectorAll("[data-as]").forEach((cb) => cb.addEventListener("change", () => {
+      const row = [...$("alarmSensors").querySelectorAll(`[data-as="${CSS.escape(cb.dataset.as)}"]`)];
+      alarmCfg().sensors[cb.dataset.as] = row.filter((c) => c.checked).map((c) => c.dataset.m);
+      saveSoon();
+    }));
+    const picks = (box, list, key, idKey, empty) => {
+      const chosen = Array.isArray(a[key]) ? a[key] : list.map((x) => x[idKey]);
+      $(box).innerHTML = list.length ? list.map((x) => `<label class="switch"><input type="checkbox" data-pk="${esc(x[idKey])}"
+        ${chosen.includes(x[idKey]) ? "checked" : ""}><span></span>${esc(x.name)}</label>`).join("") : `<span class="muted">${empty}</span>`;
+      $(box).querySelectorAll("[data-pk]").forEach((cb) => cb.addEventListener("change", () => {
+        set(key, [...$(box).querySelectorAll("[data-pk]:checked")].map((c) => c.dataset.pk));
+      }));
+    };
+    picks("alarmSirens", info.sirens, "sirens", "entity_id", "No sirens found (siren entities, or switches named siren).");
+    picks("alarmPhones", info.phones, "notify", "service", "No phones with the Home Assistant app found.");
+  }
+
+  async function applyAlarm() {
+    const b = $("btnAlarmApply");
+    if (!alarmCfg().enabled) return toast("Turn on \"Use the alarm pack\" first");
+    b.disabled = true;
+    $("alarmResult").innerHTML = `<div class="result">Applying…</div>`;
+    await saveNow();
+    const res = await api("api/alarm/apply", {});
+    b.disabled = false;
+    const steps = (res.steps || []).map((x) =>
+      `<li>${x.ok ? "✓" : x.ok === false ? "✕" : "•"} ${esc(x.step)}${x.detail ? ` – <span class="muted">${esc(x.detail)}</span>` : ""}</li>`).join("");
+    $("alarmResult").innerHTML = `<div class="result ${res.ok ? "ok" : "bad"}"><b>${res.ok ? "The alarm pack is set up." :
+      esc(res.error || "Some steps failed – see below.")}</b>${steps ? `<ul>${steps}</ul>` : ""}</div>`;
+    renderAlarm();
+  }
+
+  // ------------------------------------------------------------------ wall panels (QR codes + Fully Kiosk tablets)
+  const wp = { info: null, timer: null };
+
+  async function renderPanels(base) {
+    const info = await api("api/wall_panels" + (base ? `?base=${encodeURIComponent(base)}` : ""));
+    if (!info.ok) { $("wpQr").innerHTML = `<p class="muted">${esc(info.error || "Could not load.")}</p>`; return; }
+    wp.info = info;
+    if (document.activeElement !== $("wpBase")) $("wpBase").value = info.base_url || "";
+    $("wpViewOff").hidden = info.panel_view !== false;
+    const qr = info.qr || {};
+    const tile = (kind, title) => info.urls[kind] && qr[kind]
+      ? `<div class="qr">${qr[kind]}<b>${title}</b><code>${esc(info.urls[kind])}</code></div>` : "";
+    $("wpQr").innerHTML = (tile("browser", "Browser / Fully Kiosk") || `<p class="muted">Enter the Home Assistant address
+      (starting with http:// or https://) for the browser code.</p>`) + tile("app", "Home Assistant app") +
+      (qr.error ? `<p class="muted">${esc(qr.error)}</p>` : "");
+    const p = info.profile || {};
+    $("wpMotion").checked = !!p.motion;
+    $("wpKeepOn").checked = !!p.keep_on;
+    $("wpDimAfter").value = p.dim_after;
+    $("wpDimBright").value = p.dim_brightness;
+    const tabs = info.tablets || [];
+    $("wpTablets").classList.toggle("muted", !tabs.length);
+    $("wpTablets").innerHTML = tabs.length ? tabs.map((t) => `<div class="tablet-row"><div><b>${esc(t.name)}</b>
+        <small>${esc(t.model)}${t.entities.motion ? "" : " · no motion switch (needs PLUS)"}</small></div>
+        <button class="btn" data-wp="${esc(t.device_id)}">Apply wall panel profile</button></div>`).join("")
+      : "No Fully Kiosk tablets found in Home Assistant yet. Use the codes above, or add the Fully Kiosk Browser integration.";
+    $("wpTablets").querySelectorAll("[data-wp]").forEach((b) => b.addEventListener("click", () => applyPanel(b)));
+  }
+
+  async function applyPanel(btn) {
+    const url = (wp.info && wp.info.urls.browser) || "";
+    if (!url) return toast("Enter the Home Assistant address first");
+    btn.disabled = true;
+    $("wpResult").innerHTML = `<div class="result">Applying…</div>`;
+    const res = await api("api/wall_panels/apply", {
+      device_id: btn.dataset.wp, url,
+      profile: { motion: $("wpMotion").checked, keep_on: $("wpKeepOn").checked,
+        dim_after: Number($("wpDimAfter").value), dim_brightness: Number($("wpDimBright").value) },
+    });
+    btn.disabled = false;
+    const steps = (res.steps || []).map((s) =>
+      `<li>${s.ok ? "✓" : "✕"} ${esc(s.step)}${s.detail ? ` – <span class="muted">${esc(s.detail)}</span>` : ""}</li>`).join("");
+    $("wpResult").innerHTML = `<div class="result ${res.ok ? "ok" : "bad"}"><b>${res.ok ? `${esc(res.tablet)} is set up as a wall panel.` :
+      esc(res.error || "Some steps failed – see below.")}</b>${steps ? `<ul>${steps}</ul>` : ""}</div>`;
+  }
+
   // ------------------------------------------------------------------ music
   async function renderMusic() {
     const p = state.project;
@@ -708,6 +933,8 @@
     if (name === "licence" && !$("licFrame").src) $("licFrame").src = "license";
     if (name === "layout") { renderLayout(); if (!$("pvFrame").src) loadPreview(); }
     if (name === "modes") renderModes();
+    if (name === "panels") renderPanels();
+    if (name === "alarm") renderAlarm();
     if (name === "music") renderMusic();
   }
 
@@ -717,6 +944,11 @@
     $("btnDeployTop").addEventListener("click", deploy);
     $("btnApplyLayout").addEventListener("click", applyLayout);
     $("btnModesApply").addEventListener("click", applyModes);
+    $("btnAlarmApply").addEventListener("click", applyAlarm);
+    $("wpBase").addEventListener("input", () => {
+      clearTimeout(wp.timer);
+      wp.timer = setTimeout(() => renderPanels($("wpBase").value.trim()), 500);
+    });
     $("btnMusicRefresh").addEventListener("click", renderMusic);
     document.querySelectorAll("[data-pv]").forEach((b) => b.addEventListener("click", () => {
       document.querySelectorAll("[data-pv]").forEach((x) => x.classList.toggle("on", x === b));

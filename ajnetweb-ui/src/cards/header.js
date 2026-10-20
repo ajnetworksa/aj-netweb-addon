@@ -3,9 +3,11 @@
 //   variant: default | panel (large clock for wall tablets)
 //   image: optional background image URL for a hero header
 //   appearance: true -> palette button that opens the personal appearance picker
+//   notifications: { doorbell, alarms, safety, openings } -> bell with a count of new events; opens the list
 //   (palette / appearance_themes are passed on to it)
 import { AjnBase, bindGestures, cssUrl, esc, formatState } from "../core/base.js";
-import { openAppearance } from "./appearance.js";
+import { openAppearance, openCardSheet } from "./appearance.js";
+import { fetchEntries, lastSeen, notifEntities } from "./notifications.js";
 import { COLORS } from "../core/styles.js";
 
 export const WEATHER_ICONS = {
@@ -32,15 +34,42 @@ export class AjnetwebHeaderCard extends AjnBase {
     const c = this._config;
     const ids = [c.weather, c.alarm, ...(c.persons || [])];
     (c.chips || []).forEach((chip) => ids.push(...(chip.entities || [])));
+    if (c.notifications) ids.push(...notifEntities(c.notifications));
     return ids.filter(Boolean);
   }
 
   connectedCallback() {
     this._timer = setInterval(() => this._tick(), 15000);
+    this._onSeen = () => { this._unseen = 0; this._badge(); };
+    window.addEventListener("ajn-notifications-seen", this._onSeen);
   }
 
   disconnectedCallback() {
     clearInterval(this._timer);
+    window.removeEventListener("ajn-notifications-seen", this._onSeen);
+  }
+
+  /** Count the events since this person last opened the list (at most every few seconds). */
+  async _countNew() {
+    const n = this._config.notifications;
+    if (!n || this._counting || Date.now() - (this._countedAt || 0) < 3000) return;
+    this._counting = true;
+    try {
+      const seen = lastSeen(this._hass);
+      this._unseen = (await fetchEntries(this._hass, n)).filter((e) => e.when > seen).length;
+    } catch (e) {
+      this._unseen = 0;
+    }
+    this._counting = false;
+    this._countedAt = Date.now();
+    this._badge();
+  }
+
+  _badge() {
+    const b = this.shadowRoot && this.shadowRoot.querySelector(".badge");
+    if (!b) return;
+    b.textContent = this._unseen > 9 ? "9+" : String(this._unseen || "");
+    b.hidden = !this._unseen;
   }
 
   _greeting() {
@@ -155,6 +184,9 @@ export class AjnetwebHeaderCard extends AjnBase {
       .me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
             background: var(--_grad); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 4px 14px var(--ajn-glow, rgba(0,0,0,.2)); }
       .me ha-icon { --mdc-icon-size: 20px; }
+      .bell { position: relative; background: var(--_muted); color: var(--_text); box-shadow: none; }
+      .badge { position: absolute; top: -4px; inset-inline-end: -4px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+               border-radius: 9px; background: rgb(${COLORS.red}); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
       @container (min-width: 880px) { .nowx .weather { display: none; } }
       .row .persons { display: none; margin-inline-start: auto; }
       @container (max-width: 560px) { .side .persons { display: none; } .row .persons { display: flex; } }
@@ -187,6 +219,9 @@ export class AjnetwebHeaderCard extends AjnBase {
       <div class="chip tap ${ch.active ? "on" : ""}" tabindex="0" role="button" style="--chip-rgb:${COLORS[ch.color] || COLORS.blue}"
            ${ch.nav ? `data-nav="${esc(ch.nav)}"` : ""} ${ch.entity ? `data-entity="${esc(ch.entity)}"` : ""}>
         <ha-icon icon="${esc(ch.icon)}"></ha-icon>${esc(ch.text)}</div>`).join("");
+    const bell = c.notifications
+      ? `<div class="me bell tap" data-bell tabindex="0" role="button" aria-label="${esc(this.t("notifications"))}" title="${esc(this.t("notifications"))}">
+          <ha-icon icon="mdi:bell-outline"></ha-icon><span class="badge" hidden></span></div>` : "";
     const meBtn = c.appearance
       ? `<div class="me tap" data-appearance tabindex="0" role="button" aria-label="${esc(this.t("appearance"))}" title="${esc(this.t("appearance"))}"><ha-icon icon="mdi:palette"></ha-icon></div>` : "";
 
@@ -198,10 +233,22 @@ export class AjnetwebHeaderCard extends AjnBase {
             <div class="line"><div class="time"></div><div class="meta"><div class="date"></div><div class="greet"></div></div></div>
           </div>
           ${chips || persons ? `<div class="row">${chips}${persons ? `<div class="persons">${persons}</div>` : ""}</div>` : ""}
-          <div class="side">${persons ? `<div class="persons">${persons}</div>` : ""}${weather}${meBtn}</div>
+          <div class="side">${persons ? `<div class="persons">${persons}</div>` : ""}${weather}${bell}${meBtn}</div>
         </div>
       </ha-card>`);
     this._tick();
+    this._badge();
+    if (c.notifications) {
+      // count again only when one of the watched sensors changed, not on every light switch
+      const snap = notifEntities(c.notifications).map((id) => this._hass.states[id]);
+      if (!this._nsnap || snap.some((v, i) => v !== this._nsnap[i])) {
+        this._nsnap = snap;
+        this._countedAt = 0;
+        setTimeout(() => this._countNew(), 1500);   // the logbook needs a moment to record it
+      }
+      bindGestures(this.shadowRoot.querySelector("[data-bell]"), { onTap: () => openCardSheet(this, this._hass,
+        "ajnetweb-notifications-card", { ...c.notifications, ...(c.language ? { language: c.language } : {}) }) });
+    }
     const me = this.shadowRoot.querySelector("[data-appearance]");
     if (me) {
       bindGestures(me, { onTap: () => openAppearance(this, this._hass,

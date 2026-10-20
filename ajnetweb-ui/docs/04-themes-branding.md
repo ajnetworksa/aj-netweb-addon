@@ -31,6 +31,8 @@ because it is overwritten each time. The source is `ajnetweb_dashboard/themes.py
 | AJ Netweb Cyber Luxury | dark | Obsidian + cyan | Showrooms |
 | AJ Netweb OLED | dark | True black | Always-on wall panels (lowest glare/power) |
 | AJ Netweb Hospitality | dark + light | Walnut and brass | Hotels, serviced apartments |
+| AJ Netweb Bubble | light + dark | Very round (32 px) solid cards on a soft shadow, **no blur** | Family homes, kids' tablets |
+| AJ Netweb Pastel | dark | Near-black, quiet, pastel accents (lavender, rose, mint) | Bedrooms, night use, minimal homes |
 
 Themes with two modes follow the device's light/dark setting.
 
@@ -51,7 +53,8 @@ We looked at the most-used community themes and dashboards. Most of them need ca
 | iOS / Apple Home themes, Frosted Glass themes | Translucent cards, blur, soft gradients | Frosted Glass, Liquid Glass |
 | "Liquid Glass" community theme and tile cards (iOS 26 look) | Clear glass with a light edge | Liquid Glass (`ajn-highlight`, high saturation) |
 | Graphite, Noctis, Mushroom | Clean dark UI, native fonts | Native Blur, Bento |
-| Catppuccin, Nord | Pastel / Nordic palettes | Nordic + palettes (Rose, Arctic, Graphite) |
+| Catppuccin, Nord | Pastel / Nordic palettes | Pastel, Nordic + palettes (Rose, Arctic, Graphite) |
+| Rounded / bubble dashboards | Very round, soft, playful cards | Bubble |
 | Material You (Google) | Tonal colours, big radius | Material |
 | Caule theme packs | Many colour variants | 10 palettes × any theme, chosen per person |
 | Aurora / mesh-gradient wallpapers | Colourful background behind glass | Aurora, Desert Dusk, and per-person wallpaper |
