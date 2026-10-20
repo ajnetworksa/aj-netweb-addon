@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.16.0 - appliance card
+- **New `custom:ajnetweb-appliance-card`: washing machine, dryer, dishwasher or 3D printer at a glance.**
+  A ring around the appliance fills with the progress and the icon moves while it runs; the card says what
+  it is doing, the time left and the clock time it will be ready, and turns into a green tick when finished.
+  Works with brand integrations, a smart plug with power metering, or a plain timer. English and Arabic.
+- The preview takes `?cards=<JSON list>` to try any card on its own (with `options={"custom_dashboard":"x"}`).
+
 ## 3.15.0 - person card
 - **New `custom:ajnetweb-person-card`: who is home.** A photo (or initials) with a ring in the presence
   colour (green at home, orange away, teal in a named zone), where the person is and for how long, and their

@@ -341,6 +341,23 @@ Photo (or initials) with a ring in the presence colour: green at home, orange aw
 (the zone's name is shown). Under the name: where and for how long ("Home · for 2 h 5 min"). The phone
 battery chip turns red at 20 % and shows a bolt while charging (`…_battery_state`). Tap opens HA's person
 dialog with the map; tapping a chip opens that sensor.
+### `custom:ajnetweb-appliance-card` — washing machine, dryer, dishwasher, 3D printer
+
+```yaml
+type: custom:ajnetweb-appliance-card
+entity: sensor.washer_status          # what it is doing (sensor, binary_sensor, switch or a timer)
+kind: washer                          # optional: washer | dryer | dishwasher | printer (else guessed from the name)
+progress: sensor.washer_progress      # optional: 0-100 %
+remaining: sensor.washer_remaining    # optional: minutes left, or a finish-time timestamp
+power: sensor.washer_power            # optional: W; with no status entity, running = above `threshold`
+threshold: 5                          # optional, W
+name: Washer                          # optional
+```
+A ring around the appliance fills with the progress; the icon moves while it runs. The text says what it is
+doing (the integration's own step, e.g. "Rinse", next to it) and the time left with the clock time it will
+be ready. Finished turns the icon into a green tick. Works with brand integrations (Home Connect, LG
+ThinQ, SmartThings, Miele, Bambu Lab, OctoPrint, ...), a smart plug with power metering, or a plain
+`timer`. Tap = details of the status entity, hold = the power sensor.
 
 ### `custom:ajnetweb-appearance-card` — personal theme & colour
 

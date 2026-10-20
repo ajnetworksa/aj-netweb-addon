@@ -472,7 +472,8 @@
     "friendly_name": "Washing machine",
     "icon": "mdi:washing-machine",
     "finishes_at": "2026-10-18T15:10:37.578140+00:00",
-    "remaining": "0:25:00"
+    "remaining": "0:25:00",
+    "duration": "0:45:00"
    }
   },
   "sensor.front_door_battery": {
@@ -516,6 +517,68 @@
     "friendly_name": "Ahmed travel time",
     "icon": "mdi:car-clock",
     "unit_of_measurement": "min"
+   }
+  },
+  "sensor.dryer_status": {
+   "entity_id": "sensor.dryer_status",
+   "state": "drying",
+   "attributes": {
+    "friendly_name": "Dryer"
+   }
+  },
+  "sensor.dryer_remaining": {
+   "entity_id": "sensor.dryer_remaining",
+   "state": "42",
+   "attributes": {
+    "friendly_name": "Dryer remaining",
+    "unit_of_measurement": "min"
+   }
+  },
+  "sensor.dryer_progress": {
+   "entity_id": "sensor.dryer_progress",
+   "state": "58",
+   "attributes": {
+    "friendly_name": "Dryer progress",
+    "unit_of_measurement": "%"
+   }
+  },
+  "sensor.dishwasher_status": {
+   "entity_id": "sensor.dishwasher_status",
+   "state": "finished",
+   "attributes": {
+    "friendly_name": "Dishwasher"
+   }
+  },
+  "sensor.printer_status": {
+   "entity_id": "sensor.printer_status",
+   "state": "printing",
+   "attributes": {
+    "friendly_name": "Bambu P1S"
+   }
+  },
+  "sensor.printer_progress": {
+   "entity_id": "sensor.printer_progress",
+   "state": "35",
+   "attributes": {
+    "friendly_name": "Print progress",
+    "unit_of_measurement": "%"
+   }
+  },
+  "sensor.printer_end_time": {
+   "entity_id": "sensor.printer_end_time",
+   "state": "2026-10-19T21:30:00+00:00",
+   "attributes": {
+    "friendly_name": "Print end time",
+    "device_class": "timestamp"
+   }
+  },
+  "sensor.washer_power": {
+   "entity_id": "sensor.washer_power",
+   "state": "2.1",
+   "attributes": {
+    "friendly_name": "Washer power",
+    "unit_of_measurement": "W",
+    "device_class": "power"
    }
   }
  },
