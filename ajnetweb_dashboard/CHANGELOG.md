@@ -1,5 +1,12 @@
 # Changelog - AJ Netweb Dashboard Suite
 
+## 3.17.0 - room card indicators
+- **Room cards show more at a glance.** A green dot pulses on the room icon while someone is in the room
+  (motion, occupancy or presence). New indicator icons for an unlocked lock, open shades, a running fan
+  (spinning) and a robot vacuum at work, next to the existing alerts, open doors, AC and music.
+- **Own indicators:** `indicators:` on the room card adds any entity as an icon while it is active (a
+  sensor shows its value), with its own icon, colour and active states; `indicators: false` hides them.
+
 ## 3.16.0 - appliance card
 - **New `custom:ajnetweb-appliance-card`: washing machine, dryer, dishwasher or 3D printer at a glance.**
   A ring around the appliance fills with the progress and the icon moves while it runs; the card says what

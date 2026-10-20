@@ -45,7 +45,7 @@
    "attributes": {
     "friendly_name": "Living Room Temperature",
     "device_class": "temperature",
-    "unit_of_measurement": "\u00b0C"
+    "unit_of_measurement": "°C"
    }
   },
   "sensor.living_room_humidity": {
@@ -288,7 +288,7 @@
    "attributes": {
     "friendly_name": "Home",
     "temperature": 34,
-    "temperature_unit": "\u00b0C"
+    "temperature_unit": "°C"
    }
   },
   "person.ahmed": {
@@ -324,7 +324,7 @@
     },
     "hijri": {
      "formatted_en": "7 Jumada al-Ula 1448 AH",
-     "formatted_ar": "7 \u062c\u0645\u0627\u062f\u0649 \u0627\u0644\u0623\u0648\u0644\u0649 1448 \u0647\u0640",
+     "formatted_ar": "7 جمادى الأولى 1448 هـ",
      "ramadan": false
     },
     "helpers": {
@@ -439,7 +439,7 @@
   },
   "person.hana": {
    "entity_id": "person.hana",
-   "state": "Office",
+   "state": "home",
    "attributes": {
     "friendly_name": "Hana A"
    }
@@ -579,6 +579,21 @@
     "friendly_name": "Washer power",
     "unit_of_measurement": "W",
     "device_class": "power"
+   }
+  },
+  "binary_sensor.living_room_presence": {
+   "entity_id": "binary_sensor.living_room_presence",
+   "state": "on",
+   "attributes": {
+    "friendly_name": "Living Room Presence",
+    "device_class": "occupancy"
+   }
+  },
+  "fan.master_bedroom_fan": {
+   "entity_id": "fan.master_bedroom_fan",
+   "state": "on",
+   "attributes": {
+    "friendly_name": "Master Bedroom Fan"
    }
   }
  },
@@ -833,6 +848,18 @@
    "entity_id": "sensor.front_door_battery",
    "area_id": "entrance",
    "entity_category": "diagnostic",
+   "labels": []
+  },
+  "binary_sensor.living_room_presence": {
+   "entity_id": "binary_sensor.living_room_presence",
+   "area_id": "living_room",
+   "entity_category": null,
+   "labels": []
+  },
+  "fan.master_bedroom_fan": {
+   "entity_id": "fan.master_bedroom_fan",
+   "area_id": "master_bedroom",
+   "entity_category": null,
    "labels": []
   }
  },

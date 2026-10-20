@@ -8,6 +8,8 @@
 //   temperature / humidity       # optional sensor ids
 //   tap_action: popup | navigate ; navigation_path: /dashboard/room-living-room
 //   size: normal | large
+//   indicators: [ids or { entity, icon, color, active: [states] }]  extra indicator icons shown while
+//               the entity is active (a sensor shows its value); false hides every indicator
 //   style: photo (default) | tile  - tile: light card with the room icon and a column of quick buttons
 //          (lights, AC, shades, fan) so a room is controlled without opening it
 import { AjnBase, OFFLINE, bindGestures, cssUrl, esc, haptic } from "../core/base.js";
@@ -16,6 +18,8 @@ import { buildModel, roomEntities } from "../core/model.js";
 import { openRoomSheet } from "./sheet.js";
 
 const LEGACY_KEYS = ["lights", "climates", "covers", "media", "openings", "motion", "safety"];
+// "not active" states for custom indicators; anything else (on, open, unlocked, playing, cleaning, ...) is active
+const QUIET = ["off", "closed", "locked", "idle", "standby", "docked", "paused", "not_home", "disarmed", "clear", "unavailable", "unknown"];
 
 export class AjnetwebAreaCard extends AjnBase {
   static getStubConfig(hass) {
@@ -64,7 +68,7 @@ export class AjnetwebAreaCard extends AjnBase {
   watched() {
     if (!this._hass) return [];
     const r = this._room();
-    return [r.temperature, r.humidity, ...Object.values(r.entities).flat()].filter(Boolean);
+    return [r.temperature, r.humidity, ...Object.values(r.entities).flat(), ...this._custom().map((i) => i.entity)].filter(Boolean);
   }
 
   set hass(hass) {
@@ -79,6 +83,52 @@ export class AjnetwebAreaCard extends AjnBase {
   _count(group, test) {
     return (this._room().entities[group] || []).map((id) => this.st(id))
       .filter((s) => s && !OFFLINE.includes(s.state) && test(s)).length;
+  }
+
+  _custom() {
+    const list = this._config.indicators;
+    return (Array.isArray(list) ? list : []).map((i) => (typeof i === "string" ? { entity: i } : i)).filter((i) => i && i.entity);
+  }
+
+  /** Indicator icons: [icon, rgb, value, spin]. Alerts first, then what is running, then the installer's own. */
+  _indicators() {
+    if (this._config.indicators === false) return [];
+    const r = this._room();
+    const out = [];
+    const n = (g, test) => this._count(g, test);
+    const alerts = n("safety", (s) => s.state === "on");
+    const open = n("openings", (s) => s.state === "on");
+    const unlocked = n("access", (s) => s.entity_id.startsWith("lock.") && s.state === "unlocked");
+    const acOn = n("climates", (s) => s.state !== "off");
+    const climate = (r.entities.climates || []).map((id) => this.st(id)).find((s) => s && s.state !== "off" && !OFFLINE.includes(s.state));
+    const shades = n("covers", (s) => ["open", "opening"].includes(s.state));
+    const fans = n("fans", (s) => s.state === "on");
+    const cleaning = n("vacuums", (s) => ["cleaning", "mowing", "returning"].includes(s.state));
+    const playing = n("media", (s) => s.state === "playing");
+    if (alerts) out.push(["mdi:alert", COLORS.red, alerts]);
+    if (open) out.push(["mdi:door-open", COLORS.orange, open]);
+    if (unlocked) out.push(["mdi:lock-open-variant", COLORS.orange, ""]);
+    if (acOn) out.push(["mdi:snowflake", COLORS.blue, climate && climate.attributes.temperature != null ? `${climate.attributes.temperature}°` : acOn]);
+    if (shades) out.push(["mdi:curtains", COLORS.teal, ""]);
+    if (fans) out.push(["mdi:fan", COLORS.teal, "", true]);
+    if (cleaning) out.push(["mdi:robot-vacuum", COLORS.green, ""]);
+    if (playing) out.push(["mdi:music", COLORS.purple, ""]);
+    this._custom().forEach((i) => {
+      const s = this.st(i.entity);
+      if (!s || OFFLINE.includes(s.state)) return;
+      const numeric = s.entity_id.startsWith("sensor.") && Number.isFinite(parseFloat(s.state));
+      const active = i.active ? [].concat(i.active).includes(s.state) : numeric || !QUIET.includes(s.state);
+      if (!active) return;
+      const unit = s.attributes.unit_of_measurement || "";
+      out.push([i.icon || s.attributes.icon || "mdi:information-outline", COLORS[i.color] || COLORS.amber,
+        numeric ? `${Math.round(parseFloat(s.state) * 10) / 10}${unit === "%" || unit.startsWith("°") ? unit : unit ? ` ${unit}` : ""}` : ""]);
+    });
+    return out;
+  }
+
+  /** Someone in the room (motion / occupancy / presence on). */
+  _occupied() {
+    return this._config.indicators !== false && this._count("motion", (s) => s.state === "on") > 0;
   }
 
   _open() {
@@ -149,6 +199,13 @@ export class AjnetwebAreaCard extends AjnBase {
       .lit .big.pic { box-shadow: 0 0 0 3px rgb(${COLORS.amber}), 0 0 24px rgba(${COLORS.amber}, .35); }
       .alerts { display: flex; gap: 4px; margin-top: 6px; }
       .alerts ha-icon { --mdc-icon-size: 15px; color: rgb(var(--c)); }
+      .alerts .spin { animation: spin 1.6s linear infinite; }
+      .big { position: relative; }
+      .here { position: absolute; top: 2px; inset-inline-end: 2px; width: 12px; height: 12px; border-radius: 50%;
+              background: rgb(${COLORS.green}); box-shadow: 0 0 0 2.5px var(--_surface); }
+      .here::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgb(${COLORS.green});
+                     animation: ping 2s ease-out infinite; }
+      @keyframes ping { from { transform: scale(1); opacity: .7; } to { transform: scale(2.4); opacity: 0; } }
       .btns { display: flex; flex-direction: column; gap: 6px; justify-content: flex-start; }
       .q { width: 36px; height: 36px; border-radius: 50%; border: none; padding: 0; cursor: pointer; display: grid; place-items: center;
            background: var(--_muted); color: var(--_text2); position: relative; font: inherit; }
@@ -170,11 +227,10 @@ export class AjnetwebAreaCard extends AjnBase {
     const sub = [];
     if (t !== null) sub.push(`${Math.round(t * 10) / 10}${tUnit}`);
     if (h !== null) sub.push(`${Math.round(h)}%`);
-    const alerts = [];
-    if (this._count("safety", (s) => s.state === "on")) alerts.push(["mdi:alert", COLORS.red]);
-    if (this._count("openings", (s) => s.state === "on")) alerts.push(["mdi:door-open", COLORS.orange]);
-    if (this._count("motion", (s) => s.state === "on")) alerts.push(["mdi:motion-sensor", COLORS.teal]);
-    if (this._count("media", (s) => s.state === "playing")) alerts.push(["mdi:music", COLORS.purple]);
+    // the quick buttons already show lights, AC, shades and fans
+    const shown = new Set(this._quick().map((b) => b.key === "ac" ? "mdi:snowflake" : b.key === "covers" ? "mdi:curtains" : b.key === "fans" ? "mdi:fan" : ""));
+    const alerts = this._indicators().filter(([i]) => !shown.has(i)).slice(0, 5);
+    const occupied = this._occupied();
     const q = this._quick();
     this.shadowRoot.innerHTML = "";
     this.html(`<style>${this._tileCss()}</style>
@@ -182,9 +238,9 @@ export class AjnetwebAreaCard extends AjnBase {
         <div class="t">
           <div class="info">
             <div><div class="name">${esc(r.name)}</div><div class="sub">${sub.join(" · ") || "&nbsp;"}</div>
-              ${alerts.length ? `<div class="alerts">${alerts.map(([i, c]) => `<ha-icon icon="${i}" style="--c:${c}"></ha-icon>`).join("")}</div>` : ""}</div>
-            ${r.picture ? `<div class="big pic" style='background-image:${esc(cssUrl(r.picture))}'></div>`
-                        : `<div class="big"><ha-icon icon="${esc(r.icon)}"></ha-icon></div>`}
+              ${alerts.length ? `<div class="alerts">${alerts.map(([i, c, , spin]) => `<ha-icon class="${spin ? "spin" : ""}" icon="${esc(i)}" style="--c:${c}"></ha-icon>`).join("")}</div>` : ""}</div>
+            ${r.picture ? `<div class="big pic" style='background-image:${esc(cssUrl(r.picture))}'>${occupied ? `<span class="here" title="${esc(this.t("motion"))}"></span>` : ""}</div>`
+                        : `<div class="big"><ha-icon icon="${esc(r.icon)}"></ha-icon>${occupied ? `<span class="here" title="${esc(this.t("motion"))}"></span>` : ""}</div>`}
           </div>
           ${q.length ? `<div class="btns">${q.map((b, i) => `<button class="q ${b.on ? "on" : ""} ${b.spin ? "spin" : ""}" data-q="${i}"
               style="--c:${b.color}" aria-label="${esc(b.label)}" title="${esc(b.label)}"><ha-icon icon="${b.icon}"></ha-icon>${b.text ? `<b>${esc(b.text)}</b>` : ""}</button>`).join("")}</div>` : ""}
@@ -228,6 +284,15 @@ export class AjnetwebAreaCard extends AjnBase {
               font-size: 12px; font-weight: 600; background: rgba(0,0,0,.32); -webkit-backdrop-filter: blur(10px);
               backdrop-filter: blur(10px); }
       .pill ha-icon { --mdc-icon-size: 15px; color: rgb(var(--c)); }
+      .pill.icon { padding: 0 7px; }
+      .pill .spin { animation: spin 1.6s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .glass { position: relative; }
+      .here { position: absolute; top: 0; inset-inline-end: 0; width: 11px; height: 11px; border-radius: 50%;
+              background: rgb(${COLORS.green}); box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+      .here::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: rgb(${COLORS.green});
+                     animation: ping 2s ease-out infinite; }
+      @keyframes ping { from { transform: scale(1); opacity: .7; } to { transform: scale(2.4); opacity: 0; } }
     `;
   }
 
@@ -235,27 +300,17 @@ export class AjnetwebAreaCard extends AjnBase {
     if (this._config.style === "tile") return this._renderTile();
     const r = this._room();
     const lightsOn = this._count("lights", (s) => s.state === "on");
-    const acOn = this._count("climates", (s) => s.state !== "off");
-    const open = this._count("openings", (s) => s.state === "on");
-    const motion = this._count("motion", (s) => s.state === "on");
-    const alerts = this._count("safety", (s) => s.state === "on");
-    const playing = this._count("media", (s) => s.state === "playing");
+    const occupied = this._occupied();
     const t = this.num(r.temperature);
     const h = this.num(r.humidity);
     const tUnit = (this.st(r.temperature) || { attributes: {} }).attributes.unit_of_measurement || "°";
-    const climate = (r.entities.climates || []).map((id) => this.st(id)).find((s) => s && s.state !== "off" && !OFFLINE.includes(s.state));
 
     const sub = [];
     if (t !== null) sub.push(`${Math.round(t * 10) / 10}${tUnit}`);
     if (h !== null) sub.push(`${Math.round(h)}%`);
     if (lightsOn) sub.push(`${lightsOn} ${this.t("lights_on", lightsOn)}`);
 
-    const pills = [];
-    if (alerts) pills.push(["mdi:alert", COLORS.red, alerts]);
-    if (open) pills.push(["mdi:door-open", COLORS.orange, open]);
-    if (acOn) pills.push(["mdi:snowflake", COLORS.blue, climate && climate.attributes.temperature != null ? `${climate.attributes.temperature}°` : acOn]);
-    if (motion) pills.push(["mdi:motion-sensor", COLORS.teal, ""]);
-    if (playing) pills.push(["mdi:music", COLORS.purple, ""]);
+    const pills = this._indicators().slice(0, 6);
 
     const bg = r.picture ? `background-image:${cssUrl(r.picture)}` : `background:${roomGradient(`${r.name} ${r.icon}`)}`;
     const hasLights = (r.entities.lights || []).length > 0;
@@ -265,15 +320,15 @@ export class AjnetwebAreaCard extends AjnBase {
         <div class="bg" style='${bg}'></div><div class="shade"></div>
         <div class="wrap">
           <div class="top">
-            <div class="glass"><ha-icon icon="${esc(r.icon)}"></ha-icon></div>
+            <div class="glass"><ha-icon icon="${esc(r.icon)}"></ha-icon>${occupied ? `<span class="here" title="${esc(this.t("motion"))}"></span>` : ""}</div>
             ${hasLights ? `<button class="glass ${lightsOn ? "on" : ""}" aria-label="${esc(this.t("lights"))}">
               <ha-icon icon="${lightsOn ? "mdi:lightbulb-on" : "mdi:lightbulb-outline"}"></ha-icon></button>` : ""}
           </div>
           <div>
             <div class="name">${esc(r.name)}</div>
             <div class="sub">${sub.join(" · ") || "&nbsp;"}</div>
-            ${pills.length ? `<div class="pills">${pills.map(([i, c, v]) =>
-              `<span class="pill" style="--c:${c}"><ha-icon icon="${i}"></ha-icon>${esc(v)}</span>`).join("")}</div>` : ""}
+            ${pills.length ? `<div class="pills">${pills.map(([i, c, v, spin]) =>
+              `<span class="pill ${v === "" ? "icon" : ""}" style="--c:${c}"><ha-icon class="${spin ? "spin" : ""}" icon="${esc(i)}"></ha-icon>${esc(v)}</span>`).join("")}</div>` : ""}
           </div>
         </div>
       </ha-card>`);

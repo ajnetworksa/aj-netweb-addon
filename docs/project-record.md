@@ -11,13 +11,30 @@ Versions at the time of writing:
 
 | Product | Version |
 |---|---|
-| Dashboard Suite + UI kit | 3.16.0 |
+| Dashboard Suite + UI kit | 3.17.0 |
 | Prayer & Adhan | 1.4.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.0 |
 | Remote Access | 1.3.0 |
 | Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
+
+---
+
+## Room card indicators (Dashboard Suite 3.17.0)
+
+**Asked for:** cards inspired by https://jlnbln.gumroad.com/; his Custom Room Card's indicator icons.
+
+**Done:**
+- `ajnetweb-ui/src/cards/area.js`: one `_indicators()` list for the photo and tile styles; presence dot on
+  the room icon (replaces the motion pill); new auto indicators (unlocked lock, open shades, fan, vacuum);
+  `indicators:` option for the installer's own entities, `indicators: false` to hide.
+- Sample villa: living-room presence sensor and a bedroom fan.
+
+**Decisions:**
+- Our own code; nothing from the store was used.
+- The tile style skips indicators its quick buttons already show (AC, shades, fan).
+- No Studio option yet: `indicators` is set in *My cards* or by hand; the generator adds the automatic ones.
 
 ---
 

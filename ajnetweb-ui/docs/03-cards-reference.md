@@ -57,7 +57,20 @@ entities:                    # optional — default: everything in the area, gro
   lights: [light.majlis_chandelier, switch.majlis_spot_lights]
   climates: [climate.majlis_ac]
   scenes: [scene.majlis_guests]
+indicators:                  # optional: extra indicator icons, shown while the entity is active
+  - binary_sensor.majlis_window          # any on / open / unlocked / playing … state; a sensor shows its value
+  - entity: switch.majlis_incense
+    icon: mdi:smoke
+    color: purple                        # amber (default), blue, orange, red, green, purple, teal, indigo, pink, grey
+    active: [on]                         # optional: which states count as active
+# indicators: false          # hides every indicator
 ```
+
+**Indicators:** a green dot pulses on the room icon while someone is there (motion, occupancy or presence
+sensor). Small icons on the card show what needs a look or is running: alerts (red), open doors and
+windows, an unlocked lock, the AC with its set temperature, open shades, a running fan (spinning), a robot
+vacuum at work, music playing, then the `indicators` you add. The tile style leaves out what its quick
+buttons already show.
 
 Groups used in `entities` (and in the room sheet, in this order): `access, lights, climates, fans,
 covers, media, switches, vacuums, valves, cameras, temperature, humidity, air, power, openings,
