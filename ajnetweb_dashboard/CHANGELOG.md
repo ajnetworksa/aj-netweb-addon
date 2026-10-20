@@ -1,11 +1,15 @@
 # Changelog - AJ Netweb Dashboard Suite
 
 ## 3.17.0 - Music Assistant in each person's colours, Studio music setup
-- **Music Assistant inside the dashboard, in your own colours.** The Music page now ends with Music Assistant's
-  full app (library, playlists, radio, queue, its settings) in a *Music library* card. It is painted with the
-  theme and colour each person picked under ⋯ → Appearance, light or dark included, so it looks like the rest
-  of the dashboard. Full-screen button on phones and tablets. New card `custom:ajnetweb-music-library-card`;
-  strategy option `music_library: false` hides it. Shown only when the Music Assistant add-on is installed.
+- **Music library in the dashboard's own design.** The Music page now ends with a *Music library* card built
+  like the rest of the dashboard: speaker chips (*Play on*), a search box (Spotify, YouTube Music, radio… whatever
+  is added in Music Assistant) and tabs for Favourites, Playlists, Radio, Albums, Artists and Songs as tiles.
+  Tap a song or station to play it on the chosen speaker; albums, playlists and artists open their songs
+  (*Play all*, or one song). New card `custom:ajnetweb-music-browser-card`; strategy option
+  `music_library: false` hides it.
+- **Music Assistant button:** opens Music Assistant's own app (settings, music sources, queue) full screen
+  inside the dashboard, painted with the person's theme and colour (light/dark included). Also available as
+  its own card, `custom:ajnetweb-music-library-card`.
 - Music Assistant opened from the HA sidebar keeps its own look (it is another app; only light/dark can be
   chosen there, in its own settings).
 - **Studio → Music** (new tab): checks each step live and does it for you: install and start the Music

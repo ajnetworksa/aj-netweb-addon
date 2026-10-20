@@ -174,18 +174,32 @@ Music Assistant syncs players of the **same type** together; to mix types (e.g. 
 speaker), create a *Sync group* / *Universal group* player once in Music Assistant — it then shows up as
 one more speaker. Multi-zone amplifiers appear as one player per zone, so each zone can be linked.
 
-### `custom:ajnetweb-music-library-card` — Music Assistant library
+### `custom:ajnetweb-music-browser-card` — music library
+
+```yaml
+type: custom:ajnetweb-music-browser-card
+entities: [media_player.majlis, media_player.kitchen]   # default: Music Assistant speakers
+music_assistant_entry: 01J...         # needed for non-admin users (the Studio fills it in)
+tabs: [favorites, playlists, radio, albums, artists, tracks]   # which tabs, in this order
+app: true                             # "Music Assistant" button (its own app, full screen, in your colours)
+```
+Everything added in Music Assistant (Spotify, YouTube Music, Apple Music, Tidal, radio, own files) as tiles in
+the dashboard's design, with search. *Play on* chips pick the speaker. Tap a song or station to play it;
+albums, playlists and artists open their songs (*Play all* or one song). The generated Music page shows it.
+
+### `custom:ajnetweb-music-library-card` — Music Assistant app
 
 ```yaml
 type: custom:ajnetweb-music-library-card
 addon: d5369777_music_assistant       # optional: default is the Music Assistant add-on in the sidebar
 height: 720                           # optional, px (default: most of the screen)
+closable: true                        # close button instead of full screen
 ```
 Music Assistant's own app (library, playlists, radio, queue, its settings) inside the dashboard, painted in
 the person's appearance (theme, colour, light/dark from ⋯ → Appearance). Full-screen button at the top. Needs
 the Music Assistant **add-on** (it opens through HA ingress, the dashboard's own address; that is what lets
 the card restyle it). Music Assistant run in Docker elsewhere can't be restyled by a web page, and the card
-says the add-on is missing. The generated Music page shows it automatically (`music_library: false` hides it).
+says the add-on is missing. The music library card's *Music Assistant* button opens it full screen.
 Full variant: artwork, title/artist, live progress, shuffle / previous / play-pause / next / repeat,
 drag-to-set volume and mute, room chips to switch speakers, **Move music here** (Music Assistant
 `transfer_queue`), search across every provider you added to Music Assistant (YouTube Music,

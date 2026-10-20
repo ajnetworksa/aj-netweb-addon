@@ -37,7 +37,8 @@ MA_REPOSITORY = "https://github.com/music-assistant/home-assistant-addon"
 PROVIDERS: List[Dict[str, str]] = [
     {"key": "spotify", "name": "Spotify", "account": "Premium (Individual, Duo or Family). Free accounts do not play.",
      "how": "Sign in with Spotify on the screen. Then open the Spotify app once on the same Wi-Fi and approve "
-            "Music Assistant. Accounts made since late 2024 may need the official 'Spotify Soloist' option.",
+            "Music Assistant. Accounts made since late 2024 may need the official 'Spotify Soloist' option. "
+            "Also add the 'Spotify Connect' plugin: every speaker then shows in the Spotify app's device list.",
      "level": "easy"},
     {"key": "apple_music", "name": "Apple Music", "account": "Paid subscription.",
      "how": "Authenticate with Apple Music (open Music Assistant on http://<HA IP>:8095 for this step). "

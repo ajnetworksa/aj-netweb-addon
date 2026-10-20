@@ -3,6 +3,7 @@
 //
 //   addon: <add-on slug>   # optional; default: the Music Assistant add-on found in the sidebar
 //   height: 720            # optional, px; default fills most of the screen
+//   closable: true         # a close button instead of full screen (the music browser opens it this way)
 //
 // How: the Music Assistant add-on opens through Home Assistant ingress, which is the same web address as
 // the dashboard. The card asks the Supervisor for the add-on's ingress address and a session (the same two
@@ -16,16 +17,16 @@ import { AjnBase, bindGestures, esc, haptic } from "../core/base.js";
 
 const STR = {
   en: {
-    title: "Music library", full: "Full screen", exit: "Close full screen", loading: "Opening Music Assistant…",
+    title: "Music Assistant", full: "Full screen", exit: "Close full screen", loading: "Opening Music Assistant…",
     missing: "Music Assistant is not installed. The installer adds it in Dashboard Suite → Music.",
     stopped: "Music Assistant is not running. The installer can start it in Dashboard Suite → Music.",
-    failed: "Music Assistant could not be opened.", retry: "Try again",
+    failed: "Music Assistant could not be opened.", retry: "Try again", close: "Close",
   },
   ar: {
-    title: "مكتبة الموسيقى", full: "ملء الشاشة", exit: "إغلاق ملء الشاشة", loading: "جارٍ فتح Music Assistant…",
+    title: "Music Assistant", full: "ملء الشاشة", exit: "إغلاق ملء الشاشة", loading: "جارٍ فتح Music Assistant…",
     missing: "لم يتم تثبيت Music Assistant. يضيفه الفني من Dashboard Suite ← الموسيقى.",
     stopped: "Music Assistant متوقف. يمكن للفني تشغيله من Dashboard Suite ← الموسيقى.",
-    failed: "تعذّر فتح Music Assistant.", retry: "إعادة المحاولة",
+    failed: "تعذّر فتح Music Assistant.", retry: "إعادة المحاولة", close: "إغلاق",
   },
 };
 
@@ -173,11 +174,14 @@ export class AjnetwebMusicLibraryCard extends AjnBase {
     else this.style.removeProperty("--ajn-ml-height");
     this.html(`<ha-card dir="${this._lang === "ar" ? "rtl" : "ltr"}">
       <div class="bar"><ha-icon class="lead" icon="mdi:music-box-multiple"></ha-icon><div class="t">${esc(this.s("title"))}</div>
-        <button class="b" data-full title="${esc(this.s("full"))}" aria-label="${esc(this.s("full"))}"><ha-icon icon="mdi:fullscreen"></ha-icon></button></div>
+        ${this._config.closable ? `<button class="b" data-close title="${esc(this.s("close"))}" aria-label="${esc(this.s("close"))}"><ha-icon icon="mdi:close"></ha-icon></button>`
+          : `<button class="b" data-full title="${esc(this.s("full"))}" aria-label="${esc(this.s("full"))}"><ha-icon icon="mdi:fullscreen"></ha-icon></button>`}</div>
       <div class="frame"><iframe title="Music Assistant" allow="autoplay; fullscreen; clipboard-write"></iframe>
         <div class="msg" data-msg>${esc(this.s("loading"))}</div></div></ha-card>`);
     const full = this.shadowRoot.querySelector("[data-full]");
-    bindGestures(full, { onTap: () => this._toggleFull() });
+    if (full) bindGestures(full, { onTap: () => this._toggleFull() });
+    const close = this.shadowRoot.querySelector("[data-close]");
+    if (close) bindGestures(close, { onTap: () => { haptic("light"); this.dispatchEvent(new CustomEvent("ajn-close")); } });
     if (!this._fsBound) {
       this._fsBound = true;
       this.addEventListener("fullscreenchange", () => this._fullIcon(document.fullscreenElement === this));

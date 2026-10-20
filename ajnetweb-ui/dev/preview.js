@@ -100,6 +100,8 @@ const hass = {
       params.delete("me");
       return null;
     }
+    if (msg.type === "media_player/browse_media") return { title: "x", children: ["Li Beirut", "Kifak Inta", "Al Bosta", "Sakan El Lail"]
+      .map((t, i) => ({ title: t, media_content_id: `ytmusic://track/${i}`, media_content_type: "track", can_play: true, can_expand: false })) };
     if (msg.type === "config_entries/get") return [{ entry_id: "ma1", state: "loaded" }];
     if (msg.type === "supervisor/api") {
       if (msg.endpoint.endsWith("/info")) return { state: q("ma", "1") === "stopped" ? "stopped" : "started", ingress_url: "/fake-ma.html" };
@@ -110,7 +112,11 @@ const hass = {
       console.log("music_assistant", msg.service, msg.service_data);
       const img = (h) => `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='hsl(${h},55%25,45%25)'/%3E%3C/svg%3E`;
       const items = (type, names) => names.map((name, i) => ({ media_type: type, uri: `ytmusic://${type}/${i}`, name, image: img(i * 50 + type.length * 20), artists: [{ name: "Various" }] }));
-      if (msg.service === "get_library") return { response: { items: items(msg.service_data.media_type, msg.service_data.media_type === "radio" ? ["Quran Radio", "Mix FM"] : ["Evening Oud", "Road Trip", "Kids Songs"]) } };
+      const NAMES = { radio: ["Quran Radio", "Mix FM", "Rotana FM", "MBC FM"], artist: ["Fairuz", "Mohammed Abdu", "Umm Kulthum", "Coldplay"],
+        track: ["Li Beirut", "Al Amaken", "Enta Omri", "Yellow", "Kifak Inta"], playlist: ["Evening Oud", "Road Trip", "Kids Songs", "Focus"],
+        album: ["Greatest Hits", "Al Amaken", "Parachutes"] };
+      if (msg.service === "get_library") return { response: { items: items(msg.service_data.media_type,
+        (NAMES[msg.service_data.media_type] || ["Evening Oud"]).slice(0, msg.service_data.favorite ? 2 : 9)) } };
       if (msg.service === "search") return { response: { tracks: items("track", ["Result one", "Result two", "Result three"]), playlists: items("playlist", ["Best of " + msg.service_data.name]) } };
     }
     return [{ id: "u1", is_owner: true, group_ids: ["system-admin"] }];

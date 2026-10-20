@@ -11,7 +11,7 @@
 //   branding: { company, phone, email, website, notes }, admins: [user ids]
 //   prayer: true (prayer card when prayer times exist), music: true, music_players: [...],
 //   music_assistant_entry: <config entry id> (enables search/favourites for non-admin users)
-//   music_library: false (hide Music Assistant's own library on the Music page; shown when its add-on is installed)
+//   music_library: false (hide the music library on the Music page; shown with Music Assistant)
 //   personal: true (each person may pick theme / colour / wallpaper, palette button in the header)
 //   palette: <key> (default colour gradient, see core/appearance.js), wallpaper: false (palette as background)
 //   appearance_themes: [theme names] (limit what people can pick)
@@ -484,14 +484,17 @@ export async function generateDashboard(config, rawHass) {
   }
   const maAddon = cfg.music !== false && cfg.music_library !== false ? musicAssistantAddon(hass) : null;
   if (on("media") && (players.length || all("media").length || maAddon)) {
-    // Music page: full player (search, favourites, rooms), every speaker grouped by room,
-    // then Music Assistant's own library in the person's colours
+    // Music page: full player (search, favourites, rooms), every speaker grouped by room, then the music
+    // library in our design (its "Music Assistant" button opens MA's own app in the person's colours)
     const secs = [];
     if (players.length) secs.push(section([musicCard({ variant: "full" })], 2));
     rooms.filter((r) => r.media.length).forEach((r) => secs.push(section([heading(r.name, r.icon, roomPath(r)),
       ...r.media.map((e) => withLang({ type: "custom:ajnetweb-music-card", entities: [e.entity_id], variant: "compact",
                                        grid_options: { columns: 12 } }))])));
-    if (maAddon) secs.push(section([withLang({ type: "custom:ajnetweb-music-library-card", grid_options: { columns: "full" } })], 4));
+    if (cfg.music_library !== false && (maAddon || players.some((id) => hass.states[id] && hass.states[id].attributes.mass_player_type))) {
+      secs.push(section([withLang({ type: "custom:ajnetweb-music-browser-card", entities: players, grid_options: { columns: "full" },
+        ...(cfg.music_assistant_entry ? { music_assistant_entry: cfg.music_assistant_entry } : {}) })], 4));
+    }
     views.push(view(t("music"), "media", "mdi:music", secs));
   }
   if (on("installer") && hass.user && hass.user.is_admin) views.push(await installerView(cfg, hass, t, model, view, section, heading));

@@ -27,13 +27,18 @@ Versions at the time of writing:
 how to play music from it (Spotify, YouTube Music, others) and set up what can be set up from our add-on.
 
 **Done:**
-- `custom:ajnetweb-music-library-card`: Music Assistant's own app on the dashboard's Music page, repainted with
-  the person's appearance (theme, colour, light/dark). Full-screen button. Strategy option `music_library`.
+- `custom:ajnetweb-music-browser-card` on the Music page: Music Assistant's library (favourites, playlists,
+  radio, albums, artists, songs, search) as tiles in the dashboard's own design; tap to play on the chosen
+  speaker. Data from MA's integration services and HA's media browser. Strategy option `music_library`.
+- `custom:ajnetweb-music-library-card`: Music Assistant's own app, repainted with the person's appearance;
+  opened full screen by the library's *Music Assistant* button (for its settings and music sources).
 - Studio → Music tab (`music_setup.py`): live checks, install/start Music Assistant, connect it to HA,
   speakers count, YouTube Music helper add-on, and a guide per music service.
 - Preview: `dev/fake-ma.html` stands in for Music Assistant (same colour variables); `?ma=0` hides it.
 
 **Decisions:**
+- *Our own library cards first, MA's app second.* Mukto saw that MA's app with our colours still looks like
+  MA (its layout, fonts, shapes). The everyday browsing is therefore our card; MA's app is only for settings.
 - *Theme through the dashboard, not the sidebar.* Music Assistant opens through HA ingress, which is the same
   web address as the dashboard, so our card can add a stylesheet to it. It sets Music Assistant's own colour
   variables (Vuetify `--v-theme-*`, Tailwind tokens) for both its modes. Nothing in Music Assistant changes;
