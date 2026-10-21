@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import re
 import ssl
 import shlex
 import subprocess
@@ -32,7 +33,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.3.0")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.3.1")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -50,7 +51,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.3.0"
+        AGENT_VERSION = "1.3.1"
     return AGENT_VERSION
 
 LABELS = {
@@ -67,6 +68,45 @@ LABELS = {
 }
 # harmless or protective actions that work even with management off
 ALWAYS_ALLOWED = {"refresh", "reconnect", "revoke_temp_access", "consent_off"}
+
+# Diagnostic console: exact argument vectors only (kept identical in control/app/management.py).
+# Free-form arguments let "curl -I -w @/homeassistant/.storage/auth ..." read any file and
+# "ha ..." drive the whole Supervisor.
+DIAG_FIXED = {
+    ("uptime",), ("free",), ("free", "-m"), ("free", "-h"), ("df",), ("df", "-h"),
+    ("top", "-b", "-n", "1"), ("cat", "/etc/resolv.conf"), ("netstat", "-rn"), ("netstat", "-tuln"),
+    ("ip", "a"), ("ip", "addr"), ("ip", "addr", "show"), ("ip", "route"), ("ip", "route", "show"),
+    ("ip", "link"), ("ip", "link", "show"), ("ip", "neigh"), ("ip", "neigh", "show"),
+    ("ha", "core", "check"), ("ha", "core", "info"), ("ha", "host", "info"), ("ha", "network", "info"),
+    ("ha", "os", "info"), ("ha", "supervisor", "info"), ("ha", "resolution", "info"),
+}
+_DIAG_HOST = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$"
+                        r"|^[0-9A-Fa-f]{0,4}(?::[0-9A-Fa-f]{0,4}){2,7}$")
+_DIAG_URL = re.compile(r"^https?://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~/-]*)?$")
+
+
+def diag_argv(raw: str) -> tuple:
+    """Parse a console command: (argv, "") when it is allowed, otherwise (None, reason)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None, "no command specified"
+    if len(raw) > 120 or any(ch in raw for ch in ";&|`$<>(){}\n\\'\"@*?!#%"):
+        return None, "only the listed diagnostic commands are permitted"
+    try:
+        argv = shlex.split(raw)
+    except ValueError:
+        return None, "could not parse command"
+    n = len(argv)
+    if tuple(argv) in DIAG_FIXED:
+        return argv, ""
+    if n == 4 and argv[:2] == ["ping", "-c"] and argv[2] in [str(i) for i in range(1, 11)] \
+            and _DIAG_HOST.match(argv[3]):
+        return argv, ""
+    if 2 <= n <= 3 and argv[0] == "traceroute" and argv[1:-1] in ([], ["-n"]) and _DIAG_HOST.match(argv[-1]):
+        return argv, ""
+    if n == 3 and argv[0] == "curl" and argv[1] in ("-I", "-sI") and _DIAG_URL.match(argv[2]):
+        return argv, ""
+    return None, f"'{raw[:40]}' is not one of the permitted diagnostic commands"
 SERVER_CONN = F.ServerConn(SERVER)
 _inventory_cache: dict = {"at": 0.0, "devices": []}
 _last_diag: dict = {}
@@ -429,46 +469,16 @@ def execute(cmd: dict) -> tuple[str, str, str]:
         return "ok", (f"hub {_last_diag.get('hub_tcp_ms')} ms, down {_last_diag.get('download_mbps')} Mbit/s, "
                       f"up {_last_diag.get('upload_mbps')} Mbit/s"), json.dumps(_last_diag, indent=2)
     if kind == "diag_exec":
-        raw_cmd = (args.get("command") or "").strip()
-        if not raw_cmd:
-            return "error", "no command specified", ""
-        # Parsed and run without a shell: a prefix check + shell=True let
-        # "uptime; cat /data/ajn/client.key" through.
-        if any(ch in raw_cmd for ch in ";&|`$<>(){}\n\\"):
-            return "rejected", "shell operators are not permitted in the diagnostic console", ""
+        # Run without a shell, and only exact allow-listed argument vectors (see DIAG_FIXED).
+        argv, why = diag_argv(args.get("command") or "")
+        if argv is None:
+            return "rejected", why, ""
         try:
-            argv = shlex.split(raw_cmd)
-        except ValueError as ex:
-            return "rejected", f"could not parse command: {ex}", ""
-        allowed_args = {
-            "ha": None, "ping": None, "traceroute": None, "ip": None, "uptime": None, "free": None,
-            "df": None, "netstat": None,
-            "cat": {"/etc/resolv.conf"},
-            "top": {"-b", "-n", "1"},
-            "curl": None,
-        }
-        prog = argv[0] if argv else ""
-        if prog not in allowed_args:
-            return "rejected", f"command '{raw_cmd[:40]}' is not permitted in the diagnostic console", ""
-        if allowed_args[prog] is not None and not set(argv[1:]) <= allowed_args[prog]:
-            return "rejected", f"arguments not permitted for '{prog}'", ""
-        if prog == "curl" and not ({"-I", "-sI", "--head"} & set(argv[1:])):
-            return "rejected", "only header requests (curl -I) are permitted", ""
-        if prog == "curl" and any(a.startswith(("-o", "--output", "-K", "--config", "-T", "--upload", "-d", "--data", "-F"))
-                                  for a in argv[1:]):
-            return "rejected", "curl output/upload options are not permitted", ""
-        try:
-            res = subprocess.run(
-                argv,
-                shell=False,
-                capture_output=True,
-                text=True,
-                timeout=min(int(args.get("timeout") or 25), 45)
-            )
+            res = subprocess.run(argv, shell=False, capture_output=True, text=True, timeout=45)
             out = res.stdout + ("\n--- STDERR ---\n" + res.stderr if res.stderr else "")
             return "ok" if res.returncode == 0 else "error", f"exit code {res.returncode}", out
         except subprocess.TimeoutExpired:
-            return "error", "command timed out after 30s", ""
+            return "error", "command timed out after 45s", ""
         except Exception as ex:
             return "error", str(ex), ""
     if kind == "apply_template":

@@ -25,7 +25,7 @@ FROM $BUILD_FROM
 ARG BUILD_ARCH
 ARG FRP_VERSION=0.71.1
 ARG AJN_SERVER=""
-ARG AJN_AGENT_VERSION=1.3.0
+ARG AJN_AGENT_VERSION=1.3.1
 
 # nginx: local header adapter in front of HA   openssl: key + CSR generation (key never leaves /data)
 RUN apk add --no-cache nginx openssl python3 \

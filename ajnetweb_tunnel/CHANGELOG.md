@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+- **Security:** the remote diagnostic console now accepts only an exact list of read-only commands
+  (`uptime`, `free`, `df`, `top -b -n 1`, `ip addr/route/link/neigh`, `netstat -rn/-tuln`,
+  `cat /etc/resolv.conf`, `ha core check` and the `ha … info` commands, `ping -c 1-10 <host>`,
+  `traceroute [-n] <host>`, `curl -I <url>`). Before, `curl` and `ha` took any arguments, so for example
+  `curl -I -w @<file>` could print files from `/homeassistant` and `/data`.
+
 ## 1.3.0
 - **Licence authority for all AJ Netweb add-ons.** When this Home Assistant is activated and the
   subscription is active, Remote Access publishes a signed licence signal
