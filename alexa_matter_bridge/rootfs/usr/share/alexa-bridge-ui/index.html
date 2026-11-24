@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Alexa Matter Bridge</title>
+  <style>
+    :root {
+      --bg: #1a1b1e;
+      --card: #25262b;
+      --border: #373a40;
+      --accent: #00b4d8;
+      --accent2: #0077b6;
+      --green: #40c057;
+      --red: #fa5252;
+      --yellow: #fab005;
+      --text: #c9d1d9;
+      --muted: #868e96;
+      --alexa: #00caff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+    }
+    header {
+      background: linear-gradient(135deg, #003d5b 0%, #00b4d8 100%);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    header .alexa-icon {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 600; color: #fff; }
+    header .sub { font-size: 0.8rem; color: rgba(255,255,255,0.7); }
+    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+    /* ── Status Cards ── */
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .stat-card .value { font-size: 1.4rem; font-weight: 700; }
+    .stat-card .value.green { color: var(--green); }
+    .stat-card .value.red { color: var(--red); }
+    .stat-card .value.alexa { color: var(--alexa); }
+    .stat-card .hint { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section ── */
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .section-header h2 { font-size: 0.95rem; font-weight: 600; }
+    .section-body { padding: 16px 18px; }
+
+    /* ── Entity List ── */
+    .entity-list { list-style: none; }
+    .entity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .entity-item:last-child { border-bottom: none; }
+    .domain-badge {
+      font-size: 0.68rem;
+      background: rgba(0, 180, 216, 0.15);
+      color: var(--alexa);
+      border: 1px solid rgba(0, 180, 216, 0.3);
+      padding: 2px 7px;
+      border-radius: 4px;
+      min-width: 60px;
+      text-align: center;
+    }
+    .entity-name { flex: 1; font-size: 0.88rem; }
+    .entity-id { font-size: 0.72rem; color: var(--muted); font-family: monospace; }
+    .entity-state {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(64, 192, 87, 0.15);
+      color: var(--green);
+    }
+    .entity-state.off { background: rgba(134,142,150,0.15); color: var(--muted); }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 7px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 500;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent2); color: #fff; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-danger { background: rgba(250,82,82,0.15); color: var(--red); border: 1px solid rgba(250,82,82,0.3); }
+
+    /* ── Pairing box ── */
+    .pairing-box {
+      background: rgba(0, 180, 216, 0.08);
+      border: 1px solid rgba(0, 180, 216, 0.25);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .pairing-box h3 { font-size: 0.9rem; color: var(--alexa); margin-bottom: 8px; }
+    .pairing-box ol { padding-left: 18px; font-size: 0.84rem; line-height: 1.8; color: var(--text); }
+    .pairing-box code {
+      background: rgba(0,0,0,0.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: var(--alexa);
+    }
+
+    /* ── Backup section ── */
+    .backup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .backup-status {
+      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(64,192,87,0.1);
+      color: var(--green);
+      border: 1px solid rgba(64,192,87,0.3);
+    }
+    .backup-status.missing { background: rgba(250,82,82,0.1); color: var(--red); border-color: rgba(250,82,82,0.3); }
+
+    /* ── Spinner ── */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 16px;
+      font-size: 0.85rem; max-width: 300px;
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: var(--green); color: var(--green); }
+    #toast.error { border-color: var(--red); color: var(--red); }
+
+    .empty-state { text-align: center; color: var(--muted); padding: 32px; font-size: 0.88rem; }
+    .loading { color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="alexa-icon">🔵</div>
+  <div>
+    <h1>Alexa Matter Bridge</h1>
+    <div class="sub">Local — No cloud auth — AJ Network Solutions</div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Status Cards -->
+  <div class="status-grid" id="statusGrid">
+    <div class="stat-card">
+      <div class="label">Bridge Status</div>
+      <div class="value" id="bridgeStatus">Loading…</div>
+      <div class="hint">Matterbridge process</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Exposed to Alexa</div>
+      <div class="value alexa" id="entityCount">—</div>
+      <div class="hint">Entities with label</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Matter Port</div>
+      <div class="value alexa" id="matterPort">—</div>
+      <div class="hint">UDP + TCP</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Last Backup</div>
+      <div class="value" id="lastBackup" style="font-size:0.9rem">—</div>
+      <div class="hint">Commissioning data</div>
+    </div>
+  </div>
+
+  <!-- Pairing Instructions -->
+  <div class="section">
+    <div class="section-header">
+      <h2>🔗 Pair with Alexa (One-time)</h2>
+      <button class="btn btn-ghost" onclick="openMatterbridge()">Open Matterbridge UI ↗</button>
+    </div>
+    <div class="section-body">
+      <div class="pairing-box">
+        <h3>Steps to pair your Alexa with Home Assistant:</h3>
+        <ol>
+          <li>Open <strong>Matterbridge UI</strong> (button above) and copy the <code>Pairing Code</code></li>
+          <li>Open the <strong>Alexa app</strong> → Devices → <code>+</code> → Add Device → Matter</li>
+          <li>Select <code>Yes, it has a code</code> → enter or scan the pairing code</li>
+          <li>Alexa discovers all exposed entities automatically</li>
+          <li>After pairing, <strong>internet is not required</strong> for device control</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exposed Entities -->
+  <div class="section">
+    <div class="section-header">
+      <h2>📋 Exposed Entities</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="exposeLabel" class="domain-badge" style="min-width:auto;">alexa</span>
+        <button class="btn btn-ghost" onclick="loadStatus()">↻ Refresh</button>
+      </div>
+    </div>
+    <div class="section-body">
+      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">
+        Tag any entity in Home Assistant with the <code style="background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:4px;color:var(--alexa);">alexa</code> label 
+        to expose it. You can do this in HA → Settings → Entities → select entity → Labels.
+      </p>
+      <ul class="entity-list" id="entityList">
+        <li class="loading">Loading entities…</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Backup / Restore -->
+  <div class="section">
+    <div class="section-header">
+      <h2>💾 Commissioning Backup</h2>
+    </div>
+    <div class="section-body">
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
+        The backup saves your Alexa pairing keys. If HA is reinstalled, the backup allows automatic re-connection without re-pairing.
+      </p>
+      <div class="backup-row">
+        <span class="backup-status missing" id="backupStatus">Checking…</span>
+        <button class="btn btn-primary" id="backupBtn" onclick="runBackup()">Back Up Now</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let currentStatus = null;
+
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `show ${type}`;
+    setTimeout(() => { t.className = ''; }, 3500);
+  }
+
+  function openMatterbridge() {
+    // Matterbridge UI runs on the same host, port 8283
+    const host = window.location.hostname;
+    window.open(`http://${host}:8283`, '_blank');
+  }
+
+  function renderEntities(entities, label) {
+    document.getElementById('exposeLabel').textContent = label;
+    const list = document.getElementById('entityList');
+    if (!entities || entities.length === 0) {
+      list.innerHTML = '<li class="empty-state">No entities exposed yet.<br>Add the <strong>alexa</strong> label to entities in HA to expose them here.</li>';
+      return;
+    }
+    list.innerHTML = entities.map(e => `
+      <li class="entity-item">
+        <span class="domain-badge">${e.domain}</span>
+        <span class="entity-name">
+          ${e.name}
+          <br><span class="entity-id">${e.entity_id}</span>
+        </span>
+        <span class="entity-state ${e.state === 'off' || e.state === 'unavailable' ? 'off' : ''}">${e.state}</span>
+      </li>
+    `).join('');
+  }
+
+  async function loadStatus() {
+    try {
+      const resp = await fetch('/api/status');
+      const data = await resp.json();
+      currentStatus = data;
+
+      const b = data.bridge;
+
+      // Bridge running
+      const statusEl = document.getElementById('bridgeStatus');
+      statusEl.textContent = b.bridge_running ? '● Running' : '○ Stopped';
+      statusEl.className = `value ${b.bridge_running ? 'green' : 'red'}`;
+
+      // Entity count
+      document.getElementById('entityCount').textContent = data.exposed_entities.length;
+
+      // Matter port
+      document.getElementById('matterPort').textContent = b.matter_port || '5540';
+
+      // Last backup
+      const lbEl = document.getElementById('lastBackup');
+      if (b.last_backup) {
+        const d = new Date(b.last_backup);
+        lbEl.textContent = d.toLocaleString();
+        lbEl.className = 'value green';
+      } else {
+        lbEl.textContent = 'Never';
+        lbEl.className = 'value red';
+      }
+
+      // Backup status
+      const bsEl = document.getElementById('backupStatus');
+      if (b.backup_exists) {
+        bsEl.textContent = '✓ Backup found';
+        bsEl.className = 'backup-status';
+      } else {
+        bsEl.textContent = '⚠ No backup — click "Back Up Now"';
+        bsEl.className = 'backup-status missing';
+      }
+
+      renderEntities(data.exposed_entities, b.expose_label || 'alexa');
+    } catch (e) {
+      console.error('Failed to load status:', e);
+    }
+  }
+
+  async function runBackup() {
+    const btn = document.getElementById('backupBtn');
+    btn.innerHTML = '<span class="spinner"></span> Backing up…';
+    btn.disabled = true;
+    try {
+      const resp = await fetch('/api/backup');
+      const data = await resp.json();
+      if (data.success) {
+        showToast('✓ Commissioning backup complete!', 'success');
+        await loadStatus();
+      } else {
+        showToast('✗ Backup failed — check add-on logs', 'error');
+      }
+    } catch (e) {
+      showToast('✗ Request failed', 'error');
+    } finally {
+      btn.innerHTML = 'Back Up Now';
+      btn.disabled = false;
+    }
+  }
+
+  // Load on start, refresh every 30 seconds
+  loadStatus();
+  setInterval(loadStatus, 30000);
+</script>
+
+</body>
+</html>

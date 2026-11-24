@@ -1,0 +1,81 @@
+##
+## alexa-matter-bridge/config.yaml
+## Home Assistant Add-on: Alexa Matter Bridge
+##
+## Wraps Matterbridge with auto-configuration, entity management,
+## commissioning backup/restore, and a simple status UI.
+##
+
+name: "Alexa Matter Bridge"
+version: "1.1.3"
+slug: "alexa_matter_bridge"
+description: >
+  Exposes Home Assistant entities to Alexa locally via the Matter protocol.
+  No cloud authentication, no expiring tokens — device control stays on your LAN.
+  Powered by Matterbridge.
+url: "https://github.com/ajnetworksa/aj-netweb-addon"
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: services
+boot: auto
+init: false
+homeassistant_api: true
+hassio_api: true
+hassio_role: default
+auth_api: false
+webui: "http://[HOST]:[PORT:8283]"
+panel_icon: "mdi:amazon-alexa"
+panel_title: "Alexa Bridge"
+
+ports:
+  5540/tcp: 5540
+  5540/udp: 5540
+  8283/tcp: 8283
+
+ports_description:
+  5540/tcp: "Matter bridge commissioning & control (TCP)"
+  5540/udp: "Matter bridge commissioning & control (UDP)"
+  8283/tcp: "Matterbridge Web UI"
+
+map:
+  - config:rw
+  - data:rw
+
+host_network: true
+
+options:
+  matter_port: 5540
+  log_level: "info"
+  auto_expose_label: ""
+  ha_url: "ws://127.0.0.1:8123"
+  ha_token: ""
+  backup_commissioning: true
+  excluded_entity_prefixes:
+    - "automation."
+    - "scene."
+    - "script."
+    - "group."
+    - "device_tracker."
+    - "person."
+    - "zone."
+    - "timer."
+    - "input_boolean."
+    - "input_number."
+    - "input_select."
+    - "input_text."
+    - "input_datetime."
+    - "counter."
+
+schema:
+  matter_port: int
+  log_level: "list(debug|info|warn|error)"
+  auto_expose_label: str?
+  ha_url: str?
+  ha_token: password?
+  backup_commissioning: bool
+  excluded_entity_prefixes:
+    - str
