@@ -21,6 +21,26 @@ How the dashboard works: the Studio stores **options** in `/data/project.json` a
 builds every view **in the browser** from HA's areas, floors and devices, separately for each user.
 Nothing in the generated dashboard is stored; it is rebuilt on every load.
 
+## Works together with AJ Audio (wall panels) – read `../INTEGRATION.md` first
+
+This repo is one of three in the AJ workspace (`D:\Devlopment\AJ`). The AJ Panel app on the wall panels
+(`../aj-audio`) and the AJ Netweb control plane (`../aj-netweb-platform`) read things this repo produces.
+**[`../INTEGRATION.md`](../INTEGRATION.md) lists every shared name and contract.** Before you change any of these, read
+the matching contract and update that file in the same change (contract + change log + open items):
+
+| If you change … | Contract | Also affects |
+|---|---|---|
+| Room Access matrix / `sensor.ajnetweb_room_access` format (`ajnetweb_sharing/server.py`) | C2 | AJ Panel `Dash.java` reads it – add fields, never rename |
+| Device classification (`ajnetweb-ui/src/core/model.js`, Python discovery) | C3 | AJ Panel mirrors the same word lists and rules |
+| Room naming / order / "General" | C4 | AJ Panel shows rooms the same way |
+| Panel users, wall-panel docs (`ajnetweb-ui/docs/05-wall-panels.md`) | C5 | one non-admin HA user per panel, also used by AJ Panel |
+| Agent audio collection (`ajnetweb_tunnel/audio.py`) | C1, C7 | panel `/api/info` fields; control plane alerts |
+| Licensing | C8 | planned `audio` product for AJ Panel |
+| Themes, Arabic wording | C9 | AJ Panel uses the same brand colours and Arabic terms |
+| Any add-on port | Ports table | e.g. guest portal 8097 vs Music Assistant stream 8097 |
+
+Never write AJ Panel's names: HA frontend user data `aj_panel_*`, labels `aj_*`, long-lived tokens named `AJ Panel · …`.
+
 ## Golden rules
 
 1. **Never hand-write the generated dashboard.** Change the strategy, a card, or a Studio option. Client
@@ -47,6 +67,8 @@ Nothing in the generated dashboard is stored; it is rebuilt on every load.
    make (e.g. `lovelace/config` read, `history/*`, `recorder/statistics_during_period`,
    `energy/get_prefs`); wrap admin-only calls in `try/catch` and degrade gracefully.
 10. **No model or AI names** in commits, code comments or docs.
+11. **Cross-project contracts** (`../INTEGRATION.md`): additive changes only, one owner per name, update the file in
+    the same change. Wall panels running AJ Panel must keep working with every add-on version.
 
 ## Workflow
 
@@ -78,6 +100,7 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
 | Device classification (what counts as a light, gate, …) | `src/core/model.js` (keep in sync with the add-on's Python discovery) |
 | Themes | `ajnetweb_dashboard/themes.py`, `ajnetweb-ui/docs/04-themes-branding.md` |
 | Add-on pages following the dashboard look | `ajnetweb-ui/src/look/addon-look.js` (built into each add-on's `www/ajnetweb-look.js`), the `data-vars` map in each `www/index.html` |
+| Something AJ Panel or the control plane also uses | `../INTEGRATION.md` first (contract + change log + open items) |
 | Studio backend endpoints | `ajnetweb_dashboard/server.py` → `dashboard_engine.py` (validate every input) |
 
 ## Release checklist (every change that ships)
@@ -88,10 +111,11 @@ npm run build          # writes dist/ajnetweb-ui.js and copies it to ajnetweb_da
    version. Branches, channels and images: [`docs/releasing.md`](docs/releasing.md).
 2. `npm run build` and commit **both** bundles (`dist/ajnetweb-ui.js`, `www/ajnetweb-card-suite.js`) and the
    `www/ajnetweb-look.js` copies in the add-ons.
-3. `CHANGELOG.md` of each changed add-on, and a section at the top of `docs/project-record.md`
+3. If a shared contract changed: `../INTEGRATION.md` (contract text, change log row, open items).
+4. `CHANGELOG.md` of each changed add-on, and a section at the top of `docs/project-record.md`
    (Asked for / Done / Decisions / Open; update the version table).
-4. Docs: the playbook (`01`), options (`02`), cards (`03`) when they change.
-5. Remove `__pycache__`; never commit `node_modules`, `/data`, keys or client files.
+5. Docs: the playbook (`01`), options (`02`), cards (`03`) when they change.
+6. Remove `__pycache__`; never commit `node_modules`, `/data`, keys or client files.
 
 ## Don'ts
 

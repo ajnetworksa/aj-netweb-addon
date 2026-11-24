@@ -17,6 +17,14 @@ at a low brightness, and screen-off timer 0 (never off). Motion and dimming need
 the tablet doesn't support are listed as failed and the rest still apply. The settings you pick are saved
 for the next tablet.
 
+## Option 0 — AJ wall panels (AJ Panel app)
+
+AJ's own wall panels (Judian / DSPPA panels) run the native **AJ Panel** app instead of a browser page: its
+dashboard is built from the same areas and devices with the same rules (see `../../../INTEGRATION.md` C3/C4).
+Give each panel its own non-admin HA user (e.g. `panel-majlis`), sign the panel in with it, and set the panel's
+rooms and **Device room** in **Room Access** – the panel follows the matrix live (C2). Hide a single device on all
+panels with the HA label **AJ hide**.
+
 ## Option A — Home Assistant Companion app (simplest)
 
 1. Install the Companion app, log in with a dedicated **non-admin** user per panel
