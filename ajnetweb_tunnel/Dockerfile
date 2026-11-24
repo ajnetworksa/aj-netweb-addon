@@ -7,13 +7,13 @@ ARG BUILD_FROM
 FROM $BUILD_FROM AS agent
 ARG AJN_COMPILE=false
 ARG NUITKA_VERSION=4.2.2
-COPY agent.py features.py attest.py /src/
+COPY agent.py features.py attest.py audio.py /src/
 RUN mkdir -p /out \
  && if [ "${AJN_COMPILE}" = "true" ]; then \
       apk add --no-cache python3 python3-dev py3-pip gcc musl-dev patchelf \
    && pip3 install --no-cache-dir --break-system-packages "nuitka==${NUITKA_VERSION}" \
    && cd /src \
-   && for m in features attest agent; do \
+   && for m in features attest audio agent; do \
         python3 -m nuitka --module --no-pyi-file --remove-output --python-flag=no_docstrings,no_asserts --output-dir=/out "${m}.py" || exit 1; \
       done \
    && ls -la /out; \
@@ -25,7 +25,7 @@ FROM $BUILD_FROM
 ARG BUILD_ARCH
 ARG FRP_VERSION=0.71.1
 ARG AJN_SERVER=""
-ARG AJN_AGENT_VERSION=1.3.1
+ARG AJN_AGENT_VERSION=1.4.0
 
 # nginx: local header adapter in front of HA   openssl: key + CSR generation (key never leaves /data)
 RUN apk add --no-cache nginx openssl python3 \

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0
+- **AJ Audio status (multi-room music).** On sites with Music Assistant the status report now includes
+  the Music Assistant add-on (running, version), whether the AriaCast Receiver and Snapcast providers are
+  loaded, and every AJ wall panel (online, app version, sync connection and drops, crashes, automatic
+  updates, Zigbee bridge) read from the panel's local status page. AJ Netweb uses it to warn your installer
+  (panel offline > 10 min, unstable sync, Music Assistant down, AriaCast missing, failed panel update,
+  panel app crash, Zigbee bridge error) before you notice.
+  - New options `music_assistant_token` (long-lived token of a Music Assistant admin user, needed to list
+    the panels) and `music_assistant_url` (only if Music Assistant is not on this Home Assistant).
+  - Read-only: nothing is changed in Music Assistant or on the panels.
+  - Panel names, addresses and models are only shared while *Allow installer management* is on; otherwise
+    panels are reported by an anonymous id.
+
 ## 1.3.1
 - **Security:** the remote diagnostic console now accepts only an exact list of read-only commands
   (`uptime`, `free`, `df`, `top -b -n 1`, `ip addr/route/link/neigh`, `netstat -rn/-tuln`,
