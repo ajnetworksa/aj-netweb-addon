@@ -1,392 +1,275 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Alexa Matter Bridge</title>
-  <style>
-    :root {
-      --bg: #1a1b1e;
-      --card: #25262b;
-      --border: #373a40;
-      --accent: #00b4d8;
-      --accent2: #0077b6;
-      --green: #40c057;
-      --red: #fa5252;
-      --yellow: #fab005;
-      --text: #c9d1d9;
-      --muted: #868e96;
-      --alexa: #00caff;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      padding: 0;
-    }
-    header {
-      background: linear-gradient(135deg, #003d5b 0%, #00b4d8 100%);
-      padding: 18px 24px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-    }
-    header .alexa-icon {
-      width: 36px; height: 36px;
-      background: rgba(255,255,255,0.15);
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px;
-    }
-    header h1 { font-size: 1.3rem; font-weight: 600; color: #fff; }
-    header .sub { font-size: 0.8rem; color: rgba(255,255,255,0.7); }
-    .container { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
-
-    /* ── Status Cards ── */
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
-      margin-bottom: 24px;
-    }
-    .stat-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 16px;
-    }
-    .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-    .stat-card .value { font-size: 1.4rem; font-weight: 700; }
-    .stat-card .value.green { color: var(--green); }
-    .stat-card .value.red { color: var(--red); }
-    .stat-card .value.alexa { color: var(--alexa); }
-    .stat-card .hint { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
-
-    /* ── Section ── */
-    .section {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      margin-bottom: 20px;
-      overflow: hidden;
-    }
-    .section-header {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .section-header h2 { font-size: 0.95rem; font-weight: 600; }
-    .section-body { padding: 16px 18px; }
-
-    /* ── Entity List ── */
-    .entity-list { list-style: none; }
-    .entity-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .entity-item:last-child { border-bottom: none; }
-    .domain-badge {
-      font-size: 0.68rem;
-      background: rgba(0, 180, 216, 0.15);
-      color: var(--alexa);
-      border: 1px solid rgba(0, 180, 216, 0.3);
-      padding: 2px 7px;
-      border-radius: 4px;
-      min-width: 60px;
-      text-align: center;
-    }
-    .entity-name { flex: 1; font-size: 0.88rem; }
-    .entity-id { font-size: 0.72rem; color: var(--muted); font-family: monospace; }
-    .entity-state {
-      font-size: 0.75rem;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: rgba(64, 192, 87, 0.15);
-      color: var(--green);
-    }
-    .entity-state.off { background: rgba(134,142,150,0.15); color: var(--muted); }
-
-    /* ── Buttons ── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border-radius: 7px;
-      border: none;
-      cursor: pointer;
-      font-size: 0.82rem;
-      font-weight: 500;
-      transition: opacity 0.15s, transform 0.1s;
-    }
-    .btn:hover { opacity: 0.85; }
-    .btn:active { transform: scale(0.97); }
-    .btn-primary { background: var(--accent2); color: #fff; }
-    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    .btn-danger { background: rgba(250,82,82,0.15); color: var(--red); border: 1px solid rgba(250,82,82,0.3); }
-
-    /* ── Pairing box ── */
-    .pairing-box {
-      background: rgba(0, 180, 216, 0.08);
-      border: 1px solid rgba(0, 180, 216, 0.25);
-      border-radius: 8px;
-      padding: 16px;
-    }
-    .pairing-box h3 { font-size: 0.9rem; color: var(--alexa); margin-bottom: 8px; }
-    .pairing-box ol { padding-left: 18px; font-size: 0.84rem; line-height: 1.8; color: var(--text); }
-    .pairing-box code {
-      background: rgba(0,0,0,0.3);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-family: monospace;
-      color: var(--alexa);
-    }
-
-    /* ── Backup section ── */
-    .backup-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .backup-status {
-      font-size: 0.8rem;
-      padding: 4px 10px;
-      border-radius: 6px;
-      background: rgba(64,192,87,0.1);
-      color: var(--green);
-      border: 1px solid rgba(64,192,87,0.3);
-    }
-    .backup-status.missing { background: rgba(250,82,82,0.1); color: var(--red); border-color: rgba(250,82,82,0.3); }
-
-    /* ── Spinner ── */
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Toast ── */
-    #toast {
-      position: fixed; bottom: 20px; right: 20px;
-      background: var(--card); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px 16px;
-      font-size: 0.85rem; max-width: 300px;
-      transform: translateY(80px); opacity: 0;
-      transition: all 0.3s ease;
-      z-index: 1000;
-    }
-    #toast.show { transform: translateY(0); opacity: 1; }
-    #toast.success { border-color: var(--green); color: var(--green); }
-    #toast.error { border-color: var(--red); color: var(--red); }
-
-    .empty-state { text-align: center; color: var(--muted); padding: 32px; font-size: 0.88rem; }
-    .loading { color: var(--muted); font-size: 0.85rem; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Alexa Bridge</title>
+<style>
+  :root { --bg:#f4f5f8; --card:#fff; --card2:#f0f2f6; --border:#e2e5ec; --text:#151823; --muted:#5f6577;
+          --accent:#0a8fd1; --ok:#1f9d55; --warn:#c98a0b; --bad:#d64545; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0e1015; --card:#171a21; --card2:#1f232c; --border:#2a2f3a; --text:#eef1f6; --muted:#9aa3b5; --accent:#3ab4ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1000px; margin:0 auto; padding:16px; display:grid; gap:16px; }
+  header { display:flex; align-items:center; gap:12px; }
+  .logo { width:40px; height:40px; border-radius:12px; background:var(--accent); color:#fff; display:grid; place-items:center; font-weight:800; }
+  h1 { font-size:17px; margin:0; } h2 { font-size:16px; margin:0 0 4px; }
+  .muted { color:var(--muted); } .small { font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .kpi { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:14px; }
+  .kpi b { display:block; font-size:18px; } .kpi span { font-size:12px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-inline-end:6px; background:var(--muted); }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--bad); } .dot.warn { background:var(--warn); }
+  .btn { font:inherit; font-weight:600; padding:9px 16px; min-height:40px; border-radius:10px; border:1px solid var(--border);
+         background:var(--card); color:var(--text); cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.small { padding:5px 10px; min-height:30px; font-size:12px; }
+  .btn:disabled { opacity:.55; }
+  .pair { display:grid; grid-template-columns:auto 1fr; gap:18px; align-items:center; }
+  .qr { background:#fff; padding:10px; border-radius:12px; width:180px; height:180px; display:grid; place-items:center; }
+  .qr svg, .qr img { width:160px; height:160px; }
+  .code { font:600 26px ui-monospace,Menlo,monospace; letter-spacing:.06em; }
+  .banner { padding:12px 14px; border-radius:12px; background:rgba(201,138,11,.12); border:1px solid rgba(201,138,11,.4);
+            display:none; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+  .banner.show { display:flex; }
+  .tools { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  input[type=search], select { font:inherit; padding:8px 12px; border-radius:10px; border:1px solid var(--border);
+        background:var(--card2); color:var(--text); min-height:40px; }
+  input[type=search] { flex:1; min-width:180px; }
+  .group { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:14px 0 4px; }
+  .ent { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; padding:8px 6px; border-radius:8px; }
+  .ent:hover { background:var(--card2); }
+  .ent .id { font-size:11px; color:var(--muted); word-break:break-all; }
+  .say { font-size:12px; color:var(--accent); }
+  .gdesc { font-size:12px; color:var(--muted); margin:-2px 0 4px; }
+  .tag { font-size:11px; padding:1px 7px; border-radius:999px; background:var(--card2); color:var(--muted); margin-inline-start:6px; }
+  .tag.warn { color:var(--warn); }
+  .switch { position:relative; width:42px; height:24px; flex:none; }
+  .switch input { opacity:0; width:0; height:0; }
+  .switch span { position:absolute; inset:0; border-radius:12px; background:var(--border); transition:.2s; cursor:pointer; }
+  .switch span::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
+  .switch input:checked + span { background:var(--accent); }
+  .switch input:checked + span::after { transform:translateX(18px); }
+  .switch input:disabled + span { opacity:.5; cursor:not-allowed; }
+  pre { background:var(--card2); border-radius:10px; padding:12px; max-height:360px; overflow:auto; font-size:11px; white-space:pre-wrap; }
+  ol { margin:6px 0; padding-inline-start:20px; }
+  @media (max-width:560px) { .pair { grid-template-columns:1fr; justify-items:center; text-align:center; } }
+</style>
 </head>
 <body>
+<div class="wrap">
+  <header>
+    <div class="logo">A</div>
+    <div><h1>Alexa Bridge</h1><div class="muted small" id="ver">Local Alexa control through Matter</div></div>
+  </header>
 
-<header>
-  <div class="alexa-icon">🔵</div>
-  <div>
-    <h1>Alexa Matter Bridge</h1>
-    <div class="sub">Local — No cloud auth — AJ Network Solutions</div>
-  </div>
-</header>
-
-<div class="container">
-
-  <!-- Status Cards -->
-  <div class="status-grid" id="statusGrid">
-    <div class="stat-card">
-      <div class="label">Bridge Status</div>
-      <div class="value" id="bridgeStatus">Loading…</div>
-      <div class="hint">Matterbridge process</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Exposed to Alexa</div>
-      <div class="value alexa" id="entityCount">—</div>
-      <div class="hint">Entities with label</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Matter Port</div>
-      <div class="value alexa" id="matterPort">—</div>
-      <div class="hint">UDP + TCP</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Last Backup</div>
-      <div class="value" id="lastBackup" style="font-size:0.9rem">—</div>
-      <div class="hint">Commissioning data</div>
-    </div>
+  <div class="banner" id="restartBanner">
+    <span>Device list changed. Restart the bridge to send it to Alexa (about 20 s; pairing is kept).</span>
+    <button class="btn primary small" id="btnRestart">Restart bridge</button>
   </div>
 
-  <!-- Pairing Instructions -->
-  <div class="section">
-    <div class="section-header">
-      <h2>🔗 Pair with Alexa (One-time)</h2>
-      <button class="btn btn-ghost" onclick="openMatterbridge()">Open Matterbridge UI ↗</button>
-    </div>
-    <div class="section-body">
-      <div class="pairing-box">
-        <h3>Steps to pair your Alexa with Home Assistant:</h3>
-        <ol>
-          <li>Open <strong>Matterbridge UI</strong> (button above) and copy the <code>Pairing Code</code></li>
-          <li>Open the <strong>Alexa app</strong> → Devices → <code>+</code> → Add Device → Matter</li>
-          <li>Select <code>Yes, it has a code</code> → enter or scan the pairing code</li>
-          <li>Alexa discovers all exposed entities automatically</li>
-          <li>After pairing, <strong>internet is not required</strong> for device control</li>
+  <div class="kpis">
+    <div class="kpi"><b id="kBridge"><span class="dot"></span>…</b><span>Bridge</span></div>
+    <div class="kpi"><b id="kPair">…</b><span>Alexa pairing</span></div>
+    <div class="kpi"><b id="kExposed">…</b><span>Devices exposed</span></div>
+    <div class="kpi"><b id="kBackup">…</b><span>Last pairing backup</span></div>
+  </div>
+
+  <div class="card" id="pairCard">
+    <h2>Pair with Alexa</h2>
+    <div class="pair">
+      <div class="qr" id="qr"><span class="muted small">Waiting for bridge…</span></div>
+      <div>
+        <div class="muted small">Manual setup code</div>
+        <div class="code" id="manual">—</div>
+        <ol class="muted">
+          <li>Alexa app → <b>Devices</b> → <b>+</b> → <b>Add Device</b> → <b>Other</b> → <b>Matter</b>.</li>
+          <li>Scan this QR code, or choose “Try a different way” and type the code.</li>
+          <li>The phone must be on the same Wi-Fi as Home Assistant, and you need a Matter-capable Echo.</li>
         </ol>
+        <div class="muted small" id="pairNote"></div>
       </div>
     </div>
   </div>
 
-  <!-- Exposed Entities -->
-  <div class="section">
-    <div class="section-header">
-      <h2>📋 Exposed Entities</h2>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <span id="exposeLabel" class="domain-badge" style="min-width:auto;">alexa</span>
-        <button class="btn btn-ghost" onclick="loadStatus()">↻ Refresh</button>
-      </div>
+  <div class="card" id="voiceCard" hidden>
+    <div class="row">
+      <div><h2>Voice commands</h2>
+        <div class="muted small">House modes, scenes, ACs and the adhan, with what to say. Turning one on exposes it
+          like any device below; long helper names get a short one Alexa can hear.</div></div>
+      <button class="btn small" id="btnVoiceAll">Expose all</button>
     </div>
-    <div class="section-body">
-      <p style="font-size:0.8rem;color:var(--muted);margin-bottom:12px;">
-        Tag any entity in Home Assistant with the <code style="background:rgba(0,0,0,0.3);padding:1px 6px;border-radius:4px;color:var(--alexa);">alexa</code> label 
-        to expose it. You can do this in HA → Settings → Entities → select entity → Labels.
-      </p>
-      <ul class="entity-list" id="entityList">
-        <li class="loading">Loading entities…</li>
-      </ul>
-    </div>
+    <div class="banner" id="voiceBlocked"></div>
+    <div id="voiceList"></div>
   </div>
 
-  <!-- Backup / Restore -->
-  <div class="section">
-    <div class="section-header">
-      <h2>💾 Commissioning Backup</h2>
+  <div class="card">
+    <div class="row">
+      <div><h2>Devices for Alexa</h2>
+        <div class="muted small">Switching a device on adds the Home Assistant label <b id="lbl">alexa</b>.
+          Names over 32 characters are cut off by Matter, so rename them in HA first.</div></div>
     </div>
-    <div class="section-body">
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px;">
-        The backup saves your Alexa pairing keys. If HA is reinstalled, the backup allows automatic re-connection without re-pairing.
-      </p>
-      <div class="backup-row">
-        <span class="backup-status missing" id="backupStatus">Checking…</span>
-        <button class="btn btn-primary" id="backupBtn" onclick="runBackup()">Back Up Now</button>
-      </div>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Search name, room or entity…">
+      <select id="filter"><option value="all">All</option><option value="on">Exposed</option><option value="off">Not exposed</option></select>
+      <button class="btn small" id="btnSuggest">Expose recommended</button>
+      <button class="btn small" id="btnReload">Refresh</button>
     </div>
+    <div id="list" class="muted">Loading devices…</div>
   </div>
 
+  <div class="card">
+    <h2>Pairing backup</h2>
+    <p class="muted small">Saved to <code>/share/alexa_bridge</code> every 6 hours and survives uninstalling the add-on.
+      A fresh install restores it automatically, so Alexa keeps working without re-pairing.</p>
+    <div class="tools">
+      <button class="btn" id="btnBackup">Back up now</button>
+      <button class="btn" id="btnRestore">Restore backup</button>
+      <a class="btn" id="mbLink" target="_blank" rel="noopener">Advanced: Matterbridge UI ↗</a>
+      <button class="btn" id="btnLog">Show log</button>
+    </div>
+    <pre id="log" hidden></pre>
+  </div>
 </div>
 
-<div id="toast"></div>
-
+<script src="qrcode.js"></script>
 <script>
-  let currentStatus = null;
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  let entities = [];
 
-  function showToast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className = `show ${type}`;
-    setTimeout(() => { t.className = ''; }, 3500);
-  }
-
-  function openMatterbridge() {
-    // Matterbridge UI runs on the same host, port 8283
-    const host = window.location.hostname;
-    window.open(`http://${host}:8283`, '_blank');
-  }
-
-  function renderEntities(entities, label) {
-    document.getElementById('exposeLabel').textContent = label;
-    const list = document.getElementById('entityList');
-    if (!entities || entities.length === 0) {
-      list.innerHTML = '<li class="empty-state">No entities exposed yet.<br>Add the <strong>alexa</strong> label to entities in HA to expose them here.</li>';
-      return;
-    }
-    list.innerHTML = entities.map(e => `
-      <li class="entity-item">
-        <span class="domain-badge">${e.domain}</span>
-        <span class="entity-name">
-          ${e.name}
-          <br><span class="entity-id">${e.entity_id}</span>
-        </span>
-        <span class="entity-state ${e.state === 'off' || e.state === 'unavailable' ? 'off' : ''}">${e.state}</span>
-      </li>
-    `).join('');
+  async function api(path, body) {
+    try {
+      const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      return await r.json();
+    } catch (e) { return { ok: false, error: e.message }; }
   }
 
   async function loadStatus() {
-    try {
-      const resp = await fetch('/api/status');
-      const data = await resp.json();
-      currentStatus = data;
-
-      const b = data.bridge;
-
-      // Bridge running
-      const statusEl = document.getElementById('bridgeStatus');
-      statusEl.textContent = b.bridge_running ? '● Running' : '○ Stopped';
-      statusEl.className = `value ${b.bridge_running ? 'green' : 'red'}`;
-
-      // Entity count
-      document.getElementById('entityCount').textContent = data.exposed_entities.length;
-
-      // Matter port
-      document.getElementById('matterPort').textContent = b.matter_port || '5540';
-
-      // Last backup
-      const lbEl = document.getElementById('lastBackup');
-      if (b.last_backup) {
-        const d = new Date(b.last_backup);
-        lbEl.textContent = d.toLocaleString();
-        lbEl.className = 'value green';
-      } else {
-        lbEl.textContent = 'Never';
-        lbEl.className = 'value red';
-      }
-
-      // Backup status
-      const bsEl = document.getElementById('backupStatus');
-      if (b.backup_exists) {
-        bsEl.textContent = '✓ Backup found';
-        bsEl.className = 'backup-status';
-      } else {
-        bsEl.textContent = '⚠ No backup — click "Back Up Now"';
-        bsEl.className = 'backup-status missing';
-      }
-
-      renderEntities(data.exposed_entities, b.expose_label || 'alexa');
-    } catch (e) {
-      console.error('Failed to load status:', e);
+    const s = await api("api/status");
+    if (!s || s.error) return;
+    const v = s.versions || {};
+    $("ver").textContent = `Matterbridge ${v.matterbridge || "?"} · HA plugin ${v["matterbridge-hass"] || "?"}`;
+    $("kBridge").innerHTML = `<span class="dot ${s.bridge_running ? "ok" : "bad"}"></span>${s.bridge_running ? "Running" : "Stopped"}`;
+    const p = s.pairing || {};
+    $("kPair").innerHTML = p.commissioned === true ? `<span class="dot ok"></span>Paired`
+      : p.commissioned === false ? `<span class="dot warn"></span>Not paired` : `<span class="dot"></span>Unknown`;
+    $("lbl").textContent = s.label;
+    $("restartBanner").classList.toggle("show", !!s.restart_needed);
+    $("kBackup").textContent = s.backup ? new Date(s.backup.created_at).toLocaleString() : "Never";
+    $("mbLink").href = `${location.protocol}//${location.hostname}:${s.frontend_port}/`;
+    if (p.qr) {
+      const q = qrcode(0, "M"); q.addData(p.qr); q.make();
+      $("qr").innerHTML = q.createSvgTag(4, 0);
+      $("manual").textContent = (p.manual || "").replace(/(\d{4})(\d{3})(\d{4})/, "$1-$2-$3");
     }
+    $("pairNote").textContent = p.commissioned === true
+      ? "Already paired. To add another controller (e.g. Google or Apple Home) open the commissioning window in the Matterbridge UI."
+      : "";
   }
 
-  async function runBackup() {
-    const btn = document.getElementById('backupBtn');
-    btn.innerHTML = '<span class="spinner"></span> Backing up…';
-    btn.disabled = true;
-    try {
-      const resp = await fetch('/api/backup');
-      const data = await resp.json();
-      if (data.success) {
-        showToast('✓ Commissioning backup complete!', 'success');
-        await loadStatus();
-      } else {
-        showToast('✗ Backup failed — check add-on logs', 'error');
-      }
-    } catch (e) {
-      showToast('✗ Request failed', 'error');
-    } finally {
-      btn.innerHTML = 'Back Up Now';
-      btn.disabled = false;
-    }
+  function render() {
+    const q = $("q").value.trim().toLowerCase();
+    const f = $("filter").value;
+    const shown = entities.filter((e) => (!q || `${e.name} ${e.area} ${e.entity_id}`.toLowerCase().includes(q))
+      && (f === "all" || (f === "on") === e.exposed));
+    $("kExposed").textContent = entities.filter((e) => e.exposed).length;
+    if (!shown.length) { $("list").innerHTML = `<div class="muted">No devices match.</div>`; return; }
+    let area = null; const html = [];
+    shown.forEach((e) => {
+      if (e.area !== area) { area = e.area; html.push(`<div class="group">${esc(area || "No room")}</div>`); }
+      html.push(`<div class="ent"><div><div>${esc(e.name)}<span class="tag">${esc(e.kind)}</span>
+        ${e.name_too_long ? `<span class="tag warn">name &gt; 32</span>` : ""}
+        ${e.via_device ? `<span class="tag">via device label</span>` : ""}</div>
+        <div class="id">${esc(e.entity_id)}</div></div>
+        <label class="switch" title="${e.via_device ? "Exposed because the whole device has the label" : "Expose to Alexa"}">
+          <input type="checkbox" data-id="${esc(e.entity_id)}" ${e.exposed ? "checked" : ""} ${e.via_device ? "disabled" : ""}><span></span></label></div>`);
+    });
+    $("list").innerHTML = html.join("");
+    $("list").querySelectorAll("input[data-id]").forEach((cb) => cb.addEventListener("change", async () => {
+      cb.disabled = true;
+      const r = await api("api/expose", { entity_ids: [cb.dataset.id], exposed: cb.checked });
+      cb.disabled = false;
+      if (!r.ok) { cb.checked = !cb.checked; alert(r.error || "Failed"); return; }
+      const ent = entities.find((x) => x.entity_id === cb.dataset.id); if (ent) ent.exposed = cb.checked;
+      $("kExposed").textContent = entities.filter((e) => e.exposed).length;
+      loadStatus();
+    }));
   }
 
-  // Load on start, refresh every 30 seconds
-  loadStatus();
-  setInterval(loadStatus, 30000);
+  let voiceIds = [];
+  async function loadVoice() {
+    const r = await api("api/voice");
+    if (!r.ok) return;
+    const groups = r.groups || [];
+    $("voiceCard").hidden = !groups.length && !(r.blocked_domains || []).length;
+    const blocked = r.blocked_domains || [];
+    $("voiceBlocked").classList.toggle("show", !!blocked.length);
+    $("voiceBlocked").textContent = blocked.length ? `The add-on option "excluded_entity_prefixes" blocks ${blocked.join(", ")}, so ` +
+      "these can't reach Alexa. Remove them from the option (Configuration tab) and restart the add-on." : "";
+    voiceIds = groups.flatMap((g) => g.items.filter((i) => !i.exposed && !i.blocked).map((i) => i.entity_id));
+    $("btnVoiceAll").disabled = !voiceIds.length;
+    $("voiceList").innerHTML = groups.map((g) => `<div class="group">${esc(g.title)}</div><div class="gdesc">${esc(g.desc)}</div>` +
+      g.items.map((i) => `<div class="ent"><div><div>${esc(i.rename_to || i.name)}
+        ${i.rename_to ? `<span class="tag">now “${esc(i.name)}”</span>` : ""}</div>
+        <div class="say">“${esc(i.say)}”</div></div>
+        <label class="switch" title="Expose to Alexa"><input type="checkbox" data-voice="${esc(i.entity_id)}" ${i.exposed ? "checked" : ""}
+          ${i.blocked ? "disabled" : ""}><span></span></label></div>`).join("")).join("");
+    $("voiceList").querySelectorAll("input[data-voice]").forEach((cb) => cb.addEventListener("change", async () => {
+      cb.disabled = true;
+      const r2 = await api("api/voice/expose", { entity_ids: [cb.dataset.voice], exposed: cb.checked });
+      cb.disabled = false;
+      if (!r2.ok) { cb.checked = !cb.checked; alert(r2.error || "Failed"); return; }
+      loadVoice(); loadEntities(); loadStatus();
+    }));
+  }
+
+  async function loadEntities() {
+    const r = await api("api/entities");
+    if (!r.ok) { $("list").innerHTML = `<div style="color:var(--bad)">Could not load devices: ${esc(r.error)}</div>`; return; }
+    entities = r.entities; render();
+  }
+
+  $("q").addEventListener("input", render);
+  $("filter").addEventListener("change", render);
+  $("btnReload").addEventListener("click", loadEntities);
+  $("btnSuggest").addEventListener("click", async () => {
+    const ids = entities.filter((e) => e.suggested && !e.exposed).map((e) => e.entity_id);
+    if (!ids.length) return alert("All recommended devices (lights, switches, shades, AC, fans, locks, scenes) are already exposed.");
+    if (!confirm(`Expose ${ids.length} recommended devices to Alexa?`)) return;
+    const r = await api("api/expose", { entity_ids: ids, exposed: true });
+    if (!r.ok) alert(r.error); loadEntities(); loadStatus();
+  });
+  $("btnVoiceAll").addEventListener("click", async () => {
+    if (!voiceIds.length) return;
+    if (!confirm(`Expose ${voiceIds.length} voice commands to Alexa?`)) return;
+    const r = await api("api/voice/expose", { entity_ids: voiceIds, exposed: true });
+    if (!r.ok) alert(r.error); loadVoice(); loadEntities(); loadStatus();
+  });
+  $("btnRestart").addEventListener("click", async () => {
+    $("btnRestart").disabled = true; $("btnRestart").textContent = "Restarting…";
+    await api("api/restart", {});
+    setTimeout(() => location.reload(), 25000);
+  });
+  $("btnBackup").addEventListener("click", async () => { const r = await api("api/backup", {}); alert(r.output || r.error); loadStatus(); });
+  $("btnRestore").addEventListener("click", async () => {
+    if (!confirm("Replace the current pairing with the backup and restart the bridge?")) return;
+    const r = await api("api/restore", {}); alert(r.output || r.error);
+  });
+  $("btnLog").addEventListener("click", async () => {
+    const pre = $("log"); if (!pre.hidden) { pre.hidden = true; return; }
+    const r = await api("api/log"); pre.textContent = r.log || r.error || "(empty)"; pre.hidden = false; pre.scrollTop = pre.scrollHeight;
+  });
+
+  loadStatus(); loadVoice(); loadEntities(); setInterval(loadStatus, 10000);
+})();
 </script>
-
 </body>
 </html>

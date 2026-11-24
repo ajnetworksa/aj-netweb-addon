@@ -1,40 +1,30 @@
 #!/usr/bin/env bash
 ##
 ## backup-commissioning.sh
+## Saves the Matter pairing (fabrics, node ids, keys) and plugin config to
+## /share/alexa_bridge/ so a re-installed add-on can rejoin Alexa without re-pairing.
+## (HA backups already include /data; /share survives uninstalling the add-on.)
 ##
-## Backs up Matterbridge commissioning data to /data/commissioning_backup.tar.gz
-## Commissioning data = the cryptographic pairing with Alexa.
-## If HA is re-installed without this backup, you must re-pair Alexa from scratch.
-##
-
 set -euo pipefail
 
-PROFILE_DIR="/data/matterbridge/AlexaBridge"
-BACKUP_FILE="/data/commissioning_backup.tar.gz"
-BACKUP_META="/data/commissioning_backup.json"
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+MB_DIR="/data/.matterbridge"
+OUT_DIR="/share/alexa_bridge"
+BACKUP_FILE="${OUT_DIR}/commissioning_backup.tar.gz"
+META_FILE="${OUT_DIR}/commissioning_backup.json"
 
-# Check if there's anything to back up
-if [ ! -d "${PROFILE_DIR}" ]; then
-    echo "[backup] No commissioning data yet — nothing to back up"
+if [ ! -d "${MB_DIR}/matterstorage" ]; then
+    echo "[backup] nothing to back up yet (bridge never started)"
     exit 0
 fi
 
-# Create the backup
-echo "[backup] Backing up commissioning data at ${TIMESTAMP}..."
-tar -czf "${BACKUP_FILE}" \
-    -C "/data/matterbridge" \
-    "AlexaBridge" \
-    2>/dev/null
-
-# Write metadata
-cat > "${BACKUP_META}" << EOF
-{
-  "created_at": "${TIMESTAMP}",
-  "backup_file": "${BACKUP_FILE}",
-  "description": "Matterbridge AlexaBridge commissioning data",
-  "restore_instructions": "Run restore-commissioning.sh or restart the add-on with the backup in place"
-}
-EOF
-
-echo "[backup] ✓ Commissioning backup complete → ${BACKUP_FILE}"
+mkdir -p "${OUT_DIR}"
+ITEMS=(.matterbridge/matterstorage .matterbridge/storage)
+[ -f "${MB_DIR}/matterbridge-hass.config.json" ] && ITEMS+=(.matterbridge/matterbridge-hass.config.json)
+TMP="${BACKUP_FILE}.tmp"
+tar -czf "${TMP}" -C /data "${ITEMS[@]}"
+mv "${TMP}" "${BACKUP_FILE}"
+chmod 600 "${BACKUP_FILE}"
+jq -n --arg t "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg f "${BACKUP_FILE}" \
+    --argjson s "$(stat -c %s "${BACKUP_FILE}")" \
+    '{created_at: $t, file: $f, size: $s}' > "${META_FILE}"
+echo "[backup] saved ${BACKUP_FILE}"

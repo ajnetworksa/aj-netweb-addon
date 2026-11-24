@@ -5,7 +5,7 @@ is still open. Add a section with every pull request. Newest first.
 
 Repositories:
 - `ajnetworksa/aj-netweb-addon`: add-ons, the UI kit and the docs (this repo)
-- `ajnetworksa/alexa_bridge`: Alexa Matter Bridge add-on
+- `ajnetworksa/alexa_bridge`: old home of the Alexa Matter Bridge (since 1.2.1 it lives in this repo, `alexa_matter_bridge/`)
 
 Versions at the time of writing:
 
@@ -17,7 +17,24 @@ Versions at the time of writing:
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.1 |
 | Remote Access | 1.4.0 |
-| Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
+| Alexa Matter Bridge | 1.2.1 (in this repo) |
+
+---
+
+## Alexa Matter Bridge 1.2.1 – moved into this repository
+
+**Asked for:** keep the Alexa bridge with the other AJ Netweb add-ons; it is how Alexa controls Home Assistant.
+
+**Done:** `alexa_matter_bridge/` = the newest bridge (1.2.0 from `alexa_bridge` PRs #4/#5: voice commands, real
+pairing fixes) + port fix: its page ran on **8095 on the host network – Music Assistant's port**; now 8285. Its test
+moved to `tests/test_alexa_voice.py`. The older local copy (1.1.2) that was briefly committed here as 1.1.3 is replaced;
+it is kept outside git in the workspace archive.
+
+**Decisions:** slug stays `alexa_matter_bridge`. Sites on the old repository move with backup → install from this
+repository → restore (CHANGELOG). Ports of all AJ add-ons are listed in the workspace `INTEGRATION.md`.
+
+**Open:** bring it to the `ajnetweb_` conventions (config.json, build.json, licence check, CI images) – it is not in
+the CI add-on list yet; close PRs #4/#5 in `alexa_bridge` and archive that repository.
 
 ---
 
