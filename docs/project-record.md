@@ -12,12 +12,28 @@ Versions at the time of writing:
 | Product | Version |
 |---|---|
 | Dashboard Suite + UI kit | 3.19.0 |
-| Prayer & Adhan | 1.4.0 |
+| Prayer & Adhan | 1.4.1 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.1 |
 | Remote Access | 1.4.0 |
 | Alexa Matter Bridge | 1.2.1 (in this repo) |
+
+---
+
+## Prayer & Adhan 1.4.1 – adhan no longer loops
+
+**Asked for:** once the adhan finishes it starts again.
+
+**Done:** `player.py` – plain speakers (no Music Assistant, no announce feature; e.g. DLNA renderers, which often
+default to loop mode) got `play_media` and nothing else, so repeat mode replayed the file. Now: `repeat_set off`
+before playing (old value restored afterwards), and `finish_plain()` stops the player once the file is over
+(position near the end or restarted near 0, max 15 s grace); it leaves a player alone that now plays something else.
+Music Assistant and announce speakers are unchanged (they end and resume by themselves). `ha.py watch_states()`
+ignores restored / unavailable→back / attribute-only state changes, so the *play now* input_button no longer fires
+on every HA restart. Tests: `tests/test_adhan_player.py`.
+
+**Open:** Quran-after-Fajr (`play_media()`, normal playback) still respects the player's repeat setting on purpose.
 
 ---
 
