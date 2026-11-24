@@ -36,6 +36,8 @@ Test it on mobile data (Wi-Fi off): open the address, sign in, open a camera and
 | `license_key` | Used once to activate this Home Assistant. You can clear it afterwards. |
 | `allow_installer_management` | Lets AJ Netweb maintain this Home Assistant for you: safe updates (backup first, automatic roll-back), encrypted cloud backups, network checks, standard configuration packages, and short-lived technician logins for support visits. Also shares the device list (names, models) with your installer. Off = status reporting only, and any temporary technician login is deleted at once. Every action appears on the **AJ Netweb** sidebar page. |
 | `manage_webrtc_config` | Writes the relay settings used for live video and intercom on mobile networks. |
+| `music_assistant_token` | AJ Audio only: a long-lived token of a Music Assistant admin user. Lets AJ Netweb check your AJ wall panels (online, sync, updates) and warn your installer. Read-only. |
+| `music_assistant_url` | AJ Audio only: address of Music Assistant if it is not the add-on on this Home Assistant (e.g. `http://192.168.8.5:8095`). Empty = automatic. |
 | `log_level` | `info` normally; `debug` if AJ Netweb support asks. |
 
 ## The AJ Netweb sidebar page

@@ -7,7 +7,7 @@ Goal: clients install AJ Netweb Remote Access from the add-on store as usual, bu
 
 | Piece | Where | What it does |
 |---|---|---|
-| Compile option | `ajnetweb_tunnel/Dockerfile`, build arg `AJN_COMPILE=true` | Compiles `agent.py`, `features.py` and `attest.py` with **Nuitka 4.2.2** into native `.so` modules. Docstrings and asserts are stripped; no `.py` files go into the image. |
+| Compile option | `ajnetweb_tunnel/Dockerfile`, build arg `AJN_COMPILE=true` | Compiles `agent.py`, `features.py`, `attest.py` and `audio.py` with **Nuitka 4.2.2** into native `.so` modules. Docstrings and asserts are stripped; no `.py` files go into the image. |
 | Release workflow | `.github/workflows/addon-images.yml` (shared by every add-on, see [releasing.md](releasing.md)) | Builds compiled images for amd64 and aarch64, pushes them to `ghcr.io/ajnetworksa/{arch}-addon-ajnetweb_tunnel:<version>`, and fails if any `.py` is left in the agent folder |
 | Default local build | `AJN_COMPILE` unset | Plain Python as before, so Supervisor builds on a Pi stay quick while you test |
 

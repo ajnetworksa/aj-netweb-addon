@@ -26,6 +26,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 import attest
+import audio
 import features as F
 
 DATA = "/data/ajn"
@@ -33,7 +34,7 @@ WWW = "/tmp/ajn-www"
 OPLOG = f"{DATA}/oplog.jsonl"
 PENDING_SELF_UPDATE = f"{DATA}/pending_self_update.json"
 SERVER = os.environ.get("AJN_SERVER_RESOLVED") or os.environ.get("AJN_SERVER", "")
-AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.3.1")
+AGENT_VERSION = os.environ.get("AJN_AGENT_VERSION", "1.4.0")
 SUP_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 STARTED = time.time()
 
@@ -51,7 +52,7 @@ def get_addon_version() -> str:
     if v and v not in ("0", ""):
         AGENT_VERSION = v
     else:
-        AGENT_VERSION = "1.3.1"
+        AGENT_VERSION = "1.4.0"
     return AGENT_VERSION
 
 LABELS = {
@@ -365,6 +366,12 @@ def collect() -> dict:
         "devices": devices,
         "diagnostics": _last_diag if allowed else {},
     }
+    # AJ Audio (Music Assistant + AJ wall panels) - only present on sites that run Music Assistant
+    host_ips = [str(a).split("/")[0] for i in (net or {}).get("interfaces") or [] if i.get("connected")
+                for a in ((i.get("ipv4") or {}).get("address") or [])[:1]]
+    aud = safe(lambda: audio.collect(options(), (addons or {}).get("addons") or [], host_ips, allowed, log), {})
+    if aud:
+        res["audio"] = aud
     try:
         sys_snap = {
             "ha_uuid": os.environ.get("AJN_INSTALL_ID"),
