@@ -1,5 +1,15 @@
 # Changelog - AJ Netweb Prayer & Adhan
 
+## 1.4.1 - adhan no longer repeats on looping speakers
+- **Fix: the adhan started again when it finished** on speakers that are neither Music Assistant nor "announce"
+  speakers (DLNA renderers such as the wall panels' own players, many TVs): those were sent the file and then left
+  alone, so a player in repeat/loop mode played it over and over. Now repeat is switched off before the adhan, the
+  player is stopped once the file is over (up to 15 s extra for slow players; a player that already started
+  something else is not touched; DLNA players that report the file URL decoded or rewritten are still recognised),
+  and the old repeat setting is put back.
+- **Fix: "AJ Netweb Adhan play now" no longer presses itself when Home Assistant restarts** (the restored button
+  state was taken as a press). Only real presses play the adhan; the same for *stop*.
+
 ## 1.4.0 - iqamah, Jumu'ah, per-prayer speakers, Quran after Fajr
 - **Iqamah:** minutes after each adhan (Prayers tab). A phone reminder a few minutes before (5 by default) and an
   optional short iqamah audio on that prayer's speakers. Iqamah times are in `sensor.ajnetweb_next_prayer`
