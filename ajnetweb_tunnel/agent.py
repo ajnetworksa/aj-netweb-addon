@@ -117,15 +117,19 @@ _last_telemetry: dict = {}
 _last_result: dict = {"ok": None, "at": None, "error": None}
 _current_latency_ms: float | None = None
 _last_latency_check: float = 0.0
+_last_latency_try: float = 0.0
 
 
 def measure_latency() -> float | None:
-    global _current_latency_ms, _last_latency_check
+    global _current_latency_ms, _last_latency_check, _last_latency_try
+    _last_latency_try = time.time()
     st = state()
-    lat = safe(lambda: F.hub_latency(st), None)
+    lat = safe(lambda: F.hub_latency(st, (SERVER_CONN.host, SERVER_CONN.port), log), None)
     if lat is not None:
         _current_latency_ms = lat
         _last_latency_check = time.time()
+    elif time.time() - _last_latency_check > 300:
+        _current_latency_ms = None          # don't keep showing an old ping when the hub stopped answering
     return _current_latency_ms
 
 
@@ -700,7 +704,7 @@ def write_status() -> None:
         pass
 
     global _last_latency_check, _current_latency_ms
-    if _current_latency_ms is None or (time.time() - _last_latency_check > 30):
+    if time.time() - _last_latency_try > 30:      # also when it fails: a failed try blocks up to 10 s
         measure_latency()
 
     out = {
