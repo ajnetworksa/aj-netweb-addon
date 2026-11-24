@@ -15,9 +15,23 @@ Versions at the time of writing:
 | Prayer & Adhan | 1.4.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
-| Room & Guest Pass Studio | 1.4.0 |
-| Remote Access | 1.3.0 |
+| Room & Guest Pass Studio | 1.4.1 |
+| Remote Access | 1.4.0 |
 | Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
+
+---
+
+## Room & Guest Pass Studio 1.4.1 – guest portal port
+
+**Asked for:** the add-on would not start on the test box: "port 8097 is already in use".
+
+**Done:** host port of the guest portal 8097 → **8297** (not 8098: CCTV Studio's page runs there on the host network) (container port unchanged); guest links follow the port
+set in *Configuration → Network* (Supervisor `/addons/self/info`), so a clash can be fixed in the UI.
+
+**Decisions:** 8097 belongs to Music Assistant's stream server, which AJ wall panels need on every site. Ports of all
+AJ projects are listed in the workspace's `INTEGRATION.md` (Ports) – check it before giving an add-on a port.
+
+**Open:** none.
 
 ---
 
