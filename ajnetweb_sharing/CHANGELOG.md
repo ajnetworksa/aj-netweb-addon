@@ -1,5 +1,11 @@
 # Changelog - AJ Netweb Room & Guest Pass Studio
 
+## 1.4.1 - Guest portal on port 8297
+- **Fixed: the add-on would not start next to Music Assistant** ("port 8097 is already in use"). Music Assistant
+  streams on 8097, so the guest portal now uses host port **8297** (8098 is CCTV Studio's page on the host network). Sites that changed the port themselves keep theirs.
+- Guest links (QR codes, WhatsApp) use the port set under *Configuration → Network*, so you can move the guest
+  portal to any free port without breaking the links. A `guest_base_url` option still wins.
+
 ## 1.4.0
 - The Studio follows the person's AJ Netweb dashboard appearance (theme, colour, wallpaper), like every
   AJ Netweb add-on. Its own colour picker is hidden while it does, with a note saying where to change it.

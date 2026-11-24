@@ -5,7 +5,7 @@ is still open. Add a section with every pull request. Newest first.
 
 Repositories:
 - `ajnetworksa/aj-netweb-addon`: add-ons, the UI kit and the docs (this repo)
-- `ajnetworksa/alexa_bridge`: Alexa Matter Bridge add-on
+- `ajnetworksa/alexa_bridge`: old home of the Alexa Matter Bridge (since 1.2.1 it lives in this repo, `alexa_matter_bridge/`)
 
 Versions at the time of writing:
 
@@ -15,9 +15,40 @@ Versions at the time of writing:
 | Prayer & Adhan | 1.4.0 |
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
-| Room & Guest Pass Studio | 1.4.0 |
-| Remote Access | 1.3.0 |
-| Alexa Matter Bridge | 1.2.0 (`alexa_bridge` PR #5, stacked on #4 = 1.1.0) |
+| Room & Guest Pass Studio | 1.4.1 |
+| Remote Access | 1.4.0 |
+| Alexa Matter Bridge | 1.2.1 (in this repo) |
+
+---
+
+## Alexa Matter Bridge 1.2.1 – moved into this repository
+
+**Asked for:** keep the Alexa bridge with the other AJ Netweb add-ons; it is how Alexa controls Home Assistant.
+
+**Done:** `alexa_matter_bridge/` = the newest bridge (1.2.0 from `alexa_bridge` PRs #4/#5: voice commands, real
+pairing fixes) + port fix: its page ran on **8095 on the host network – Music Assistant's port**; now 8285. Its test
+moved to `tests/test_alexa_voice.py`. The older local copy (1.1.2) that was briefly committed here as 1.1.3 is replaced;
+it is kept outside git in the workspace archive.
+
+**Decisions:** slug stays `alexa_matter_bridge`. Sites on the old repository move with backup → install from this
+repository → restore (CHANGELOG). Ports of all AJ add-ons are listed in the workspace `INTEGRATION.md`.
+
+**Open:** bring it to the `ajnetweb_` conventions (config.json, build.json, licence check, CI images) – it is not in
+the CI add-on list yet; close PRs #4/#5 in `alexa_bridge` and archive that repository.
+
+---
+
+## Room & Guest Pass Studio 1.4.1 – guest portal port
+
+**Asked for:** the add-on would not start on the test box: "port 8097 is already in use".
+
+**Done:** host port of the guest portal 8097 → **8297** (not 8098: CCTV Studio's page runs there on the host network) (container port unchanged); guest links follow the port
+set in *Configuration → Network* (Supervisor `/addons/self/info`), so a clash can be fixed in the UI.
+
+**Decisions:** 8097 belongs to Music Assistant's stream server, which AJ wall panels need on every site. Ports of all
+AJ projects are listed in the workspace's `INTEGRATION.md` (Ports) – check it before giving an add-on a port.
+
+**Open:** none.
 
 ---
 

@@ -352,8 +352,19 @@ def guest_base_url() -> str:
     for iface in info.get("interfaces", []):
         if iface.get("primary") and (iface.get("ipv4") or {}).get("address"):
             ip = iface["ipv4"]["address"][0].split("/")[0]
-            return f"http://{ip}:{GUEST_PORT}"
+            return f"http://{ip}:{guest_host_port()}"
     return ""
+
+
+def guest_host_port() -> int:
+    """The port guests reach on the host: the add-on's Network setting for the guest portal (default 8297 since
+    1.4.1 – Music Assistant streams on 8097). Falls back to the container port."""
+    net = (supervisor_get("/addons/self/info") or {}).get("network") or {}
+    port = net.get(f"{GUEST_PORT}/tcp")
+    try:
+        return int(port) if port else GUEST_PORT
+    except (TypeError, ValueError):
+        return GUEST_PORT
 
 
 def supervisor_get(path: str):
