@@ -6,16 +6,19 @@
 set -e
 root="$(git rev-parse --show-toplevel)"; hooks="$(git rev-parse --git-path hooks)"
 mkdir -p "$hooks"
+# the hooks keep their own copy of the scanner, so they also work on branches made before tools/secret-scan.py existed
+cp "$(dirname "$0")/secret-scan.py" "$hooks/secret-scan.py"
 py='for p in python3 python py; do
   if command -v "$p" >/dev/null 2>&1 && "$p" -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" >/dev/null 2>&1; then PY="$p"; break; fi
 done
 [ -n "$PY" ] || { echo "secret-scan: Python 3 not found - blocked. Install Python 3 (python.org) or use --no-verify if you are sure." >&2; exit 1; }
-root="$(git rev-parse --show-toplevel)"'
+root="$(git rev-parse --show-toplevel)"
+scan="$root/tools/secret-scan.py"; [ -f "$scan" ] || scan="$(git rev-parse --git-path hooks)/secret-scan.py"'
 cat > "$hooks/pre-commit" <<HOOK
 #!/bin/sh
 # AJ secret guard (tools/install-secret-hooks.sh)
 $py
-exec "\$PY" "\$root/tools/secret-scan.py" --staged
+exec "\$PY" "\$scan" --staged
 HOOK
 cat > "$hooks/pre-push" <<HOOK
 #!/bin/sh
@@ -25,7 +28,7 @@ z=0000000000000000000000000000000000000000
 while read -r lref lsha rref rsha; do
   [ "\$lsha" = "\$z" ] && continue                       # deleting a branch
   if [ "\$rsha" = "\$z" ]; then set -- --new "\$lsha"; else set -- --range "\$rsha..\$lsha"; fi
-  "\$PY" "\$root/tools/secret-scan.py" "\$@" || exit 1
+  "\$PY" "\$scan" "\$@" || exit 1
 done
 exit 0
 HOOK
