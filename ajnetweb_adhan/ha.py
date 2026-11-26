@@ -89,7 +89,12 @@ class WS:
 
 
 def watch_states(entity_ids: Callable[[], set], on_change: Callable[[str, dict], None]):
-    """Background thread: call on_change(entity_id, new_state) for the watched entities."""
+    """Background thread: call on_change(entity_id, new_state) for the watched entities.
+
+    Only real changes are passed on: an entity that appears (old_state None, e.g. restored when Home Assistant
+    restarts), comes back from unavailable/unknown, or only changes attributes is ignored. Otherwise an
+    input_button would "press" itself on every HA restart.
+    """
 
     def run():
         while True:
@@ -111,8 +116,12 @@ def watch_states(entity_ids: Callable[[], set], on_change: Callable[[str, dict],
                         continue
                     data = msg["event"]["data"]
                     eid = data.get("entity_id")
-                    if eid in entity_ids() and data.get("new_state"):
-                        on_change(eid, data["new_state"])
+                    new, old = data.get("new_state"), data.get("old_state")
+                    if eid in entity_ids() and new and old \
+                            and old.get("state") not in ("unavailable", "unknown") \
+                            and new.get("state") not in ("unavailable", "unknown") \
+                            and new.get("state") != old.get("state"):
+                        on_change(eid, new)
             except Exception as e:
                 log.info("state watcher reconnecting: %s", e)
                 time.sleep(5)
