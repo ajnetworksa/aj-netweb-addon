@@ -16,8 +16,21 @@ Versions at the time of writing:
 | Intercom & Door Station | 1.8.0 |
 | CCTV & NVR Studio | 1.4.0 |
 | Room & Guest Pass Studio | 1.4.1 |
-| Remote Access | 1.4.0 |
+| Remote Access | 1.4.1 |
 | Alexa Matter Bridge | 1.2.1 (in this repo) |
+
+---
+
+## Remote Access 1.4.1 – status page ping
+
+**Asked for:** the Remote Access page shows "Ping: …" and Server Ping "—" (demo site, tunnel connected).
+
+**Done:** `features.hub_latency()` dialled `state.tunnel.server_addr` (public hub name from activation), but `run.sh`
+points frpc at the LAN IP when the `server` option is a LAN address, so from inside the network the ping never
+connected (NAT loopback) while the tunnel worked. New `tunnel_target()` reads `serverAddr`/`serverPort` from the
+rendered `frpc.toml`; fallback = the API host (`SERVER_CONN`), and one log line says which addresses failed. Network
+diagnostics `hub_tcp_ms` uses the same target. The agent clears a ping older than 5 min and retries a failing ping
+every 30 s (was every 10 s, each failure blocking the status loop). Tests: `tests/test_tunnel_ping.py`.
 
 ---
 

@@ -211,11 +211,51 @@ def _tcp_ms(host: str, port: int, tries: int = 5) -> float | None:
     return round(sorted(vals)[len(vals) // 2], 1) if vals else None
 
 
-def hub_latency(state: dict) -> float | None:
+def tunnel_target(state: dict, data_dir: str = DATA) -> tuple[str, int] | None:
+    """Address the tunnel really dials: frpc.toml written by run.sh (it may swap the public hub name for a LAN IP),
+    else the one from activation."""
+    try:
+        with open(f"{data_dir}/frpc.toml", encoding="utf-8") as f:
+            addr = port = None
+            for line in f:
+                k, _, v = line.partition("=")
+                k, v = k.strip(), v.strip().strip('"')
+                if k == "serverAddr":
+                    addr = v
+                elif k == "serverPort" and v.isdigit():
+                    port = int(v)
+                elif line.startswith("["):
+                    break
+            if addr and port:
+                return addr, port
+    except OSError:
+        pass
     tun = state.get("tunnel") or {}
-    if not tun.get("server_addr"):
-        return None
-    return _tcp_ms(tun["server_addr"], int(tun.get("server_port", 7000)), tries=1)
+    if tun.get("server_addr"):
+        return tun["server_addr"], int(tun.get("server_port") or 7000)
+    return None
+
+
+_ping_note: dict = {"last": None}
+
+
+def hub_latency(state: dict, api: tuple[str, int] | None = None, log=None) -> float | None:
+    """TCP connect time to the hub, over the path the tunnel uses; the API host when that can't be reached."""
+    tried = []
+    for target in (tunnel_target(state), api):
+        if not target or not target[0] or target in tried:
+            continue
+        tried.append(target)
+        ms = _tcp_ms(target[0], target[1], tries=1)
+        if ms is not None:
+            _ping_note["last"] = None
+            return ms
+    note = "no hub address known yet" if not tried else \
+        "hub not reachable on " + ", ".join(f"{h}:{p}" for h, p in tried)
+    if log and note != _ping_note["last"]:     # say it once, not every 30 s
+        log(f"ping: {note}")
+    _ping_note["last"] = note
+    return None
 
 
 def diagnostics(supervisor, server_conn, state: dict, token: str, allowed: bool) -> dict:
@@ -228,8 +268,9 @@ def diagnostics(supervisor, server_conn, state: dict, token: str, allowed: bool)
         out["dns_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     except OSError as e:
         out["dns_error"] = str(e)
-    if tun.get("server_addr"):
-        out["hub_tcp_ms"] = _tcp_ms(tun["server_addr"], int(tun.get("server_port", 7000)))
+    target = tunnel_target(state)
+    if target:
+        out["hub_tcp_ms"] = _tcp_ms(*target)
     # throughput to the hub over the same TLS path the tunnel uses
     try:
         n = 5_000_000

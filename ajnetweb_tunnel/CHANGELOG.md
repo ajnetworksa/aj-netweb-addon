@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 - status page ping works on every site
+- **Fix: "Ping: …" / Server Ping "—" never showed a value on some sites.** The ping dialled the hub address from
+  activation, while the tunnel may use a different one (a LAN server address set in the `server` option, as on
+  sites where the hub runs on the same network). The ping now uses the address the tunnel really connects to, falls
+  back to the AJ Netweb API host, and the log says once why the hub can't be reached. Network diagnostics
+  (`hub_tcp_ms`) use the same address.
+- A ping that stops answering is no longer shown as the last good value for ever (cleared after 5 minutes), and a
+  failing ping is retried every 30 s instead of every 10 s (each failed try held up the status page for up to 10 s).
+
 ## 1.4.0
 - **AJ Audio status (multi-room music).** On sites with Music Assistant the status report now includes
   the Music Assistant add-on (running, version), whether the AriaCast Receiver and Snapcast providers are
